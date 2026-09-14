@@ -5,6 +5,7 @@ import type { Invitations } from "./invitations.ts";
 import type { Attachments } from "./attachments.ts";
 import { ProductivityRepository } from "./productivity-repository.ts";
 import { contextRoute } from "./context-http.ts";
+import { agentRoute } from "./agent-http.ts";
 import type { GitHubBinding } from "../github-context.ts";
 
 // Enough for 8,000 Unicode description characters plus metadata, still bounded.
@@ -71,7 +72,7 @@ export async function handleApi(request: Request, dependencies: Dependencies): P
       result = await repository.bootstrap(user);
     } else {
       const workspaceId = identifier(url.searchParams.get("workspace_id"));
-      const context = await contextRoute(repository, user.userId, workspaceId, url, request.method, input, dependencies.githubBindings);
+      const context = await agentRoute(repository, user.userId, workspaceId, url, request.method, input) ?? await contextRoute(repository, user.userId, workspaceId, url, request.method, input, dependencies.githubBindings);
       if (context) { result = context.body; status = context.status; }
       else if (route === "/api/capabilities" && request.method === "GET") { await repository.membership(user.userId, workspaceId); result = dependencies.capabilities?.() ?? { email: false, attachments: false }; }
       else if (route === "/api/invitations" && ["GET", "POST"].includes(request.method) && dependencies.invitations) result = request.method === "GET" ? await dependencies.invitations().list(user.userId, workspaceId) : await dependencies.invitations().create(user.userId, workspaceId, input);

@@ -45,7 +45,7 @@ try {
   execFileSync("docker", ["exec", container, "createdb", "-U", "stride_test", "stride_restore"], { stdio: "pipe" });
   execFileSync("docker", ["exec", container, "pg_restore", "-U", "stride_test", "--dbname=stride_restore", "--no-owner", "--no-privileges", "--exit-on-error", "/tmp/stride-ci.dump"], { stdio: "pipe" });
   const restoredUrl = new URL(url); restoredUrl.pathname = "/stride_restore"; restorePool = new Pool({ connectionString: restoredUrl.href, max: 1 });
-  const contextTables = ["project_context_heads", "context_documents", "context_revisions", "context_events", "task_context_briefs", "task_context_bindings", "repository_sources", "repository_observations", "repository_source_heads", "repository_source_events", "repository_source_receipts"];
+  const contextTables = ["project_context_heads", "context_documents", "context_revisions", "context_events", "task_context_briefs", "task_context_bindings", "repository_sources", "repository_observations", "repository_source_heads", "repository_source_events", "repository_source_receipts", "agent_profiles", "agent_role_bindings", "agent_role_events"];
   const tables = ["tasks", "checklist_items", "memberships", "comments", "notifications", "invitations", "account_admissions", "saved_views", "task_templates", "attachments", "email_outbox", ...contextTables];
   for (const table of tables) {
     const sourceCount: { rows: { n: number }[] } = await pool.query(`SELECT COUNT(*)::integer AS n FROM ${table}`);

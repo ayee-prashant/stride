@@ -1,7 +1,7 @@
 name: Verify hosting migration
 on:
   pull_request:
-    branches: [main, design/human-agent-workforce, feature/agent-context-foundation]
+    branches: [main, design/human-agent-workforce, feature/agent-context-foundation, design/human-approved-delivery]
 permissions:
   contents: read
 concurrency:
@@ -61,6 +61,10 @@ jobs:
           TEST_DATABASE_URL: postgresql://stride_test:isolated_ci_fixture@127.0.0.1:5432/stride_test
       - name: Verify GitHub source reconciliation and competing workers on PostgreSQL
         run: node --experimental-strip-types --test tests/postgres-repository-sources.integration.test.ts
+        env:
+          TEST_DATABASE_URL: postgresql://stride_test:isolated_ci_fixture@127.0.0.1:5432/stride_test
+      - name: Verify human agent roles and concurrent decisions on PostgreSQL
+        run: node --experimental-strip-types --test tests/postgres-agent-registry.integration.test.ts
         env:
           TEST_DATABASE_URL: postgresql://stride_test:isolated_ci_fixture@127.0.0.1:5432/stride_test
       - name: Audit dependencies

@@ -92,6 +92,25 @@ try {
   assert.equal(task.archived_at !== null, true);
   task = await json(await request("/api/tasks/" + task.id + "?workspace_id=" + workspaceId, "PATCH", { version: task.version, archived: false }));
   assert.equal(task.archived_at, null);
+  stage = "human-agent-role";
+  const agentPath = `/api/projects/${metadata.projects[0].id}/agents`;
+  const agentSuffix = `?workspace_id=${workspaceId}`;
+  const roleTemplate = await json(await request(`${agentPath}/roles/development${agentSuffix}`));
+  const roleRequest = { request_id: crypto.randomUUID(), profile: { alias: "RUNTIME-DEV", operator_id: bootstrap.user.userId, tool_label: "Isolated fixture" }, role_id: "development", template_hash: roleTemplate.hash, read_paths: ["tests/"], write_paths: ["tests/"], reason: "Runtime role registration" };
+  const registeredRole = await json(await request(agentPath + agentSuffix, "POST", roleRequest), 201);
+  assert.equal(registeredRole.binding.state, "pending");
+  assert.equal((await json(await request(agentPath + agentSuffix, "POST", roleRequest), 201)).event_id, registeredRole.event_id);
+  const roleDecision = { request_id: crypto.randomUUID(), expected_version: registeredRole.binding.version, template_hash: roleTemplate.hash, reason: "Runtime operator accepts scoped responsibility" };
+  const initializedRole = await json(await request(`${agentPath}/${registeredRole.binding.id}/initialize${agentSuffix}`, "POST", roleDecision));
+  assert.equal(initializedRole.binding.state, "initialized");
+  assert.equal(initializedRole.binding.execution_ready, false);
+  assert.equal(initializedRole.binding.connection_state, "not_connected");
+  assert.equal((await request(`${agentPath}/${registeredRole.binding.id}/start${agentSuffix}`, "POST", {})).status, 404);
+  const revokedRole = await json(await request(`${agentPath}/${registeredRole.binding.id}/revoke${agentSuffix}`, "POST", { request_id: crypto.randomUUID(), expected_version: initializedRole.binding.version, reason: "Runtime role withdrawal" }));
+  assert.equal(revokedRole.binding.state, "revoked");
+  assert.equal((await json(await request(`${agentPath}/${registeredRole.binding.id}/initialize${agentSuffix}`, "POST", roleDecision))).binding.state, "revoked");
+  const roleHistory = await json(await request(`${agentPath}/${registeredRole.binding.id}/history${agentSuffix}`));
+  assert.deepEqual(roleHistory.events.map(e => e.action), ["revoked", "initialized", "registered"]);
   stage = "project-context";
   const contextPath = `/api/projects/${metadata.projects[0].id}/context?workspace_id=${workspaceId}`;
   const contextInput = { request_id: crypto.randomUUID(), expected_version: 0, kind: "requirement", title: "Runtime context requirement", body: "Every task brief preserves the approved requirement version.", change_note: "Runtime contract verification" };
@@ -109,7 +128,7 @@ try {
   assert.equal(staleBrief.brief.payload.documents[0].body, contextInput.body);
   const restricted = new Pool({ connectionString: fixtureUrl.toString(), max: 1 });
   try {
-    for (const table of ["context_revisions", "context_events", "task_context_briefs", "repository_observations", "repository_source_events", "repository_source_receipts"]) {
+    for (const table of ["context_revisions", "context_events", "task_context_briefs", "repository_observations", "repository_source_events", "repository_source_receipts", "agent_profiles", "agent_role_events"]) {
       const privileges = await restricted.query("SELECT has_table_privilege(current_user,$1,'UPDATE') AS can_update, has_table_privilege(current_user,$1,'DELETE') AS can_delete", [table]);
       assert.deepEqual(privileges.rows[0], { can_update: false, can_delete: false });
     }

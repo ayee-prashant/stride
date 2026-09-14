@@ -322,3 +322,31 @@ h1 { font-size: clamp(1.9rem, 3vw, 2.4rem); font-weight: 700; letter-spacing: -.
 .repository-actions { margin-top: 1rem; display: flex; flex-wrap: wrap; gap: .5rem; }
 .repository-boundary { margin-top: 1rem; padding-top: .8rem; border-top: 1px solid var(--border); font-size: .75rem; color: var(--muted-foreground); }
 @media (max-width: 640px) { .repository-context { padding: 1rem; } .repository-actions { align-items: stretch; } .repository-actions button { white-space: normal; height: auto; min-height: 2.5rem; } }
+
+.agent-registry { margin-top: 1.5rem; min-width: 0; }
+.agent-toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; margin: 1.25rem 0; }
+.agent-toolbar>p { max-width: 36rem; font-size: .875rem; }
+.agent-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,340px),1fr)); gap: 1rem; }
+.agent-card { min-width: 0; border: 1px solid var(--border); border-radius: .75rem; background: var(--card); padding: 1.2rem; display: grid; gap: .75rem; font-size: .875rem; }
+.agent-card-heading { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: .7rem; }
+.agent-card h3 { font-weight: 650; font-size: 1rem; overflow-wrap: anywhere; }
+.agent-card-heading p { color: var(--muted-foreground); margin-top: .25rem; }
+.agent-state { font-size: .75rem; border-radius: 1rem; background: var(--muted); padding: .3rem .6rem; }
+.agent-state-initialized { background: var(--accent); color: var(--primary); }
+.agent-state-revoked { color: var(--muted-foreground); }
+.agent-identity,.agent-template-id { font-size: .75rem; color: var(--muted-foreground); }
+.agent-identity code,.agent-template-id code { display: block; overflow-wrap: anywhere; white-space: normal; margin-top: .3rem; }
+.agent-card-status { display: flex; align-items: center; gap: .5rem; font-size: .75rem; color: var(--muted-foreground); padding-top: .6rem; border-top: 1px solid var(--border); }
+.agent-card-actions { display: flex; flex-wrap: wrap; gap: .4rem; }
+.agent-notice { background: var(--accent); color: var(--primary); padding: .8rem; border-radius: .5rem; margin-bottom: 1rem; }
+.agent-pagination { margin-top: 1rem; }
+.agent-role-section { display: grid; gap: .5rem; padding-top: .4rem; }
+.agent-role-section h4 { font-weight: 600; }
+.agent-role-section p { white-space: pre-wrap; font-size: .8125rem; line-height: 1.65; }
+.agent-role-dialog summary,.agent-history-dialog summary { cursor: pointer; font-size: .8125rem; font-weight: 500; }
+.agent-prompt { padding: .8rem; margin-top: .7rem; background: var(--muted); border-radius: .5rem; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 24rem; overflow-y: auto; font-size: .75rem; line-height: 1.65; }
+.agent-review-check { display: flex; align-items: flex-start; gap: .6rem; font-size: .8125rem; line-height: 1.5; }
+.agent-review-check input { margin-top: .25rem; flex-shrink: 0; }
+.agent-role-dialog .context-pane { overflow-wrap: anywhere; }
+.agent-role-dialog .context-review button { white-space: normal; height: auto; min-height: 2.5rem; }
+@media(max-width:640px) { .agent-card { padding: 1rem; } .agent-toolbar .inline-actions { flex-wrap: wrap; } .agent-card-actions button { flex: 1 1 auto; } }
