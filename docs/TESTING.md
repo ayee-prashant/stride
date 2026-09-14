@@ -69,7 +69,8 @@ and invalidation of old sessions. The fixture script rejects non-loopback or
 non-stride_test databases and must never target production.
 
 The test server allows HTTP only under the existing nonproduction loopback rule.
-Production connections still require HTTPS and verified PostgreSQL TLS.
+The production application origin still requires HTTPS, and its PostgreSQL
+connections require verified TLS.
 Production verification must separately confirm the provider's actual certificate,
 canonical origin, health response, authenticated behavior, and persistence.
 

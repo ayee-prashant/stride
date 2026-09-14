@@ -38,9 +38,16 @@ fix findings, and rerun affected gates before release.
   authenticated runtime flow in GitHub Actions run 34831794534.
 - Slice 7: that exact application is healthy on Railway, with a restricted
   database role, verified private database TLS, and separately provisioned owner.
-- The production smoke job verifies the real session/task flow within Railway.
-  Its actual log result belongs in RELEASE_REVIEW.md.
+- The production smoke job passed all seven checks at 10:45:43 UTC, including
+  real sign-in, persistence, permission denials, and sign-out. Its QA task is
+  archived. The immutable source and log evidence are in RELEASE_REVIEW.md.
 - Vercel accepted the entry redirect submission but its status API denies the
   team scope; public-edge and browser checks remain unverified.
 - Future work must preserve the approved private audience and use this release
   process. Do not reopen completed code slices or add deferred product scope.
+
+PR #2 contains the reviewable release. Its main-branch merge was rejected by
+automatic approval review as requiring explicit merge authorization; deployment
+and live verification are complete on the existing Railway release branch.
+Vercel terminal status and public-edge/browser verification remain the stated
+access limitations, not unfinished application implementation.

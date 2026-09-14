@@ -54,7 +54,9 @@ configuration. Never run the CI fixture against production.
 
 The app's c39487f release passed 48 native tests, real PostgreSQL tests, full
 session/task/password runtime checks, typecheck, lint, and production compilation.
-Railway confirms the exact source is healthy. Public-edge/browser acceptance,
+Railway confirms the exact source is healthy, and the controlled production
+session/task verification passed. The complete release is in PR #2; merging it
+into main is awaiting explicit merge authorization. Public-edge/browser acceptance,
 load measurements, backup restore, and dependency audit are separately recorded
 limits, not assumed passes.
 

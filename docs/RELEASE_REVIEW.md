@@ -33,9 +33,21 @@ These are API/SSR checks, not browser interaction tests.
 - The app and database run in sfo. PostgreSQL uses a persistent 5000 MB volume
   and private networking. Web runtime variables contain no migration credential
   or bootstrap password.
-- A separate, guarded production verification job is prepared. Its result
-  must be recorded from the actual log event before live session/task checks
-  are described as passed.
+- Production verification deployment 74ff60fc-3815-4297-804d-e92bf56ecb57 used
+  source 3417332693c0507f590555dbd07b30ccc7eed3fa and emitted production_verified
+  at 10:45:43 UTC. All seven checks passed: readiness, closed enrollment, real
+  sign-in with Secure/HttpOnly/SameSite cookie assertions, workspace SSR,
+  durable task transitions and stale-write rejection, origin/tenant denial,
+  and sign-out/session invalidation. Its own new verification task was archived.
+  The job accessed only stride-app.railway.internal:8080 in the dedicated
+  production environment. No owner password change or data reset was performed.
+- Operations source 3417332 also passed the entire CI suite in
+  [run 34834478104](https://github.com/ayee-prashant/stride/actions/runs/34834478104),
+  job 103945077773, including the new production-script syntax check. Runtime
+  application files are unchanged from the deployed and live-verified c39487f.
+- After the one-off verification finished, the provisioning service's configured
+  start command was restored to npm run db:provision with restart policy NEVER.
+  It has no public domain or recurring verification schedule.
 
 ## Vercel and public checks
 
@@ -87,3 +99,13 @@ requires controlled enrollment.
 The earlier native baseline cfdc751 passed run 34828808360; initial Sites-only
 source and registry blocks are historical and do not describe the current
 compiled Railway runtime. See DEPLOYMENT.md for current operating instructions.
+
+## Source delivery
+
+The complete runtime, operations, and release evidence are available in
+[PR #2](https://github.com/ayee-prashant/stride/pull/2), marked ready for review.
+PR #1 is closed as superseded; its deployment branch is retained.
+Automatic approval review rejected merging PR #2 into main because it requires
+explicit authorization for that default-branch mutation. No direct push or other
+method was used to bypass the rejection. The already deployed c39487f app and
+its persisted database remain operational independently of that merge.

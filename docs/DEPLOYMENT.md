@@ -77,7 +77,9 @@ is not a verified restore.
 
 The c39487f application passed the complete CI runtime gate and Railway's live
 database-backed readiness check. Provisioning created the restricted role and
-approved owner. See RELEASE_REVIEW.md for exact source and deployment evidence.
+approved owner. The controlled live job passed real authentication, task
+persistence, permission denials, and sign-out, and archived its QA task. See
+RELEASE_REVIEW.md for exact source and deployment evidence.
 
 Do not trust a configured source branch alone. Confirm list-deployments commitHash:
 the provider's first create-deployment used main despite the requested branch,
@@ -89,3 +91,8 @@ The Vercel entry source is infra/vercel/. Deploy those two files with no framewo
 install, or build command. The current production submission has an unverified
 terminal status because the Vercel connector denies the team's scope.
 The Railway app is the canonical runtime; the Vercel entry stores no credentials.
+
+The current web service remains on the tested c39487f application. Its operations
+and documentation are consolidated in PR #2. A main-branch merge requires
+explicit authorization after an automatic approval-review rejection; do not
+substitute a direct main ref update for that merge.
