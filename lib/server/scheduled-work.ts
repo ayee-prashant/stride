@@ -25,6 +25,7 @@ export class ScheduledWork {
         const clock = localClock(now, preferences.timezone); if (clock.hour < preferences.reminder_hour) continue;
         if (preferences.due_reminders) {
           // Catch up on overdue work, with the same persisted per-recipient preferences.
+          // Notification inserts tolerate both primary-key and event-key conflicts.
           const offset = Math.round((now.getTime() - new Date(`${clock.day}T${String(clock.hour).padStart(2, "0")}:${String(clock.minute).padStart(2, "0")}:00Z`).getTime()) / 60000);
           await this.repo.notifications(member.user_id, member.workspace_id, { tz_offset: Math.max(-840, Math.min(840, offset)) }, true);
           await this.repo.statement(`INSERT INTO notifications(id,workspace_id,task_id,recipient_id,kind,event_key,created_at)
@@ -33,7 +34,7 @@ export class ScheduledWork {
             WHERE t.workspace_id=? AND COALESCE(t.assignee_id,t.created_by)=? AND t.status<>'done' AND t.archived_at IS NULL AND p.archived_at IS NULL AND t.due_date=?
             AND ${notificationAllowed("t.workspace_id", "t.id", "COALESCE(t.assignee_id,t.created_by)", "reminder")}
             AND NOT EXISTS(SELECT 1 FROM notifications n WHERE n.id='reminder:'||t.id||':'||t.due_date||':'||?)
-            ORDER BY t.id LIMIT 100 ON CONFLICT(recipient_id,event_key) DO NOTHING`, member.user_id, member.user_id, member.user_id, now.toISOString(), member.workspace_id, member.user_id, clock.day, member.user_id).run();
+            ORDER BY t.id LIMIT 100 ON CONFLICT DO NOTHING`, member.user_id, member.user_id, member.user_id, now.toISOString(), member.workspace_id, member.user_id, clock.day, member.user_id).run();
         }
         if (provider && preferences.daily_digest) {
           const summary = await this.repo.statement(`SELECT CAST(COUNT(*) AS INTEGER) AS open,CAST(COALESCE(SUM(CASE WHEN t.due_date<=? THEN 1 ELSE 0 END),0) AS INTEGER) AS due,

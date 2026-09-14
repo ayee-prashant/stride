@@ -70,7 +70,14 @@ test("PostgreSQL migrations and repository contract", async t => {
     assert.deepEqual(comment.mentioned_user_ids, [other.userId]);
     assert.equal((await clock.comments(other.userId, workspace, collaboration.id, { limit: 1, offset: 0 })).comments[0].id, comment.id);
     assert.equal((await clock.task(owner.userId, workspace, collaboration.id)).version, collaboration.version);
-    await Promise.all([clock.notifications(other.userId, workspace, {}, true), clock.notifications(other.userId, workspace, {}, true)]);
+    // Fresh due dates race on both unique indexes, as simultaneous tabs/worker
+    // scans do. A duplicate insert must be a successful no-op on either index.
+    for (let day = 12; day >= 1; day--) {
+      collaboration = await clock.updateTask(owner.userId, workspace, collaboration.id, { version: collaboration.version, due_date: `2026-09-${String(day).padStart(2, "0")}` });
+      await Promise.all(Array.from({ length: 8 }, () => clock.notifications(other.userId, workspace, {}, true)));
+      const stored = await pool.query<{ n: number }>("SELECT COUNT(*)::int AS n FROM notifications WHERE task_id=$1 AND recipient_id=$2 AND kind='overdue' AND event_key=$3", [collaboration.id, other.userId, `overdue:${collaboration.id}:${collaboration.due_date}:${other.userId}`]);
+      assert.equal(stored.rows[0].n, 1);
+    }
     const inbox = await clock.notifications(other.userId, workspace, {});
     assert.equal(inbox.notifications.filter(item => item.task_id === collaboration.id).length, 3);
     assert.equal(inbox.notifications.filter(item => item.task_id === collaboration.id && item.kind === "overdue").length, 1);

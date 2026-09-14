@@ -1,5 +1,20 @@
 # Release review — 2026-09-14
 
+## Reminder concurrency follow-up
+
+The documentation-only commit 0e262e6 triggered CI run 34866667041, which
+exposed an intermittent PostgreSQL notification primary-key conflict during two
+simultaneous overdue syncs. Earlier full runs and live verification had passed;
+the race was not a migration or type/build failure. The failing run still passed
+73 native tests, typecheck, lint, build and the dependency audit.
+
+Notification inserts previously handled only recipient/event uniqueness, while
+also producing deterministic primary keys. They now treat conflicts on either
+unique constraint as an idempotent no-op, preserving foreign-key/check failures
+and the existing authorization predicates. The real PostgreSQL regression now
+races eight syncs on each of 12 fresh due dates and verifies one stored event per
+date. Validation and deployment of this correction are in progress.
+
 ## Productivity release
 
 Application 78cfbb02963cdf0b27bd5b9f9cd644c8213b2c3d passed

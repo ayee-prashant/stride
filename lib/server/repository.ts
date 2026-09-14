@@ -118,7 +118,7 @@ export class Repository {
       SELECT ?,t.workspace_id,t.id,r.user_id,?,'assignment',?,? FROM tasks t
       JOIN memberships r ON r.workspace_id=t.workspace_id AND r.user_id=COALESCE(t.assignee_id,t.created_by)
       WHERE t.workspace_id=? AND t.id=? AND t.last_mutation_id=? AND r.user_id<>? AND ${memberGuard} AND ${notificationAllowed("t.workspace_id", "t.id", "r.user_id", "assignment")}
-      ON CONFLICT(recipient_id,event_key) DO NOTHING`, `assignment:${mutation}`, actor, `assignment:${mutation}`, time, workspaceId, taskId, mutation, actor, workspaceId, actor);
+      ON CONFLICT DO NOTHING`, `assignment:${mutation}`, actor, `assignment:${mutation}`, time, workspaceId, taskId, mutation, actor, workspaceId, actor);
   }
   async createTask(userId: string, workspaceId: string, input: unknown): Promise<Task> {
     await this.membership(userId, workspaceId); const value = parseTaskCreate(input);
@@ -202,7 +202,7 @@ export class Repository {
         SELECT 'mention:'||c.id||':'||m.user_id,c.workspace_id,c.task_id,m.user_id,c.author_id,'mention','mention:'||c.id,c.created_at
         FROM comments c JOIN memberships m ON m.workspace_id=c.workspace_id
         WHERE c.id=? AND c.workspace_id=? AND c.author_id=? AND m.user_id<>c.author_id AND m.user_id IN (${marks}) AND ${notificationAllowed("c.workspace_id", "c.task_id", "m.user_id", "mention")}
-        ON CONFLICT(recipient_id,event_key) DO NOTHING`, id, workspaceId, userId, ...mentions)] : []),
+        ON CONFLICT DO NOTHING`, id, workspaceId, userId, ...mentions)] : []),
     ]);
     if (!result[0].results.length) throw new AppError(409, "COMMENT_UNAVAILABLE", "The task, project, or membership changed. Refresh before commenting.");
     const row = await this.statement(`SELECT c.*,u.name AS author_name FROM comments c JOIN users u ON u.id=c.author_id WHERE c.id=? AND c.workspace_id=? AND ${memberGuard}`, id, workspaceId, workspaceId, userId).first<StoredComment>();
@@ -212,14 +212,15 @@ export class Repository {
     await this.membership(userId, workspaceId); const query = parseNotificationQuery(input);
     const now = this.now(); const today = dateAtOffset(now, query.tz_offset);
     if (sync) {
-      // Bounded catch-up and a unique key make focus/refresh and concurrent tabs safe.
+      // Either the deterministic primary key or recipient/event uniqueness can win
+      // a concurrent insert. Treat both as the same already-delivered notification.
       await this.statement(`INSERT INTO notifications(id,workspace_id,task_id,recipient_id,actor_id,kind,event_key,created_at)
         SELECT 'overdue:'||t.id||':'||t.due_date||':'||?,t.workspace_id,t.id,?,NULL,'overdue','overdue:'||t.id||':'||t.due_date||':'||?,?
         FROM tasks t JOIN projects p ON p.workspace_id=t.workspace_id AND p.id=t.project_id
         WHERE t.workspace_id=? AND ${memberGuard} AND (t.assignee_id=? OR (t.assignee_id IS NULL AND t.created_by=?))
         AND t.archived_at IS NULL AND p.archived_at IS NULL AND t.status<>'done' AND t.due_date<? AND ${notificationAllowed('t.workspace_id', 't.id', 'COALESCE(t.assignee_id,t.created_by)', 'overdue')}
         AND NOT EXISTS(SELECT 1 FROM notifications n WHERE n.id='overdue:'||t.id||':'||t.due_date||':'||?)
-        ORDER BY t.due_date,t.id LIMIT 100 ON CONFLICT(recipient_id,event_key) DO NOTHING`,
+        ORDER BY t.due_date,t.id LIMIT 100 ON CONFLICT DO NOTHING`,
       userId, userId, userId, now.toISOString(), workspaceId, workspaceId, userId, userId, userId, today, userId).run();
     }
     const join = "FROM notifications n JOIN tasks t ON t.workspace_id=n.workspace_id AND t.id=n.task_id JOIN projects p ON p.workspace_id=t.workspace_id AND p.id=t.project_id LEFT JOIN users a ON a.id=n.actor_id";
