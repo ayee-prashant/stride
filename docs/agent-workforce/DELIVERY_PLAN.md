@@ -1,6 +1,10 @@
 # Ordered delivery plan
 
-Status: design complete; implementation not started for this scope. All slices below are pending. Existing task-management completion and deployment evidence remain in [the current release review](../RELEASE_REVIEW.md).
+Status: design approved; the first context foundation is implemented and under
+verification. [Implementation status](IMPLEMENTATION_STATUS.md) tracks evidence
+and incomplete contracts. The complete delivery slices below remain pending
+until all their acceptance gates pass. Existing task-management deployment
+evidence remains in [the current release review](../RELEASE_REVIEW.md).
 
 ## Delivery rule
 

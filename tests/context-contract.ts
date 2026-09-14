@@ -45,6 +45,7 @@ export async function contextContract(t: TestContext, fixture: () => Promise<Fix
     assert.deepEqual(events.events.map(e => e.sequence), [1, 2]);
     assert.equal(events.next_cursor, 2);
     assert.deepEqual((await c.changes(f.owner.userId, f.workspace, f.project, 2)).events, []);
+    await assert.rejects(c.changes(f.owner.userId, f.workspace, f.project, 3), { code: "CONTEXT_RESYNC_REQUIRED" });
   });
   await t.test("duplicate active titles require reviewing the existing document", async () => {
     const f = await fixture(); const c = new ContextRepository(f.repo);

@@ -63,6 +63,6 @@ export function parseTaskBrief(input: unknown) {
 }
 export function parseContextCursor(value: string | null) {
   if (value === null) return 0;
-  if (!/^(0|[1-9]\d{0,9})$/.test(value)) return invalid("Invalid context cursor.");
+  if (!/^(0|[1-9]\d{0,9})$/.test(value) || Number(value) > 2_147_483_647) return invalid("Invalid context cursor.");
   return nonnegative(Number(value), "Context cursor");
 }

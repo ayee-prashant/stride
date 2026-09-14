@@ -17,15 +17,14 @@ export function TaskContext({ task, disabled, onBusyChange, onDirtyChange }: { t
   const receipt = useRef({ input: "", id: "" }); const selectionEdited = useRef(false);
   const taskPath = workspacePath(`tasks/${encodeURIComponent(task.id)}/context`, task.workspace_id);
   const projectPath = workspacePath(`projects/${encodeURIComponent(task.project_id)}/context`, task.workspace_id);
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(() => {
     controller.current?.abort(); const c = new AbortController(); controller.current = c;
-    try {
-      const [project, result] = await Promise.all([api<ProjectBrief>(projectPath, { signal: c.signal }), api<TaskBriefResult>(taskPath, { signal: c.signal })]);
+    return Promise.all([api<ProjectBrief>(projectPath, { signal: c.signal }), api<TaskBriefResult>(taskPath, { signal: c.signal })]).then(([project, result]) => {
       if (!c.signal.aborted) {
         setData({ project, result }); setError("");
         if (!selectionEdited.current) setSelected(result.brief?.payload.documents.filter(d => d.kind === "requirement").map(d => d.document_id) ?? []);
       }
-    } catch (e) { if (!c.signal.aborted) { setData(null); setError(e instanceof Error ? e.message : "The task brief could not be loaded."); } }
+    }).catch(e => { if (!c.signal.aborted) { setData(null); setError(e instanceof Error ? e.message : "The task brief could not be loaded."); } });
   }, [projectPath, taskPath]);
   useEffect(() => { if (!open) return; void refresh(); const focus = () => { if (!lock.current) void refresh(); }; window.addEventListener("focus", focus); return () => { controller.current?.abort(); window.removeEventListener("focus", focus); }; }, [open, refresh, task.version]);
   async function prepare() {

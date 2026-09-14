@@ -32,5 +32,6 @@ test("context HTTP keeps authentication, JSON origin guards, private caching and
   assert.equal((await response.json()).approved_by, f.owner.userId);
   assert.equal((await handleApi(new Request(`${endpoint}${suffix}&workspace_id=ws_other`), dependencies)).status, 400);
   assert.equal((await handleApi(new Request(`${endpoint}/changes${suffix}&after=-1`), dependencies)).status, 400);
+  assert.equal((await handleApi(new Request(`${endpoint}/changes${suffix}&after=2147483648`), dependencies)).status, 400);
   assert.equal((await handleApi(new Request(`${endpoint}${suffix}`), { ...dependencies, identity: async () => f.other })).status, 404);
 });

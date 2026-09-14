@@ -107,6 +107,8 @@ export class ContextRepository {
 
   async changes(userId: string, workspaceId: string, projectId: string, after: number) {
     await this.project(userId, workspaceId, projectId);
+    const head = await this.repo.statement(`SELECT sequence FROM project_context_heads WHERE workspace_id=? AND project_id=? AND ${memberGuard}`, workspaceId, projectId, workspaceId, userId).first<{ sequence: number }>();
+    if (after > (head?.sequence ?? 0)) throw new AppError(409, "CONTEXT_RESYNC_REQUIRED", "This cursor is ahead of the project. Reload its current brief before resuming changes.");
     const rows = await this.repo.statement(`SELECT sequence,document_id,document_version,created_by,created_at FROM context_events WHERE workspace_id=? AND project_id=? AND sequence>? AND ${memberGuard} ORDER BY sequence LIMIT 101`, workspaceId, projectId, after, workspaceId, userId).all<{ sequence: number; document_id: string; document_version: number; created_by: string; created_at: string }>();
     const events = rows.results.slice(0, 100);
     return { events, next_cursor: events.at(-1)?.sequence ?? after, has_more: rows.results.length > 100 };

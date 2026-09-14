@@ -30,12 +30,12 @@ export function ProjectContext({ workspaceId, projectId, members }: { workspaceI
   const [history, setHistory] = useState<ContextRevision | null>(null);
   const controller = useRef<AbortController | null>(null);
   const path = workspacePath(`projects/${encodeURIComponent(projectId)}/context`, workspaceId);
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(() => {
     controller.current?.abort(); const c = new AbortController(); controller.current = c;
-    setLoading(true);
-    try { const latest = await api<ProjectBrief>(path, { signal: c.signal }); if (!c.signal.aborted) { setData(latest); setError(""); } }
-    catch (e) { if (!c.signal.aborted) { setError(errorMessage(e)); setData(null); } }
-    finally { if (!c.signal.aborted) setLoading(false); }
+    return api<ProjectBrief>(path, { signal: c.signal })
+      .then(latest => { if (!c.signal.aborted) { setData(latest); setError(""); } })
+      .catch(e => { if (!c.signal.aborted) { setError(errorMessage(e)); setData(null); } })
+      .finally(() => { if (!c.signal.aborted) setLoading(false); });
   }, [path]);
   useEffect(() => { void refresh(); const focus = () => { void refresh(); }; window.addEventListener("focus", focus); return () => { controller.current?.abort(); window.removeEventListener("focus", focus); }; }, [refresh]);
   const needle = query.trim().toLowerCase();

@@ -1,6 +1,8 @@
 # Stride: human-supervised agent work
 
-Status: proposed architecture, reviewed on 2026-09-14. These capabilities are not implemented by this documentation change.
+Status: architecture approved and implementation started on 2026-09-14. See
+[implementation status](IMPLEMENTATION_STATUS.md) for working features, evidence
+and remaining gates; the full agent system described here is not yet available.
 
 ## Product decision
 
