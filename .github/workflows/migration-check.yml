@@ -11,8 +11,6 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    outputs:
-      artifact-id: ${{ steps.generated.outputs.artifact-id }}
     services:
       postgres:
         image: postgres:18
@@ -33,10 +31,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      # One-time migration bootstrap. The resulting lockfile must be reviewed
-      # and committed before this changes to npm ci and production is released.
-      - run: npm install --no-audit --no-fund
+      - run: npm ci --no-audit --no-fund
       - run: npm run db:generate
+      - name: Check committed migration history
+        run: test -z "$(git status --porcelain -- package-lock.json drizzle-postgres)"
       - uses: actions/upload-artifact@v4
         id: generated
         with:
@@ -56,31 +54,3 @@ jobs:
         if: ${{ !cancelled() && steps.generated.outcome == 'success' }}
       - run: npm run build
         if: ${{ !cancelled() && steps.generated.outcome == 'success' }}
-  save-generated-source:
-    needs: verify
-    if: >-
-      always() && needs.verify.outputs.artifact-id != '' &&
-      github.event.pull_request.head.repo.full_name == github.repository &&
-      github.event.pull_request.head.ref == 'deploy/vercel-railway'
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: write
-    steps:
-      # This job runs no dependency scripts. It saves only generated source
-      # on the authorized draft branch, never on main.
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-      - uses: actions/download-artifact@v4
-        with:
-          artifact-ids: ${{ needs.verify.outputs.artifact-id }}
-          merge-multiple: true
-      - name: Save generated source for review
-        run: |
-          git add -- package-lock.json drizzle-postgres
-          if git diff --cached --quiet; then exit 0; fi
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git commit -m 'Save generated dependency lock and PostgreSQL migrations'
-          git push origin HEAD:refs/heads/deploy/vercel-railway

@@ -46,7 +46,7 @@ test("untrusted values remain separate from SQL and bound statements are immutab
 
 test("a batch uses one checked-out client and releases it after commit", async () => {
   const f = poolFixture();
-  const result = await f.db.batch([f.db.prepare("SELECT ? AS value").bind("task"), f.db.prepare("INSERT INTO activity VALUES (?)").bind("event")]);
+  const result = await f.db.batch<{ value: string }>([f.db.prepare("SELECT ? AS value").bind("task"), f.db.prepare("INSERT INTO activity VALUES (?)").bind("event")]);
   assert.equal(f.connections(), 1);
   assert.deepEqual(f.calls.map(call => call.client), Array(4).fill("transaction"));
   assert.deepEqual(f.calls.map(call => call.text), ["BEGIN", "SELECT $1 AS value", "INSERT INTO activity VALUES ($1)", "COMMIT"]);

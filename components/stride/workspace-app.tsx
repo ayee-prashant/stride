@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ComponentProps, FormEvent } from "react";
+import { useRouter } from "next/navigation";
 import { Archive, ArrowRight, Check, CheckCheck, Circle, CircleDashed, Folder, FolderKanban, LayoutList, ListTodo, Loader2, LogOut, Pencil, Play, Plus, RotateCcw, Search, Users } from "lucide-react";
 import { toast } from "sonner";
 import { SidebarProvider, Sidebar, SidebarHeader, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuItem, SidebarMenuButton as BaseSidebarMenuButton, SidebarInset, SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
@@ -24,6 +25,8 @@ import { useTaskCreationTool } from "@/hooks/use-task-creation-tool";
 type View = "my" | "board" | "projects" | "members";
 type Metadata = { role: "admin" | "member"; projects: Project[]; members: Member[] };
 type Page = { tasks: Task[]; hasMore: boolean; nextOffset: number };
+const emptyPage: Page = { tasks: [], hasMore: false, nextOffset: 0 };
+type TaskResult = { key: string; page: Page; error: string };
 const headings: Record<View, string> = { my: "My Work", board: "Project board", projects: "Projects", members: "People" };
 
 function SidebarMenuButton(props: ComponentProps<typeof BaseSidebarMenuButton>) {
@@ -32,22 +35,23 @@ function SidebarMenuButton(props: ComponentProps<typeof BaseSidebarMenuButton>) 
 }
 
 export function WorkspaceApp({ identity }: { identity: Identity }) {
+  const router = useRouter();
   const [signingOut, setSigningOut] = useState(false);
   async function signOut() {
     setSigningOut(true);
     try {
       const result = await authClient.signOut();
       if (result.error) throw new Error("Sign-out failed");
-      window.location.assign("/sign-in");
+      router.replace("/sign-in"); router.refresh();
     } catch { setSigningOut(false); toast.error("Could not sign out. Please try again."); }
   }
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]); const [workspaceId, setWorkspaceId] = useState("");
   const [metadata, setMetadata] = useState<Metadata | null>(null); const [bootError, setBootError] = useState(""); const [bootRetry, setBootRetry] = useState(0);
   const [view, setView] = useState<View>("my"); const [projectId, setProjectId] = useState("");
-  const [page, setPage] = useState<Page>({ tasks: [], hasMore: false, nextOffset: 0 }); const [offset, setOffset] = useState(0);
+  const [taskResult, setTaskResult] = useState<TaskResult>({ key: "", page: emptyPage, error: "" }); const [offset, setOffset] = useState(0);
   const [priority, setPriority] = useState("all"); const [assignee, setAssignee] = useState("all");
   const [search, setSearch] = useState(""); const [query, setQuery] = useState(""); const [showDone, setShowDone] = useState(false); const [archived, setArchived] = useState(false);
-  const [loading, setLoading] = useState(false); const [listError, setListError] = useState(""); const [revision, setRevision] = useState(0); const [metadataRevision, setMetadataRevision] = useState(0);
+  const [revision, setRevision] = useState(0); const [metadataRevision, setMetadataRevision] = useState(0);
   const [title, setTitle] = useState(""); const [busy, setBusy] = useState(false); const lock = useRef(false); const composer = useRef<HTMLInputElement>(null);
   const [selected, setSelected] = useState<Task | null>(null); const [projectDialog, setProjectDialog] = useState<Project | "new" | null>(null);
   const [memberEmail, setMemberEmail] = useState(""); const [memberRole, setMemberRole] = useState("member"); const [memberError, setMemberError] = useState("");
@@ -61,34 +65,44 @@ export function WorkspaceApp({ identity }: { identity: Identity }) {
   }, !!metadata && !!activeProjects.length);
 
   useEffect(() => {
-    const controller = new AbortController(); setBootError("");
-    api<{ workspaces: Workspace[] }>("bootstrap", { method: "POST", body: {}, signal: controller.signal }).then(result => { setWorkspaces(result.workspaces); setWorkspaceId(current => current || result.workspaces[0]?.id || ""); }).catch(e => { if (!controller.signal.aborted) setBootError(e.message); });
+    const controller = new AbortController();
+    api<{ workspaces: Workspace[] }>("bootstrap", { method: "POST", body: {}, signal: controller.signal }).then(result => { if (controller.signal.aborted) return; setBootError(""); setWorkspaces(result.workspaces); setWorkspaceId(current => current || result.workspaces[0]?.id || ""); }).catch(e => { if (!controller.signal.aborted) setBootError(e.message); });
     return () => controller.abort();
   }, [bootRetry]);
   useEffect(() => {
-    if (!workspaceId) return; const controller = new AbortController(); setBootError("");
+    if (!workspaceId) return; const controller = new AbortController();
     api<Metadata>(workspacePath("workspace", workspaceId), { signal: controller.signal }).then(result => {
-      setMetadata(result); setProjectId(current => result.projects.some(p => p.id === current && !p.archived_at) ? current : result.projects.find(p => !p.archived_at)?.id ?? "");
+      if (controller.signal.aborted) return;
+      setBootError(""); setMetadata(result); setProjectId(current => result.projects.some(p => p.id === current && !p.archived_at) ? current : result.projects.find(p => !p.archived_at)?.id ?? "");
     }).catch(e => { if (!controller.signal.aborted) setBootError(e.message); });
     return () => controller.abort();
   }, [workspaceId, metadataRevision]);
   useEffect(() => { const timer = setTimeout(() => { setQuery(search); setOffset(0); }, 250); return () => clearTimeout(timer); }, [search]);
   const refresh = useCallback(() => setRevision(n => n + 1), []);
   useEffect(() => { const focus = () => { refresh(); setMetadataRevision(n => n + 1); }; window.addEventListener("focus", focus); return () => window.removeEventListener("focus", focus); }, [refresh]);
+  const params = new URLSearchParams({ workspace_id: workspaceId, include_done: String(view === "board" || showDone || archived), archived: String(archived), query, limit: "50", offset: String(offset) });
+  if (view === "my") params.set("assignee_id", identity.userId);
+  else { params.set("project_id", projectId); if (assignee !== "all") params.set("assignee_id", assignee); }
+  if (priority !== "all") params.set("priority", priority);
+  const taskUrl = workspaceId && metadata && ["my", "board"].includes(view) && (view !== "board" || projectId) ? `tasks?${params}` : "";
+  const taskKey = taskUrl ? `${revision}:${taskUrl}` : "";
+  const currentResult = Boolean(taskUrl) && taskResult.key === taskKey;
+  const page = currentResult ? taskResult.page : emptyPage;
+  const loading = Boolean(taskUrl) && !currentResult;
+  const listError = currentResult ? taskResult.error : "";
   useEffect(() => {
-    if (!workspaceId || !metadata || !["my", "board"].includes(view)) return;
-    if (view === "board" && !projectId) { setPage({ tasks: [], hasMore: false, nextOffset: 0 }); return; }
-    const controller = new AbortController(); setLoading(true); setListError("");
-    const params = new URLSearchParams({ workspace_id: workspaceId, include_done: String(view === "board" || showDone || archived), archived: String(archived), query, limit: "50", offset: String(offset) });
-    if (view === "my") params.set("assignee_id", identity.userId);
-    else { params.set("project_id", projectId); if (assignee !== "all") params.set("assignee_id", assignee); }
-    if (priority !== "all") params.set("priority", priority);
-    api<Page>(`tasks?${params}`, { signal: controller.signal }).then(setPage).catch(e => { if (!controller.signal.aborted) { setListError(e.message); setPage({ tasks: [], hasMore: false, nextOffset: 0 }); } }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    if (!taskUrl) return;
+    const controller = new AbortController();
+    api<Page>(taskUrl, { signal: controller.signal }).then(result => {
+      if (!controller.signal.aborted) setTaskResult({ key: taskKey, page: result, error: "" });
+    }).catch(e => {
+      if (!controller.signal.aborted) setTaskResult({ key: taskKey, page: emptyPage, error: e.message });
+    });
     return () => controller.abort();
-  }, [workspaceId, metadata, view, projectId, assignee, priority, query, showDone, archived, offset, revision, identity.userId]);
+  }, [taskUrl, taskKey]);
 
   function navigate(next: View) { setView(next); setOffset(0); setSelected(null); }
-  function changeWorkspace(id: string) { setWorkspaceId(id); setMetadata(null); setProjectId(""); setPage({ tasks: [], hasMore: false, nextOffset: 0 }); setSelected(null); setOffset(0); setAssignee("all"); }
+  function changeWorkspace(id: string) { setWorkspaceId(id); setMetadata(null); setProjectId(""); setTaskResult({ key: "", page: emptyPage, error: "" }); setBootError(""); setSelected(null); setOffset(0); setAssignee("all"); }
   async function mutation<T>(action: () => Promise<T>): Promise<T> {
     if (lock.current) throw new Error("Please wait for the current change to finish.");
     lock.current = true; setBusy(true);
@@ -96,7 +110,7 @@ export function WorkspaceApp({ identity }: { identity: Identity }) {
   }
   async function updateTask(task: Task, patch: Omit<TaskPatch, "version">): Promise<Task> {
     const updated = await mutation(() => api<Task>(workspacePath(`tasks/${encodeURIComponent(task.id)}`, task.workspace_id), { method: "PATCH", body: { ...patch, version: task.version } }));
-    setPage(current => ({ ...current, tasks: current.tasks.map(t => t.id === updated.id ? updated : t) })); refresh();
+    setTaskResult(current => current.key === taskKey ? { ...current, page: { ...current.page, tasks: current.page.tasks.map(t => t.id === updated.id ? updated : t) } } : current); refresh();
     return updated;
   }
   async function quickUpdate(task: Task, patch: Omit<TaskPatch, "version">) {
@@ -132,7 +146,7 @@ export function WorkspaceApp({ identity }: { identity: Identity }) {
     </SidebarContent><SidebarFooter><div className="account"><Avatar name={identity.displayName} /><div><strong>{identity.displayName}</strong><span>{metadata?.role === "admin" ? "Workspace admin" : "Team member"}</span></div><button type="button" aria-label="Sign out" disabled={signingOut || busy} onClick={signOut}><LogOut size={17} /></button></div></SidebarFooter></Sidebar>
     <SidebarInset className="stride-main"><header className="topbar"><div><SidebarTrigger /><span className="breadcrumb">Workspace <span>/</span> {headings[view]}</span></div><span className="private-label">Private workspace</span></header>
       <main id="main-content" className="workspace-content"><div className="page-heading"><div><p className="eyebrow">{view === "my" ? "YOUR DAILY WORKSPACE" : view === "board" ? "WORK IN MOTION" : "WORKSPACE"}</p><h1>{headings[view]}</h1><p className="page-description">{view === "my" ? "A clear place to start. One task at a time." : view === "board" ? "See what’s next, what’s moving, and what’s done." : view === "projects" ? "Keep related work together." : "The people who share this workspace."}</p></div>{["my", "board"].includes(view) ? <Button onClick={() => composer.current?.focus()} disabled={!activeProjects.length || archived}><Plus size={17} />Add task</Button> : view === "projects" && metadata?.role === "admin" ? <Button onClick={() => setProjectDialog("new")}><Plus size={17} />New project</Button> : null}</div>
-      {bootError ? <div className="error-box" role="alert"><p>{bootError}</p><div className="inline-actions"><Button variant="outline" onClick={() => { setBootRetry(n => n + 1); setMetadataRevision(n => n + 1); }}>Try again</Button><a href="/sign-in">Sign in again</a></div></div> : !metadata ? <div aria-label="Loading your workspace" className="loading-state"><Skeleton className="h-14 w-full" /><Skeleton className="h-36 w-full" /></div> : <>
+      {bootError ? <div className="error-box" role="alert"><p>{bootError}</p><div className="inline-actions"><Button variant="outline" onClick={() => { setBootError(""); setBootRetry(n => n + 1); setMetadataRevision(n => n + 1); }}>Try again</Button><a href="/sign-in">Sign in again</a></div></div> : !metadata ? <div aria-label="Loading your workspace" className="loading-state"><Skeleton className="h-14 w-full" /><Skeleton className="h-36 w-full" /></div> : <>
         {["my", "board"].includes(view) && <>
           <div className="work-context"><div className="context-title">{view === "board" ? <FolderKanban size={18} /> : <LayoutList size={18} />}<span>{view === "board" ? "Project" : "Create in"}</span><Choice label={view === "board" ? "Project board" : "Project for new tasks"} value={projectId || "none"} onChange={value => { setProjectId(value); setOffset(0); }} options={activeProjects.length ? activeProjects.map(p => ({ value: p.id, label: p.name })) : [{ value: "none", label: "No active projects" }]} disabled={!activeProjects.length} /></div><span className="context-note">{view === "my" ? "Showing work assigned to you" : "Team view"}</span></div>
           {!archived && <form className="quick-create" onSubmit={createTask}><Plus size={20} aria-hidden="true" /><Input ref={composer} aria-label="New task title" placeholder="What needs to get done?" value={title} maxLength={200} onChange={e => setTitle(e.target.value)} required disabled={busy || !activeProjects.length} /><Button type="submit" variant="ghost" disabled={busy || !title.trim() || !activeProjects.length}>{busy ? <Loader2 size={17} className="animate-spin" /> : <ArrowRight size={18} />}<span className="sr-only">Create task</span></Button></form>}
@@ -142,7 +156,7 @@ export function WorkspaceApp({ identity }: { identity: Identity }) {
           {!loading && !listError && (page.tasks.length > 0 || offset > 0) && <div className="pagination-row"><p>{page.tasks.length ? `Showing ${offset + 1}–${offset + page.tasks.length}` : "No tasks on this page"}{page.hasMore ? " · more tasks available" : " · end of results"}</p><div><Button variant="outline" size="sm" disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - 50))}>Previous</Button><Button variant="outline" size="sm" disabled={!page.hasMore} onClick={() => setOffset(page.nextOffset)}>Next</Button></div></div>}
         </>}
         {view === "projects" && <div className="project-grid">{metadata.projects.map(p => <Card className={`project-card ${p.archived_at ? "archived-project" : ""}`} key={p.id}><CardContent><div className="project-card-top"><span className="project-mark"><Folder size={23} /></span><span className="muted">{p.archived_at ? "Archived" : "Active"}</span></div><h2>{p.name}</h2><p>{p.description || "No description yet."}</p><div className="project-card-actions"><Button variant="outline" disabled={!!p.archived_at} onClick={() => { setProjectId(p.id); navigate("board"); }}>Open board<ArrowRight size={14} /></Button>{metadata.role === "admin" && <div><Button variant="ghost" size="icon" aria-label={`Edit ${p.name}`} disabled={busy} onClick={() => setProjectDialog(p)}><Pencil size={16} /></Button><Button variant="ghost" size="icon" aria-label={`${p.archived_at ? "Restore" : "Archive"} ${p.name}`} disabled={busy} onClick={() => void archiveProject(p)}>{p.archived_at ? <RotateCcw size={16} /> : <Archive size={16} />}</Button></div>}</div></CardContent></Card>)}</div>}
-        {view === "members" && <section className="people-section">{metadata.role === "admin" && <form className="member-form" onSubmit={async event => { event.preventDefault(); setMemberError(""); try { await mutation(() => api(workspacePath("members", workspaceId), { method: "POST", body: { email: memberEmail, role: memberRole } })); setMemberEmail(""); setMetadataRevision(n => n + 1); toast.success("Membership saved"); } catch (e) { setMemberError(e instanceof Error ? e.message : "Could not save membership."); } }}><h2>Add an existing user</h2><p className="muted">They need access to this Site and must sign in once first. This does not send an invitation or change Site sharing.</p><div className="member-form-fields"><Input type="email" aria-label="Member email" required maxLength={254} placeholder="teammate@example.com" value={memberEmail} onChange={e => setMemberEmail(e.target.value)} disabled={busy} /><Choice label="Member role" value={memberRole} onChange={setMemberRole} options={[{ value: "member", label: "Member" }, { value: "admin", label: "Admin" }]} disabled={busy} /><Button type="submit" disabled={busy || !memberEmail}>Save member</Button></div>{memberError && <p role="alert" className="error-box">{memberError}</p>}</form>}<div className="people-list">{metadata.members.map(m => <div className="person-row" key={m.user_id}><Avatar name={m.name} /><div><strong>{m.name}</strong><span>{m.email}</span></div><span className="person-role">{m.user_id === workspace?.owner_id ? "Owner" : m.role}</span></div>)}</div></section>}
+        {view === "members" && <section className="people-section">{metadata.role === "admin" && <form className="member-form" onSubmit={async event => { event.preventDefault(); setMemberError(""); try { await mutation(() => api(workspacePath("members", workspaceId), { method: "POST", body: { email: memberEmail, role: memberRole } })); setMemberEmail(""); setMetadataRevision(n => n + 1); toast.success("Membership saved"); } catch (e) { setMemberError(e instanceof Error ? e.message : "Could not save membership."); } }}><h2>Add an existing user</h2><p className="muted">They need approved access and must sign in once before being added. Adding a member does not send an invitation.</p><div className="member-form-fields"><Input type="email" aria-label="Member email" required maxLength={254} placeholder="teammate@example.com" value={memberEmail} onChange={e => setMemberEmail(e.target.value)} disabled={busy} /><Choice label="Member role" value={memberRole} onChange={setMemberRole} options={[{ value: "member", label: "Member" }, { value: "admin", label: "Admin" }]} disabled={busy} /><Button type="submit" disabled={busy || !memberEmail}>Save member</Button></div>{memberError && <p role="alert" className="error-box">{memberError}</p>}</form>}<div className="people-list">{metadata.members.map(m => <div className="person-row" key={m.user_id}><Avatar name={m.name} /><div><strong>{m.name}</strong><span>{m.email}</span></div><span className="person-role">{m.user_id === workspace?.owner_id ? "Owner" : m.role}</span></div>)}</div></section>}
       </>}
       <footer className="workspace-footer"><CircleDashed size={14} /><span>Keep the next step simple.</span></footer>
     </main></SidebarInset>
