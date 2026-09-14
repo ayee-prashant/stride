@@ -50,7 +50,7 @@ The three-pane document dialog is **Published context → Your draft → Review 
 publish**. Its desktop, mobile, revision history, preserved drafts and stale brief
 flows were verified. This code remains on the feature branch; it is not deployed.
 
-## GitHub source slice implemented; integration verification in progress
+## GitHub source foundation implemented
 
 - Admin enrollment uses a server-owned project-to-repository grant, with a
   separate read-only GitHub App key confined to the context worker.
@@ -65,15 +65,27 @@ flows were verified. This code remains on the feature branch; it is not deployed
 - Project brief includes enrollment, source status, commit/file review, refresh
   and disconnect controls. Task briefs show their saved repository versions.
 
-Local native suite: **100 tests passed**. Source migration generation, real
-PostgreSQL concurrency, type/lint/build and the extended browser flow still need
-the complete next-branch CI gate before this increment is described as verified.
+The first complete source CI passed in
+[run 34889108668](https://github.com/ayee-prashant/stride/actions/runs/34889108668)
+on `2ad6bd374a44b214e7d524a0b1fa99d9105178f6` (tree
+`098238b42d1cbffe37c75c8349a2fbe253862963`). Its gates include 100 native tests,
+real PostgreSQL source/context contracts and competing workers, migration parity,
+runtime grants, audit, type/lint/build, performance/restore and the genuine
+session/browser flow. Desktop/mobile source review and outage screenshots were
+retrieved and visually inspected.
+
+Post-build review preserves selected requirements during source outages, clears
+obsolete success notices, allows explicit reenrollment after a changed project
+grant, improves task-brief spacing, and verifies restored context record contents.
+The expanded native suite has **101 passing tests**. The latest complete check
+results are attached to [draft PR #7](https://github.com/ayee-prashant/stride/pull/7);
+each new source commit must pass the full gate before release.
 Setup, coverage and limits are in [GITHUB_CONTEXT_SETUP.md](GITHUB_CONTEXT_SETUP.md).
 No GitHub App credentials have been provisioned for the deployed application.
 
 ## Remaining gates
 
-1. Complete GitHub source CI and installed-App validation, then PR/CI
+1. Installed GitHub App/live external-push validation, then PR/CI
    reconciliation, indexed traceability and webhook handling (AW-006).
 2. MCP 2026-07-28 and maintained OAuth integration/client compatibility
    evidence (AW-001/002), fake-launch safety proof (AW-003).

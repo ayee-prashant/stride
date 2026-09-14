@@ -164,6 +164,8 @@ export async function verifyBrowser(origin, cookie, reconcileRepository) {
     await clickButton("Refresh context");
     await waitFor("document.querySelector('.task-brief-status')?.textContent.includes('current access cannot be verified')");
     assert.equal(await evaluate("document.querySelector('.saved-task-brief') === null"), true);
+    assert.equal(await evaluate("document.querySelector('.brief-requirement-picker legend').textContent.includes('(1/20)')"), true);
+    assert.equal(await evaluate("!document.querySelector('.task-context-content').textContent.includes('Task brief prepared.')"), true);
     await capture("context-github-unavailable");
     await reconcileRepository("b");
     await clickButton("Refresh context");

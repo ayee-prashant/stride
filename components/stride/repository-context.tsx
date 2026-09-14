@@ -37,7 +37,7 @@ export function RepositoryContext({ workspaceId, projectId }: { workspaceId: str
   const refresh = useCallback(() => {
     controller.current?.abort(); const c = new AbortController(); controller.current = c;
     return api<GitHubSourceResult>(path, { signal: c.signal }).then(result => {
-      if (!c.signal.aborted) { setData(result); setError(""); }
+      if (!c.signal.aborted) { setData(result); setError(""); setNotice(""); }
     }).catch(e => { if (!c.signal.aborted) { setData(null); setError(e instanceof Error ? e.message : "Repository status is unavailable."); } });
   }, [path]);
   useEffect(() => {
@@ -67,7 +67,7 @@ export function RepositoryContext({ workspaceId, projectId }: { workspaceId: str
     {error && <p className="error-box" role="alert">{error} Refresh the status before trying again.</p>}
     {!data && !error && <p role="status">Loading repository status…</p>}
     {data && (!source || source.state === "disconnected") && <div className="repository-setup">
-      <p>{data.configured ? "Connect the approved repository to include verified code context in task briefs." : "No repository grant is configured for this project. A server administrator can add its GitHub App connection."}</p>
+      <p>{data.configured ? "Connect the approved repository to include verified code context in task briefs. Current workspace members will be able to read the included files." : "No repository grant is configured for this project. A server administrator can add its GitHub App connection."}</p>
       {data.can_manage && data.choices.map(choice => <div key={choice.key}><strong>{choice.repository}</strong><p className="muted text-sm">{choice.branch} · {choice.paths.length} required source files</p><details><summary>Review included paths</summary><ul>{choice.paths.map(path => <li key={path}><code>{path}</code></li>)}</ul></details><Button type="button" size="sm" disabled={busy} onClick={() => void mutate("connect", choice.key)}>Connect repository</Button></div>)}
     </div>}
     {source && source.state !== "disconnected" && <>

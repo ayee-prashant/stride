@@ -41,7 +41,9 @@ No model API is required.
    source version as the web app, its runtime database URL and verified database
    TLS configuration. The existing scheduled email/reminder job remains separate.
    Allow at least 45 seconds for graceful termination of an in-flight read.
-6. A workspace admin opens **Project brief → GitHub context**, reviews the included
+6. The project grant delegates read access to current members of its Stride
+   workspace. Review that audience and the configured files before enrollment.
+   A workspace admin opens **Project brief → GitHub context**, reviews the included
    paths and selects **Connect repository**. This explicit enrollment queues a
    read. The interface shows waiting, checking, verified or unavailable states.
    Members can request a sync; only admins can connect or disconnect.

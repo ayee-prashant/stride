@@ -36,7 +36,7 @@ export class RepositorySources {
     const base = { configured: approved.length > 0, can_manage: role === "admin" && !project.archived_at, choices };
     const source = current.source;
     if (!source) return { ...base, source: null };
-    if (!this.binding(source)) return { ...base, source: { id: source.id, version: source.version, state: "unavailable", repository: "Restricted repository", branch: "", last_verified_at: null, next_refresh_at: source.next_refresh_at, reason: "access_changed", observation: null } };
+    if (!this.binding(source)) return { ...base, source: { id: source.id, version: source.version, state: source.state === "disconnected" ? "disconnected" : "unavailable", repository: "Restricted repository", branch: "", last_verified_at: null, next_refresh_at: source.next_refresh_at, reason: "access_changed", observation: null } };
     return { ...base, source: {
       id: source.id, version: source.version, repository: source.repository, branch: source.branch,
       state: source.state === "current" && current.state !== "current" ? "pending" : source.state,

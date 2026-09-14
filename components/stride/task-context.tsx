@@ -22,8 +22,8 @@ export function TaskContext({ task, disabled, onBusyChange, onDirtyChange }: { t
     controller.current?.abort(); const c = new AbortController(); controller.current = c;
     return Promise.all([api<ProjectBrief>(projectPath, { signal: c.signal }), api<TaskBriefResult>(taskPath, { signal: c.signal })]).then(([project, result]) => {
       if (!c.signal.aborted) {
-        setData({ project, result }); setError("");
-        if (!selectionEdited.current) setSelected(result.brief?.payload.documents.filter(d => d.kind === "requirement").map(d => d.document_id) ?? []);
+        setData({ project, result }); setError(""); setNotice("");
+        if (!selectionEdited.current && result.brief) setSelected(result.brief.payload.documents.filter(d => d.kind === "requirement").map(d => d.document_id));
       }
     }).catch(e => { if (!c.signal.aborted) { setData(null); setError(e instanceof Error ? e.message : "The task brief could not be loaded."); } });
   }, [projectPath, taskPath]);

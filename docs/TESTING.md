@@ -123,3 +123,26 @@ restore script creates 20,000 synthetic tasks, measures 20 warm samples/scenario
 restores pg_dump output into stride_restore, compares 11 table counts and proves
 independent write access. These are warm unloaded CI measurements, not a public
 latency SLA or proof of configured production backups.
+
+
+## Shared context and repository sources
+
+The native suite includes context publication/task briefs and the GitHub source
+provider, enrollment, durable jobs, request receipts, current access checks and
+source-aware brief contracts. Provider requests use deterministic mocked responses
+and generated synthetic keys; no real GitHub credential or paid model is needed.
+
+Run `node --experimental-strip-types --test tests/postgres-context.integration.test.ts`
+and `node --experimental-strip-types --test tests/postgres-repository-sources.integration.test.ts`
+with the same isolated `TEST_DATABASE_URL` used by the existing PostgreSQL gate.
+These apply committed migrations and test concurrent publishers, membership
+revocation, source-worker claims and source/brief publication races.
+
+The runtime/browser gate verifies the genuine human session → repository enrollment
+→ durable source observation → saved task brief → changed commit → access outage
+→ recovered source flow. The fixture substitutes only the external observation;
+it passes through the real service and runtime-role database. Source snapshots,
+events and request receipts must deny UPDATE and DELETE to the runtime role.
+The browser captures plain-text source rendering, desktop/mobile layouts and
+unavailable cached-content behavior. Installed-App/real-push verification remains
+separate from this deterministic CI gate.

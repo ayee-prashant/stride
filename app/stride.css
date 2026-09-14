@@ -57,7 +57,7 @@
 .brief-history li { padding-bottom: 1rem; border-bottom: 1px solid var(--border); }
 .brief-history li>p { margin: .35rem 0; font-size: .85rem; color: var(--muted-foreground); }
 .brief-history summary, .saved-task-brief summary { cursor: pointer; font-size: .875rem; font-weight: 600; padding: .6rem 0; }
-.task-context-section { border-top: 1px solid var(--border); padding: 1.1rem 0; }
+.task-context-section { border-top: 1px solid var(--border); padding: 1.25rem 1.5rem; }
 .task-context-toggle { display: flex; width: 100%; gap: .6rem; align-items: center; text-align: left; font-weight: 650; }
 .task-context-toggle span:last-child { margin-left: auto; color: var(--muted-foreground); font-size: .8rem; font-weight: 400; }
 .task-context-content>p, .task-context-content>button { margin-top: .8rem; }

@@ -185,7 +185,7 @@ export class ContextRepository {
     // Never disclose historical private files while their current grant or access is unavailable.
     // Preserve the immutable stored packet; withholding it does not rewrite its fingerprint.
     if (bound && (!source.snapshot || bound.source_id !== source.snapshot.source_id || bound.policy_hash !== source.snapshot.policy_hash)) {
-      return { brief: null, check: { state: "unavailable", reasons: ["This brief contains repository files whose current access cannot be verified. Restore the source connection and sync before reading it."], execution_ready: false } };
+      return { brief: null, check: { state: "unavailable", reasons: [source.snapshot ? "This saved brief uses a previous repository connection. Review the selected requirements and prepare a new brief from the current verified source." : "This brief contains repository files whose current access cannot be verified. Restore the source connection and sync before reading it."], execution_ready: false } };
     }
     return { brief, check: await this.check(userId, workspaceId, task, brief, source) };
   }

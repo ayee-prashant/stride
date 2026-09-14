@@ -128,6 +128,27 @@ export async function repositorySourceContract(t: TestContext, fixture: () => Pr
     await f.sources.disconnect(f.owner.userId, f.workspace, f.project, mutateInput(1));
     assert.equal((await f.context.taskBrief(f.owner.userId, f.workspace, task.id)).brief, null);
   });
+  await t.test("a changed project grant can be disconnected and explicitly reenrolled without disclosing the old packet", async () => {
+    const f = sourceFixture(await fixture());
+    await f.sources.connect(f.owner.userId, f.workspace, f.project, connectInput(f.binding)); await sync(f);
+    const doc = await f.context.publish(f.owner.userId, f.workspace, f.project, publication());
+    const task = await f.repo.createTask(f.owner.userId, f.workspace, { project_id: f.project, title: "New source grant" });
+    const input = { request_id: crypto.randomUUID(), task_version: task.version, context_sequence: 3, requirement_ids: [doc.document_id] };
+    const old = await f.context.createTaskBrief(f.owner.userId, f.workspace, task.id, input); assert.ok(old.brief);
+    const binding = parseBinding({ ...f.binding, branch: "release" });
+    const sources = new RepositorySources(f.repo, [binding]); const context = new ContextRepository(f.repo, [binding]);
+    assert.equal((await sources.view(f.owner.userId, f.workspace, f.project)).source?.reason, "access_changed");
+    const disconnected = await sources.disconnect(f.owner.userId, f.workspace, f.project, mutateInput(1));
+    assert.equal(disconnected.source?.state, "disconnected"); assert.equal(disconnected.choices[0].branch, "release");
+    await sources.connect(f.owner.userId, f.workspace, f.project, connectInput(binding, 2));
+    const claim = await sources.claim(); assert.ok(claim);
+    await sources.finish(claim, observation(binding, "c"));
+    const withheld = await context.taskBrief(f.owner.userId, f.workspace, task.id);
+    assert.equal(withheld.brief, null); assert.match(withheld.check?.reasons[0] ?? "", /previous repository connection/);
+    const current = await context.createTaskBrief(f.owner.userId, f.workspace, task.id, { ...input, request_id: crypto.randomUUID(), context_sequence: (await context.brief(f.owner.userId, f.workspace, f.project)).sequence });
+    assert.equal(current.brief?.payload.repository?.observation.branch, "release");
+    assert.notEqual(current.brief?.payload.repository?.policy_hash, old.brief.payload.repository?.policy_hash);
+  });
   await t.test("manual refresh honors provider cooldowns; archived projects and revoked grants are not polled", async () => {
     const f = sourceFixture(await fixture());
     await f.sources.connect(f.owner.userId, f.workspace, f.project, connectInput(f.binding));
