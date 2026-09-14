@@ -5,7 +5,8 @@
 Read README.md, docs/PRODUCT.md, docs/ARCHITECTURE.md, docs/DEVELOPMENT_PLAN.md,
 docs/SECURITY.md, and docs/TESTING.md before changing product code. Read
 docs/DECISIONS.md before introducing a new dependency or architectural pattern.
-The active scope is the first release, not every future sprint.
+The active scope is the user-approved team productivity release in
+docs/PRODUCTIVITY_RELEASE.md. Preserve the completed first-release flows.
 
 ## Operating rules
 

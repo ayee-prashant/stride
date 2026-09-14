@@ -25,12 +25,17 @@ export const tasks = pgTable("tasks", {
   status: text("status", { enum: ["todo", "in_progress", "done"] }).notNull().default("todo"),
   priority: text("priority", { enum: ["low", "medium", "high"] }).notNull().default("medium"),
   assigneeId: text("assignee_id"), dueDate: text("due_date"), completedAt: text("completed_at"), archivedAt: text("archived_at"),
+  blockedReason: text("blocked_reason").notNull().default(""), waitingOnId: text("waiting_on_id"),
+  recurrence: text("recurrence", { enum: ["none", "daily", "weekly", "monthly"] }).notNull().default("none"),
+  recurrenceParentId: text("recurrence_parent_id").unique(),
   version: integer("version").notNull().default(1), lastMutationId: text("last_mutation_id").notNull(),
   createdBy: text("created_by").notNull().references(() => users.id), updatedBy: text("updated_by").notNull().references(() => users.id),
   createdAt: text("created_at").notNull(), updatedAt: text("updated_at").notNull(),
 }, t => [
   foreignKey({ columns: [t.workspaceId, t.projectId], foreignColumns: [projects.workspaceId, projects.id] }),
   foreignKey({ columns: [t.workspaceId, t.assigneeId], foreignColumns: [memberships.workspaceId, memberships.userId] }),
+  foreignKey({ columns: [t.workspaceId, t.waitingOnId], foreignColumns: [memberships.workspaceId, memberships.userId] }),
+  foreignKey({ name: "task_recurrence_parent_fk", columns: [t.workspaceId, t.recurrenceParentId], foreignColumns: [t.workspaceId, t.id] }),
   unique("uq_task_workspace").on(t.workspaceId, t.id),
   index("idx_tasks_workspace_project_archive").on(t.workspaceId, t.projectId, t.archivedAt),
   index("idx_tasks_workspace_assignee_archive").on(t.workspaceId, t.assigneeId, t.archivedAt),
@@ -39,6 +44,8 @@ export const tasks = pgTable("tasks", {
   check("task_status", sql`${t.status} IN ('todo','in_progress','done')`),
   check("task_priority", sql`${t.priority} IN ('low','medium','high')`),
   check("task_version", sql`${t.version} > 0`),
+  check("task_recurrence", sql`${t.recurrence} IN ('none','daily','weekly','monthly')`),
+  check("task_blocker", sql`length(${t.blockedReason}) <= 500 AND (${t.waitingOnId} IS NULL OR length(${t.blockedReason}) > 0)`),
   check("task_completion", sql`(${t.status} = 'done' AND ${t.completedAt} IS NOT NULL) OR (${t.status} != 'done' AND ${t.completedAt} IS NULL)`),
 ]);
 export const activity = pgTable("activity", {
@@ -61,7 +68,7 @@ export const comments = pgTable("comments", {
 export const notifications = pgTable("notifications", {
   id: text("id").primaryKey(), workspaceId: text("workspace_id").notNull(), taskId: text("task_id").notNull(),
   recipientId: text("recipient_id").notNull(), actorId: text("actor_id").references(() => users.id),
-  kind: text("kind", { enum: ["assignment", "mention", "overdue"] }).notNull(),
+  kind: text("kind", { enum: ["assignment", "mention", "overdue", "reminder"] }).notNull(),
   eventKey: text("event_key").notNull(), createdAt: text("created_at").notNull(), readAt: text("read_at"),
 }, t => [
   foreignKey({ columns: [t.workspaceId, t.taskId], foreignColumns: [tasks.workspaceId, tasks.id] }),
@@ -69,5 +76,5 @@ export const notifications = pgTable("notifications", {
   unique("uq_notification_event").on(t.recipientId, t.eventKey),
   index("idx_notifications_inbox").on(t.workspaceId, t.recipientId, t.createdAt, t.id),
   index("idx_notifications_unread").on(t.workspaceId, t.recipientId, t.readAt),
-  check("notification_kind", sql`${t.kind} IN ('assignment','mention','overdue')`),
+  check("notification_kind", sql`${t.kind} IN ('assignment','mention','overdue','reminder')`),
 ]);

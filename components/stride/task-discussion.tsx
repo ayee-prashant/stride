@@ -7,10 +7,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api, workspacePath } from "@/lib/client-api";
+import type { Attachment } from "@/lib/productivity";
 import type { CommentDraft, CommentPage, Member, Task } from "@/lib/domain";
 
 type Props = {
   task: Task;
+  attachments?: Attachment[];
   disabled: boolean;
   members: Member[];
   draft: CommentDraft;
@@ -19,7 +21,7 @@ type Props = {
   onPosted: () => void;
 };
 
-export function TaskDiscussion({ task, disabled, members, draft, onDraftChange, onBusyChange, onPosted }: Props) {
+export function TaskDiscussion({ task, attachments = [], disabled, members, draft, onDraftChange, onBusyChange, onPosted }: Props) {
   const [offset, setOffset] = useState(0);
   const [revision, setRevision] = useState(0);
   const [result, setResult] = useState<{ key: string; page?: CommentPage; error?: string }>({ key: "" });
@@ -85,7 +87,7 @@ export function TaskDiscussion({ task, disabled, members, draft, onDraftChange, 
       {postError && <div role="alert" className="error-box"><p>{postError}</p><Button type="button" variant="outline" disabled={posting || disabled} onClick={() => { setOffset(0); setRevision(value => value + 1); }}>Refresh comments before retrying</Button></div>}
     </form>}
     {error ? <div role="alert" className="error-box">{error}<Button variant="outline" onClick={() => setRevision(value => value + 1)}>Retry loading comments</Button></div> : !page ? <p className="muted" role="status">Loading comments…</p> : <>
-      {page.comments.length ? <ol className="comment-list">{page.comments.map(comment => <li key={comment.id}><div className="comment-heading"><strong>{comment.author_name}</strong><time dateTime={comment.created_at}>{new Date(comment.created_at).toLocaleString()}</time></div><p className="comment-body">{comment.body}</p></li>)}</ol> : <p className="muted text-sm">{offset ? "No more comments on this page." : "No comments yet. Keep the next step here."}</p>}
+      {page.comments.length ? <ol className="comment-list">{page.comments.map(comment => <li key={comment.id}><div className="comment-heading"><strong>{comment.author_name}</strong><time dateTime={comment.created_at}>{new Date(comment.created_at).toLocaleString()}</time></div><p className="comment-body">{comment.body}</p>{attachments.filter(file => file.comment_id === comment.id).map(file => <a className="comment-file" key={file.id} href={`/api/files?${new URLSearchParams({ workspace_id: task.workspace_id, id: file.id })}`} download>{file.filename}</a>)}</li>)}</ol> : <p className="muted text-sm">{offset ? "No more comments on this page." : "No comments yet. Keep the next step here."}</p>}
       {(offset > 0 || page.hasMore) && <div className="comment-pagination"><Button size="sm" variant="outline" disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - 30))}>Newer comments</Button><Button size="sm" variant="outline" disabled={!page.hasMore} onClick={() => setOffset(page.nextOffset)}>Older comments</Button></div>}
     </>}
   </section>;

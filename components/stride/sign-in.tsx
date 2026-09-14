@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { authClient } from "@/lib/auth-client";
 
-export function SignIn({ available }: { available: boolean }) {
+export function SignIn({ available, next = "/" }: { available: boolean; next?: string }) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -21,7 +21,7 @@ export function SignIn({ available }: { available: boolean }) {
     try {
       const result = await authClient.signIn.email({ email, password, rememberMe: true });
       if (result.error) throw new Error("Sign-in failed");
-      setPassword(""); router.replace("/"); router.refresh();
+      setPassword(""); router.replace(next); router.refresh();
     } catch {
       setError("Sign-in failed. Check your email and password, then try again.");
       setBusy(false);
@@ -36,7 +36,8 @@ export function SignIn({ available }: { available: boolean }) {
         <Button type="submit" className="w-full" disabled={busy}><LogIn aria-hidden="true" />{busy ? "Signing in…" : "Sign in"}</Button>
       </form> : <p className="text-sm text-muted-foreground" role="status">Your workspace is being prepared. Sign-in will be available when setup is complete.</p>}
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-      <p className="text-xs text-muted-foreground">Access is limited to approved accounts. Contact your workspace owner if you need access or account recovery.</p>
+      <a href="/forgot-password" className="text-sm text-primary underline">Forgot password?</a>
+      <p className="text-xs text-muted-foreground">Access is limited to approved and invited accounts. Contact your workspace owner for an invitation.</p>
     </section>
   </main>;
 }

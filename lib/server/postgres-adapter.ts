@@ -99,7 +99,8 @@ class PostgresStatement implements Statement {
 /** D1-compatible repository boundary backed by a PostgreSQL connection pool. */
 export class PostgresDatabase implements Database {
   readonly pool: PgPool;
-  constructor(pool: PgPool) { this.pool = pool; }
+  readonly inTransaction: boolean;
+  constructor(pool: PgPool, inTransaction = false) { this.pool = pool; this.inTransaction = inTransaction; }
 
   prepare(sql: string): Statement { return new PostgresStatement(this, postgresParameters(sql)); }
 
@@ -111,16 +112,29 @@ export class PostgresDatabase implements Database {
       }
       return statement;
     });
+    return this.transaction(async database => {
+      const executor = (database as PostgresDatabase).pool;
+      const results: SqlResult<T>[] = [];
+      for (const statement of own) results.push(await statement.execute<T>(executor));
+      return results;
+    });
+  }
+
+  async transaction<T>(operation: (database: Database) => Promise<T>): Promise<T> {
+    if (this.inTransaction) return operation(this);
     const client = await this.pool.connect();
     let begun = false;
     let destroy = false;
     try {
       await client.query("BEGIN");
       begun = true;
-      const results: SqlResult<T>[] = [];
-      for (const statement of own) results.push(await statement.execute<T>(client));
+      const scoped = new PostgresDatabase({
+        query: (text, values) => client.query(text, values),
+        connect: async () => { throw new Error("Nested connection is unavailable inside a transaction"); },
+      }, true);
+      const result = await operation(scoped);
       await client.query("COMMIT");
-      return results;
+      return result;
     } catch (error) {
       if (begun) {
         try { await client.query("ROLLBACK"); }

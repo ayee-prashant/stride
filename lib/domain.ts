@@ -3,6 +3,8 @@ export const STATUSES = ["todo", "in_progress", "done"] as const;
 export const PRIORITIES = ["low", "medium", "high"] as const;
 export const DUE_FILTERS = ["all", "overdue", "today", "upcoming", "none"] as const;
 export const TASK_SORTS = ["due_date", "priority"] as const;
+export const RECURRENCES = ["none", "daily", "weekly", "monthly"] as const;
+export type Recurrence = (typeof RECURRENCES)[number];
 export type Status = (typeof STATUSES)[number];
 export type Priority = (typeof PRIORITIES)[number];
 export type Role = "admin" | "member";
@@ -15,18 +17,20 @@ export type Task = {
   status: Status; priority: Priority; assignee_id: string | null; due_date: string | null;
   completed_at: string | null; archived_at: string | null; version: number;
   created_by: string; updated_by: string; created_at: string; updated_at: string;
+  blocked_reason: string; waiting_on_id: string | null; recurrence: Recurrence; recurrence_parent_id: string | null;
+  checklist_total?: number; checklist_done?: number;
   project_name?: string; assignee_name?: string | null; responsible_id?: string; responsible_name?: string;
 };
 export type Activity = { id: string; action: string; actor_name: string; created_at: string };
 export type CommentDraft = { body: string; mentioned_user_ids: string[] };
 export type TaskComment = CommentDraft & { id: string; workspace_id: string; task_id: string; author_id: string; author_name: string; created_at: string };
-export type TaskNotification = { id: string; task_id: string; task_title: string; project_name: string; kind: "assignment" | "mention" | "overdue"; actor_name: string | null; created_at: string; read_at: string | null };
+export type TaskNotification = { id: string; task_id: string; task_title: string; project_name: string; kind: "assignment" | "mention" | "overdue" | "reminder"; actor_name: string | null; created_at: string; read_at: string | null };
 export type PageQuery = { limit: number; offset: number };
 export type NotificationQuery = PageQuery & { tz_offset: number };
 export type CommentPage = { comments: TaskComment[]; hasMore: boolean; nextOffset: number };
 export type NotificationPage = { notifications: TaskNotification[]; unreadCount: number; hasMore: boolean; nextOffset: number };
-export type TaskCreate = Pick<Task, "project_id" | "title" | "description" | "status" | "priority" | "assignee_id" | "due_date">;
-export type TaskPatch = Partial<Omit<TaskCreate, "project_id">> & { version: number; archived?: boolean };
+export type TaskCreate = Pick<Task, "project_id" | "title" | "description" | "status" | "priority" | "assignee_id" | "due_date"> & { recurrence?: Recurrence };
+export type TaskPatch = Partial<Omit<TaskCreate, "project_id">> & { version: number; archived?: boolean; blocked_reason?: string; waiting_on_id?: string | null };
 export type ProjectInput = { name: string; description: string };
 export type ProjectPatch = Partial<ProjectInput> & { version: number; archived?: boolean };
 export type TaskQuery = PageQuery & { project_id?: string; assignee_id?: string; priority?: Priority; status?: Status; query: string; archived: boolean; include_done: boolean; due: (typeof DUE_FILTERS)[number]; sort: (typeof TASK_SORTS)[number]; tz_offset: number };
@@ -52,14 +56,14 @@ export function text(value: unknown, label: string, max: number, allowEmpty = fa
   return result;
 }
 export function identifier(value: unknown): string { return text(value, "Identifier", 256); }
-function choice<T extends string>(value: unknown, choices: readonly T[], label: string): T {
+export function choice<T extends string>(value: unknown, choices: readonly T[], label: string): T {
   if (typeof value !== "string" || !choices.includes(value as T)) invalid(`Invalid ${label}.`);
   return value as T;
 }
-function boolean(value: unknown): boolean {
+export function boolean(value: unknown): boolean {
   if (typeof value !== "boolean") invalid("Expected true or false."); return value;
 }
-function version(value: unknown): number {
+export function version(value: unknown): number {
   if (!Number.isSafeInteger(value) || (value as number) < 1) invalid("A valid record version is required."); return value as number;
 }
 export function calendarDate(value: unknown): string | null {
@@ -70,16 +74,17 @@ export function calendarDate(value: unknown): string | null {
   return value;
 }
 export function parseTaskCreate(input: unknown): TaskCreate {
-  const v = object(input, ["project_id", "title", "description", "status", "priority", "assignee_id", "due_date"]);
+  const v = object(input, ["project_id", "title", "description", "status", "priority", "assignee_id", "due_date", "recurrence"]);
   return {
     project_id: identifier(v.project_id), title: text(v.title, "Title", 200),
     description: text(v.description ?? "", "Description", 8000, true),
     status: choice(v.status ?? "todo", STATUSES, "status"), priority: choice(v.priority ?? "medium", PRIORITIES, "priority"),
     assignee_id: v.assignee_id == null ? null : identifier(v.assignee_id), due_date: calendarDate(v.due_date ?? null),
+    ...("recurrence" in v ? { recurrence: choice(v.recurrence, RECURRENCES, "repeat schedule") } : {}),
   };
 }
 export function parseTaskPatch(input: unknown): TaskPatch {
-  const v = object(input, ["version", "title", "description", "status", "priority", "assignee_id", "due_date", "archived"]);
+  const v = object(input, ["version", "title", "description", "status", "priority", "assignee_id", "due_date", "archived", "blocked_reason", "waiting_on_id", "recurrence"]);
   if (Object.keys(v).length < 2) invalid("No task changes supplied.");
   const result: TaskPatch = { version: version(v.version) };
   if ("title" in v) result.title = text(v.title, "Title", 200);
@@ -89,6 +94,9 @@ export function parseTaskPatch(input: unknown): TaskPatch {
   if ("assignee_id" in v) result.assignee_id = v.assignee_id === null ? null : identifier(v.assignee_id);
   if ("due_date" in v) result.due_date = calendarDate(v.due_date);
   if ("archived" in v) result.archived = boolean(v.archived);
+  if ("blocked_reason" in v) result.blocked_reason = text(v.blocked_reason, "Blocker reason", 500, true);
+  if ("waiting_on_id" in v) result.waiting_on_id = v.waiting_on_id === null ? null : identifier(v.waiting_on_id);
+  if ("recurrence" in v) result.recurrence = choice(v.recurrence, RECURRENCES, "repeat schedule");
   return result;
 }
 export function parseProject(input: unknown): ProjectInput {

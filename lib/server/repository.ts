@@ -1,4 +1,6 @@
 import { AppError, dateAtOffset, identifier, object, parseComment, parseMember, parseNotificationQuery, parseProject, parseProjectPatch, parseTaskCreate, parseTaskPatch, text } from "../domain.ts";
+import { notificationAllowed } from "./notification-rules.ts";
+import { localClock, nextOccurrence } from "../productivity.ts";
 import type { Activity, CommentPage, Identity, Member, NotificationPage, PageQuery, Project, Role, Task, TaskComment, TaskNotification, TaskQuery, Workspace } from "../domain.ts";
 
 export type SqlValue = string | number | null;
@@ -9,13 +11,17 @@ export interface Statement {
   all<T = Record<string, unknown>>(): Promise<SqlResult<T>>;
   run(): Promise<{ meta: { changes: number } }>;
 }
-export interface Database { prepare(query: string): Statement; batch<T = Record<string, unknown>>(statements: Statement[]): Promise<SqlResult<T>[]> }
+export interface Database {
+  prepare(query: string): Statement;
+  batch<T = Record<string, unknown>>(statements: Statement[]): Promise<SqlResult<T>[]>;
+  transaction<T>(operation: (database: Database) => Promise<T>): Promise<T>;
+}
 
 const missing = () => new AppError(404, "NOT_FOUND", "The item is unavailable or you do not have access.");
 const conflict = () => new AppError(409, "CONFLICT", "This item changed. Refresh it before saving again.");
 const memberGuard = "EXISTS (SELECT 1 FROM memberships m WHERE m.workspace_id = ? AND m.user_id = ?)";
 const adminGuard = "EXISTS (SELECT 1 FROM memberships m WHERE m.workspace_id = ? AND m.user_id = ? AND m.role = 'admin')";
-const taskSelect = "SELECT t.*, p.name AS project_name, u.name AS assignee_name, COALESCE(t.assignee_id,t.created_by) AS responsible_id, COALESCE(u.name,creator.name) AS responsible_name FROM tasks t JOIN projects p ON p.id=t.project_id AND p.workspace_id=t.workspace_id LEFT JOIN users u ON u.id=t.assignee_id JOIN users creator ON creator.id=t.created_by";
+const taskSelect = "SELECT t.*, (SELECT CAST(COUNT(*) AS INTEGER) FROM checklist_items c WHERE c.workspace_id=t.workspace_id AND c.task_id=t.id) AS checklist_total, (SELECT CAST(COUNT(*) AS INTEGER) FROM checklist_items c WHERE c.workspace_id=t.workspace_id AND c.task_id=t.id AND c.completed=1) AS checklist_done, p.name AS project_name, u.name AS assignee_name, COALESCE(t.assignee_id,t.created_by) AS responsible_id, COALESCE(u.name,creator.name) AS responsible_name FROM tasks t JOIN projects p ON p.id=t.project_id AND p.workspace_id=t.workspace_id LEFT JOIN users u ON u.id=t.assignee_id JOIN users creator ON creator.id=t.created_by";
 type StoredComment = Omit<TaskComment, "mentioned_user_ids"> & { mentioned_user_ids: string };
 const commentValue = (row: StoredComment): TaskComment => ({ ...row, mentioned_user_ids: JSON.parse(row.mentioned_user_ids) as string[] });
 
@@ -111,7 +117,7 @@ export class Repository {
     return this.statement(`INSERT INTO notifications(id,workspace_id,task_id,recipient_id,actor_id,kind,event_key,created_at)
       SELECT ?,t.workspace_id,t.id,r.user_id,?,'assignment',?,? FROM tasks t
       JOIN memberships r ON r.workspace_id=t.workspace_id AND r.user_id=COALESCE(t.assignee_id,t.created_by)
-      WHERE t.workspace_id=? AND t.id=? AND t.last_mutation_id=? AND r.user_id<>? AND ${memberGuard}
+      WHERE t.workspace_id=? AND t.id=? AND t.last_mutation_id=? AND r.user_id<>? AND ${memberGuard} AND ${notificationAllowed("t.workspace_id", "t.id", "r.user_id", "assignment")}
       ON CONFLICT(recipient_id,event_key) DO NOTHING`, `assignment:${mutation}`, actor, `assignment:${mutation}`, time, workspaceId, taskId, mutation, actor, workspaceId, actor);
   }
   async createTask(userId: string, workspaceId: string, input: unknown): Promise<Task> {
@@ -119,7 +125,7 @@ export class Repository {
     value.assignee_id ??= userId;
     const now = this.now().toISOString(); const id = crypto.randomUUID(); const mutation = crypto.randomUUID();
     const result = await this.db.batch([
-      this.statement(`INSERT INTO tasks(id,workspace_id,project_id,title,description,status,priority,assignee_id,due_date,completed_at,last_mutation_id,created_by,updated_by,created_at,updated_at) SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,? WHERE ${memberGuard} AND EXISTS (SELECT 1 FROM projects WHERE id=? AND workspace_id=? AND archived_at IS NULL) AND (CAST(? AS TEXT) IS NULL OR EXISTS(SELECT 1 FROM memberships WHERE workspace_id=? AND user_id=?)) RETURNING *`, id, workspaceId, value.project_id, value.title, value.description, value.status, value.priority, value.assignee_id, value.due_date, value.status === "done" ? now : null, mutation, userId, userId, now, now, workspaceId, userId, value.project_id, workspaceId, value.assignee_id, workspaceId, value.assignee_id),
+      this.statement(`INSERT INTO tasks(id,workspace_id,project_id,title,description,status,priority,assignee_id,due_date,completed_at,last_mutation_id,created_by,updated_by,created_at,updated_at,recurrence) SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,? WHERE ${memberGuard} AND EXISTS (SELECT 1 FROM projects WHERE id=? AND workspace_id=? AND archived_at IS NULL) AND (CAST(? AS TEXT) IS NULL OR EXISTS(SELECT 1 FROM memberships WHERE workspace_id=? AND user_id=?)) RETURNING *`, id, workspaceId, value.project_id, value.title, value.description, value.status, value.priority, value.assignee_id, value.due_date, value.status === "done" ? now : null, mutation, userId, userId, now, now, value.recurrence ?? "none", workspaceId, userId, value.project_id, workspaceId, value.assignee_id, workspaceId, value.assignee_id),
       this.event(mutation, workspaceId, id, userId, "created", now),
       this.assignmentEvent(mutation, workspaceId, id, userId, now),
     ]);
@@ -127,15 +133,38 @@ export class Repository {
     return this.task(userId, workspaceId, id);
   }
   async updateTask(userId: string, workspaceId: string, taskId: string, input: unknown): Promise<Task> {
+    // A successor, copied checklist, task edit and notifications commit together.
+    const before = await this.task(userId, workspaceId, taskId);
+    return this.db.transaction(async database => {
+      const scoped = new Repository(database, this.now);
+      const updated = await scoped.updateTaskRecord(userId, workspaceId, taskId, input);
+      if (before.status !== "done" && updated.status === "done" && !updated.archived_at && updated.recurrence !== "none") {
+        const existing = await scoped.statement("SELECT id FROM tasks WHERE workspace_id=? AND recurrence_parent_id=?", workspaceId, taskId).first();
+        if (!existing) {
+          const settings = await scoped.statement("SELECT timezone FROM notification_preferences WHERE workspace_id=? AND user_id=?", workspaceId, userId).first<{ timezone: string }>();
+          const due = nextOccurrence(updated.recurrence, updated.due_date, localClock(scoped.now(), settings?.timezone ?? "UTC").day);
+          const next = await scoped.createTask(userId, workspaceId, { project_id: updated.project_id, title: updated.title, description: updated.description, priority: updated.priority, assignee_id: updated.assignee_id ?? updated.created_by, due_date: due, recurrence: updated.recurrence });
+          await scoped.statement("UPDATE tasks SET recurrence_parent_id=? WHERE id=? AND workspace_id=?", taskId, next.id, workspaceId).run();
+          const checklist = await scoped.statement("SELECT title,position FROM checklist_items WHERE workspace_id=? AND task_id=? ORDER BY position,id LIMIT 50", workspaceId, taskId).all<{ title: string; position: number }>();
+          for (const item of checklist.results) await scoped.statement("INSERT INTO checklist_items(id,workspace_id,task_id,title,position,created_at) VALUES(?,?,?,?,?,?)", crypto.randomUUID(), workspaceId, next.id, item.title, item.position, scoped.now().toISOString()).run();
+        }
+      }
+      return updated;
+    });
+  }
+  private async updateTaskRecord(userId: string, workspaceId: string, taskId: string, input: unknown): Promise<Task> {
     const patch = parseTaskPatch(input); const current = await this.task(userId, workspaceId, taskId);
     if (current.version !== patch.version) throw conflict();
     if (current.archived_at && (patch.archived !== false || Object.keys(patch).length !== 2)) throw new AppError(409, "ARCHIVED", "Restore this task before editing it.");
     const now = this.now().toISOString(); const mutation = crypto.randomUUID(); const status = patch.status ?? current.status;
     const assignee = patch.assignee_id === undefined ? current.assignee_id : patch.assignee_id;
+    const blocked = patch.blocked_reason ?? current.blocked_reason;
+    const waiting = !blocked ? null : patch.waiting_on_id === undefined ? current.waiting_on_id : patch.waiting_on_id;
+    if (patch.waiting_on_id && !blocked) throw new AppError(400, "INVALID_BLOCKER", "Add a blocker reason before selecting a teammate.");
     const action = patch.archived === true ? "archived" : patch.archived === false ? "restored" : status !== current.status ? `status:${status}` : "updated";
     const completed = status === "done" ? current.completed_at ?? now : null;
     const result = await this.db.batch([
-      this.statement(`UPDATE tasks SET title=?,description=?,status=?,priority=?,assignee_id=?,due_date=?,completed_at=?,archived_at=?,version=version+1,last_mutation_id=?,updated_by=?,updated_at=? WHERE id=? AND workspace_id=? AND version=? AND ${memberGuard} AND EXISTS(SELECT 1 FROM projects WHERE id=tasks.project_id AND workspace_id=? AND archived_at IS NULL) AND (CAST(? AS TEXT) IS NULL OR EXISTS(SELECT 1 FROM memberships WHERE workspace_id=? AND user_id=?)) RETURNING *`, patch.title ?? current.title, patch.description ?? current.description, status, patch.priority ?? current.priority, assignee, patch.due_date === undefined ? current.due_date : patch.due_date, completed, patch.archived === undefined ? current.archived_at : patch.archived ? now : null, mutation, userId, now, taskId, workspaceId, patch.version, workspaceId, userId, workspaceId, assignee, workspaceId, assignee),
+      this.statement(`UPDATE tasks SET title=?,description=?,status=?,priority=?,assignee_id=?,due_date=?,completed_at=?,archived_at=?,version=version+1,last_mutation_id=?,updated_by=?,updated_at=?,blocked_reason=?,waiting_on_id=?,recurrence=? WHERE id=? AND workspace_id=? AND version=? AND ${memberGuard} AND EXISTS(SELECT 1 FROM projects WHERE id=tasks.project_id AND workspace_id=? AND archived_at IS NULL) AND (CAST(? AS TEXT) IS NULL OR EXISTS(SELECT 1 FROM memberships WHERE workspace_id=? AND user_id=?)) AND (CAST(? AS TEXT) IS NULL OR EXISTS(SELECT 1 FROM memberships WHERE workspace_id=? AND user_id=?)) RETURNING *`, patch.title ?? current.title, patch.description ?? current.description, status, patch.priority ?? current.priority, assignee, patch.due_date === undefined ? current.due_date : patch.due_date, completed, patch.archived === undefined ? current.archived_at : patch.archived ? now : null, mutation, userId, now, blocked, waiting, patch.recurrence ?? current.recurrence, taskId, workspaceId, patch.version, workspaceId, userId, workspaceId, assignee, workspaceId, assignee, waiting, workspaceId, waiting),
       this.event(mutation, workspaceId, taskId, userId, action, now),
       ...((assignee ?? current.created_by) !== (current.assignee_id ?? current.created_by) ? [this.assignmentEvent(mutation, workspaceId, taskId, userId, now)] : []),
     ]);
@@ -172,7 +201,7 @@ export class Repository {
       ...(mentions.length ? [this.statement(`INSERT INTO notifications(id,workspace_id,task_id,recipient_id,actor_id,kind,event_key,created_at)
         SELECT 'mention:'||c.id||':'||m.user_id,c.workspace_id,c.task_id,m.user_id,c.author_id,'mention','mention:'||c.id,c.created_at
         FROM comments c JOIN memberships m ON m.workspace_id=c.workspace_id
-        WHERE c.id=? AND c.workspace_id=? AND c.author_id=? AND m.user_id<>c.author_id AND m.user_id IN (${marks})
+        WHERE c.id=? AND c.workspace_id=? AND c.author_id=? AND m.user_id<>c.author_id AND m.user_id IN (${marks}) AND ${notificationAllowed("c.workspace_id", "c.task_id", "m.user_id", "mention")}
         ON CONFLICT(recipient_id,event_key) DO NOTHING`, id, workspaceId, userId, ...mentions)] : []),
     ]);
     if (!result[0].results.length) throw new AppError(409, "COMMENT_UNAVAILABLE", "The task, project, or membership changed. Refresh before commenting.");
@@ -188,13 +217,16 @@ export class Repository {
         SELECT 'overdue:'||t.id||':'||t.due_date||':'||?,t.workspace_id,t.id,?,NULL,'overdue','overdue:'||t.id||':'||t.due_date||':'||?,?
         FROM tasks t JOIN projects p ON p.workspace_id=t.workspace_id AND p.id=t.project_id
         WHERE t.workspace_id=? AND ${memberGuard} AND (t.assignee_id=? OR (t.assignee_id IS NULL AND t.created_by=?))
-        AND t.archived_at IS NULL AND p.archived_at IS NULL AND t.status<>'done' AND t.due_date<?
+        AND t.archived_at IS NULL AND p.archived_at IS NULL AND t.status<>'done' AND t.due_date<? AND ${notificationAllowed('t.workspace_id', 't.id', 'COALESCE(t.assignee_id,t.created_by)', 'overdue')}
         AND NOT EXISTS(SELECT 1 FROM notifications n WHERE n.id='overdue:'||t.id||':'||t.due_date||':'||?)
         ORDER BY t.due_date,t.id LIMIT 100 ON CONFLICT(recipient_id,event_key) DO NOTHING`,
       userId, userId, userId, now.toISOString(), workspaceId, workspaceId, userId, userId, userId, today, userId).run();
     }
     const join = "FROM notifications n JOIN tasks t ON t.workspace_id=n.workspace_id AND t.id=n.task_id JOIN projects p ON p.workspace_id=t.workspace_id AND p.id=t.project_id LEFT JOIN users a ON a.id=n.actor_id";
     const visible = `n.workspace_id=? AND n.recipient_id=? AND ${memberGuard} AND t.archived_at IS NULL AND p.archived_at IS NULL
+      AND NOT EXISTS(SELECT 1 FROM task_notification_settings nm WHERE nm.workspace_id=n.workspace_id AND nm.task_id=n.task_id AND nm.user_id=n.recipient_id AND nm.muted=1)
+      AND NOT EXISTS(SELECT 1 FROM notification_preferences np WHERE np.workspace_id=n.workspace_id AND np.user_id=n.recipient_id AND ((n.kind='assignment' AND np.assignments=0) OR (n.kind='mention' AND np.mentions=0) OR (n.kind IN ('overdue','reminder') AND np.due_reminders=0)))
+      AND (n.kind<>'reminder' OR (t.status<>'done' AND COALESCE(t.assignee_id,t.created_by)=n.recipient_id AND n.event_key='reminder:'||t.id||':'||t.due_date||':'||n.recipient_id))
       AND (n.kind<>'overdue' OR (t.status<>'done' AND t.due_date<? AND COALESCE(t.assignee_id,t.created_by)=n.recipient_id AND n.event_key='overdue:'||t.id||':'||t.due_date||':'||n.recipient_id))`;
     const values: SqlValue[] = [workspaceId, userId, workspaceId, userId, today];
     const [rows, count] = await Promise.all([
@@ -215,9 +247,9 @@ export class Repository {
       AND EXISTS(SELECT 1 FROM tasks t JOIN projects p ON p.id=t.project_id AND p.workspace_id=t.workspace_id WHERE t.id=notifications.task_id AND t.workspace_id=notifications.workspace_id AND t.archived_at IS NULL AND p.archived_at IS NULL) RETURNING id,read_at`, now, id, workspaceId, userId, workspaceId, userId).first();
     if (!row) throw missing(); return row;
   }
-  async rateLimit(userId: string, now = Date.now()) {
+  async rateLimit(userId: string, now = Date.now(), maximum = 120) {
     const window = Math.floor(now / 60000);
     const row = await this.statement("INSERT INTO mutation_limits(user_id,window_start,hits) VALUES(?,?,1) ON CONFLICT(user_id) DO UPDATE SET hits=CASE WHEN mutation_limits.window_start=excluded.window_start THEN mutation_limits.hits+1 ELSE 1 END,window_start=excluded.window_start RETURNING hits", userId, window).first<{ hits: number }>();
-    if (!row || row.hits > 120) throw new AppError(429, "RATE_LIMITED", "Too many changes. Wait a minute before trying again.");
+    if (!row || row.hits > maximum) throw new AppError(429, "RATE_LIMITED", "Too many changes. Wait a minute before trying again.");
   }
 }

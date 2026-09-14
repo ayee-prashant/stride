@@ -1,0 +1,101 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { fixture } from "./sqlite.ts";
+import { Repository } from "../lib/server/repository.ts";
+import { ProductivityRepository } from "../lib/server/productivity-repository.ts";
+import { DEFAULT_PREFERENCES, localClock, nextOccurrence, parseBulk, parsePreferences, parseSavedView, parseTemplate, safeReturnTo, taskLink } from "../lib/productivity.ts";
+import { parseTaskQuery } from "../lib/domain.ts";
+
+test("productivity validation rejects mass assignment, excess selection and unsafe return URLs", () => {
+  assert.throws(() => parseBulk({ tasks: [{ id: "a", version: 1 }, { id: "a", version: 2 }], changes: { status: "done" } }));
+  assert.throws(() => parseBulk({ tasks: [{ id: "a", version: 1 }], changes: { project_id: "outside" } }));
+  assert.throws(() => parseSavedView({ name: "Bad", filters: { user_id: "outside" } }));
+  assert.throws(() => parsePreferences({ ...DEFAULT_PREFERENCES, timezone: "Not/A_Zone" }));
+  assert.throws(() => parseTemplate({ name: "Bad", task: { title: "Bad", due_date: "2026-01-01" }, checklist: [] }));
+  for (const value of ["https://evil.test", "//evil.test", "/\\evil.test", "/api/auth/sign-out", "/\n/evil.test"]) assert.equal(safeReturnTo(value), "/");
+  assert.equal(safeReturnTo(taskLink("ws a", "task&b")), "/?workspace=ws+a&task=task%26b");
+});
+test("recurrence handles leap years, short months, past dates and local calendar boundaries", () => {
+  assert.equal(nextOccurrence("monthly", "2028-01-31", "2028-01-20"), "2028-02-29");
+  assert.equal(nextOccurrence("monthly", null, "2027-01-31"), "2027-02-28");
+  assert.equal(nextOccurrence("weekly", "2025-01-01", "2026-12-28"), "2027-01-04");
+  assert.equal(localClock(new Date("2026-01-01T01:00:00Z"), "America/Los_Angeles").day, "2025-12-31");
+});
+test("checklists are scoped, versioned, counted in task results and survive task archives", async () => {
+  const f = await fixture(); const s = new ProductivityRepository(f.repo);
+  const task = await f.repo.createTask("owner", f.workspace, { title: "Check", project_id: f.project });
+  const created = await s.changeChecklist("owner", f.workspace, task.id, null, { title: "Verify" });
+  const item = created.item!;
+  await assert.rejects(s.checklist("other", f.workspace, task.id), { status: 404 });
+  await s.changeChecklist("owner", f.workspace, task.id, item.id, { version: 1, completed: true });
+  await assert.rejects(s.changeChecklist("owner", f.workspace, task.id, item.id, { version: 1, title: "Stale" }), { status: 409 });
+  const loaded = await f.repo.task("owner", f.workspace, task.id);
+  assert.equal(loaded.checklist_total, 1); assert.equal(loaded.checklist_done, 1);
+  await f.repo.updateTask("owner", f.workspace, task.id, { version: 1, archived: true });
+  await assert.rejects(s.changeChecklist("owner", f.workspace, task.id, null, { title: "Hidden" }), { status: 409 });
+  assert.equal((await s.checklist("owner", f.workspace, task.id)).length, 1);
+  f.db.raw.close();
+});
+test("bulk changes and audit entries roll back together when any selection is stale or inaccessible", async () => {
+  const f = await fixture(); const s = new ProductivityRepository(f.repo);
+  const tasks = [await f.repo.createTask("owner", f.workspace, { title: "A", project_id: f.project }), await f.repo.createTask("owner", f.workspace, { title: "B", project_id: f.project })];
+  const selection = tasks.map(t => ({ id: t.id, version: t.version })).sort((a, b) => a.id.localeCompare(b.id));
+  const count = f.db.raw.prepare("SELECT COUNT(*) AS n FROM activity").get()!.n;
+  selection[1].version = 99;
+  await assert.rejects(s.bulk("owner", f.workspace, { tasks: selection, changes: { status: "done" } }), { status: 409 });
+  assert.equal(f.db.raw.prepare("SELECT COUNT(*) AS n FROM activity").get()!.n, count);
+  for (const t of tasks) assert.equal((await f.repo.task("owner", f.workspace, t.id)).status, "todo");
+  selection[1].version = 1;
+  assert.equal((await s.bulk("owner", f.workspace, { tasks: selection, changes: { priority: "high" } })).tasks.length, 2);
+  f.db.raw.close();
+});
+test("blockers require a current teammate and never add a fourth workflow status", async () => {
+  const f = await fixture(); const t = await f.repo.createTask("owner", f.workspace, { title: "Blocked", project_id: f.project });
+  await assert.rejects(f.repo.updateTask("owner", f.workspace, t.id, { version: 1, blocked_reason: "Review", waiting_on_id: "other" }), { status: 409 });
+  await f.repo.addMember("owner", f.workspace, { email: "other@example.test" });
+  const blocked = await f.repo.updateTask("owner", f.workspace, t.id, { version: 1, blocked_reason: "Review", waiting_on_id: "other" });
+  assert.equal(blocked.status, "todo"); assert.equal(blocked.waiting_on_id, "other");
+  const cleared = await f.repo.updateTask("owner", f.workspace, t.id, { version: 2, blocked_reason: "" });
+  assert.equal(cleared.waiting_on_id, null); f.db.raw.close();
+});
+test("repeated completion creates one durable successor with a reset checklist", async () => {
+  const f = await fixture(); const repo = new Repository(f.db, () => new Date("2026-01-31T12:00:00Z")); const s = new ProductivityRepository(repo);
+  const t = await repo.createTask("owner", f.workspace, { title: "Monthly review", project_id: f.project, recurrence: "monthly" });
+  await s.changeChecklist("owner", f.workspace, t.id, null, { title: "Review findings" });
+  await repo.updateTask("owner", f.workspace, t.id, { version: 1, status: "done" });
+  await repo.updateTask("owner", f.workspace, t.id, { version: 2, status: "todo" });
+  await repo.updateTask("owner", f.workspace, t.id, { version: 3, status: "done" });
+  const successors = f.db.raw.prepare("SELECT * FROM tasks WHERE recurrence_parent_id=?").all(t.id);
+  assert.equal(successors.length, 1); assert.equal(successors[0].due_date, "2026-02-28");
+  const items = await s.checklist("owner", f.workspace, String(successors[0].id));
+  assert.equal(items[0].completed, 0); assert.equal(items[0].title, "Review findings"); f.db.raw.close();
+});
+test("saved views are private and templates copy checklist values into the chosen project", async () => {
+  const f = await fixture(); const s = new ProductivityRepository(f.repo);
+  await f.repo.addMember("owner", f.workspace, { email: "other@example.test" });
+  const view = await s.saveView("owner", f.workspace, null, { name: "Urgent", filters: { priority: "high" } });
+  assert.deepEqual(await s.views("other", f.workspace), []);
+  await assert.rejects(s.removeView("other", f.workspace, view.id, { version: 1 }), { status: 409 });
+  const template = await s.saveTemplate("owner", f.workspace, null, { name: "Release", task: { title: "Release checklist", priority: "high" }, checklist: ["Run tests", "Review"] });
+  await assert.rejects(s.saveTemplate("other", f.workspace, template.id, { name: "Changed", task: { title: "Changed" }, checklist: [], version: 1 }), { status: 409 });
+  const t = await s.useTemplate("other", f.workspace, template.id, { project_id: "project_owner" });
+  assert.equal(t.assignee_id, "other"); assert.equal(t.priority, "high"); assert.equal(t.checklist_total, 2);
+  await assert.rejects(s.useTemplate("other", f.workspace, template.id, { project_id: "project_other" }), { status: 400 });
+  f.db.raw.close();
+});
+test("notification preferences, task muting and workload honor membership and ownership", async () => {
+  const f = await fixture(); const s = new ProductivityRepository(f.repo);
+  await f.repo.addMember("owner", f.workspace, { email: "other@example.test" });
+  const pref = await s.savePreferences("other", f.workspace, { ...DEFAULT_PREFERENCES, assignments: false, mentions: false });
+  await assert.rejects(s.savePreferences("other", f.workspace, DEFAULT_PREFERENCES), { status: 409 });
+  const t = await f.repo.createTask("owner", f.workspace, { title: "Notice", project_id: f.project, assignee_id: "other" });
+  await f.repo.createComment("owner", f.workspace, t.id, { body: "Hello", mentioned_user_ids: ["other"] });
+  assert.equal((await f.repo.notifications("other", f.workspace, {})).unreadCount, 0);
+  await s.savePreferences("other", f.workspace, { ...pref, mentions: true });
+  await s.muteTask("other", f.workspace, t.id, { muted: true });
+  await f.repo.createComment("owner", f.workspace, t.id, { body: "Muted", mentioned_user_ids: ["other"] });
+  assert.equal((await f.repo.notifications("other", f.workspace, {})).unreadCount, 0);
+  assert.equal((await s.workload("owner", f.workspace)).find(row => row.user_id === "other")?.open, 1);
+  assert.equal((await f.repo.listTasks("owner", f.workspace, parseTaskQuery(new URLSearchParams()))).tasks.length, 1);
+  f.db.raw.close();
+});

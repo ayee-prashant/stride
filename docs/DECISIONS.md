@@ -1,5 +1,24 @@
 # Architecture decisions
 
+## ADR-011: approved team productivity expansion
+
+Accepted. Keep the modular monolith and compose a productivity service around
+the existing repository. Version task/checklist/view/template edits. Use one
+transaction for bulk changes and recurrence creation. A completed repeating task
+creates exactly one new occurrence, with a unique predecessor reference; reopen
+and re-complete never create duplicate successors. Templates copy values and
+checklists, not mutable references to past work. Personal filters and notification
+preferences are scoped to the authenticated member.
+
+Admin-issued invitation tokens are high-entropy capabilities stored only as
+hashes. Acceptance checks expiry, current admin authority, exact email identity,
+single use, and membership limits in a transaction. It can enroll a new account
+using Better Auth's maintained password hashing, never overwrite an existing
+credential. Persisted invitation admission supplements the operator allowlist.
+Email delivery uses a bounded durable outbox and a verified provider; missing
+provider configuration is an explicit unavailable state. Private S3-compatible
+storage holds attachment bodies; only metadata belongs in PostgreSQL.
+
 ## ADR-001: modular monolith
 
 Accepted. A single deployable app keeps the first release operable. Separate

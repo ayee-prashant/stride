@@ -41,6 +41,7 @@
     "lib/**/*.ts",
     "db/postgres-schema.ts",
     "db/auth-schema.ts",
+    "db/productivity-schema.ts",
     "tests/**/*.ts",
     "scripts/*.ts",
     "next.config.ts",

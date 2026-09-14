@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { parseTaskQuery } from "../lib/domain.ts";
 import { fixture } from "./sqlite.ts";
-import type { Statement, SqlResult } from "../lib/server/repository.ts";
+import type { Database } from "../lib/server/repository.ts";
 
 const query = (s = "") => parseTaskQuery(new URLSearchParams(s));
 test("bootstrap is idempotent and creates an empty first project", async t => {
@@ -112,10 +112,10 @@ test("common project and assignee queries use their intended indexes", async t =
 test("a concurrent update after the read is stopped by SQL compare-and-swap", async t => {
   const f = await fixture(); t.after(() => f.db.raw.close());
   const task = await f.repo.createTask("owner", f.workspace, { title: "Original", project_id: f.project });
-  const batch = f.db.batch.bind(f.db);
-  f.db.batch = async function<T>(statements: Statement[]): Promise<SqlResult<T>[]> {
+  const transaction = f.db.transaction.bind(f.db);
+  f.db.transaction = async function<T>(operation: (database: Database) => Promise<T>): Promise<T> {
     f.db.raw.prepare("UPDATE tasks SET title='Concurrent winner',version=2,last_mutation_id='concurrent' WHERE id=?").run(task.id);
-    return batch<T>(statements);
+    return transaction(operation);
   };
   await assert.rejects(f.repo.updateTask("owner", f.workspace, task.id, { version: 1, title: "Losing edit" }), { status: 409 });
   assert.equal((await f.repo.task("owner", f.workspace, task.id)).title, "Concurrent winner");

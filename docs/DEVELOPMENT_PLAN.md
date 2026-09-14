@@ -2,6 +2,10 @@
 
 Each slice includes validation and tests, rather than postponing security to the end.
 
+The active next release is ordered in PRODUCTIVITY_RELEASE.md. Its ten approved
+improvements, reliability checks, and deployment are in progress. The completed
+first-sprint evidence below remains the regression baseline.
+
 | Order | Slice | Exit criterion |
 |---|---|---|
 | 1 | Agent setup, product contract, ADRs | Explicit scope, boundaries, commands, release gates |

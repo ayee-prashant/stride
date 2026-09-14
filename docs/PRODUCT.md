@@ -33,11 +33,12 @@ No hidden automatic due dates. Done tasks are not overdue. Date-only comparisons
 use the viewer's local calendar date. Archiving a project hides, not deletes, its
 tasks; restore the project to continue edits.
 
-## Deferred
+## Previous first-sprint deferrals (superseded where approved)
 
 Outbound email/push delivery, attachments, checklists,
 dependencies, labels, custom workflows, sprint planning, reports, time tracking,
-automations, external integrations, and AI generation. Do not add these to v1.
+automations, external integrations, and AI generation. The user has now approved
+the bounded additions in PRODUCTIVITY_RELEASE.md; that document governs this release.
 
 ## Release boundary
 
