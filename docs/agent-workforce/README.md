@@ -56,3 +56,5 @@ No new LLM API is required for context storage, packet assembly, source reconcil
 8. Templates: [role brief](templates/ROLE_BRIEF.md), [work packet](templates/WORK_PACKET.md), [handoff](templates/HANDOFF.md), and [context change](templates/CONTEXT_CHANGE.md).
 
 These documents define a design baseline, not permission to execute tickets, change production policy or skip repository instructions. Existing `AGENTS.md` remains the development entry point. Begin future implementation with the compatibility/security slice in the delivery plan and update actual completion evidence after each slice.
+
+The source synchronization increment is described in [GITHUB_CONTEXT_SETUP.md](GITHUB_CONTEXT_SETUP.md).

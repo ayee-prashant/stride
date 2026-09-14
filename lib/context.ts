@@ -1,4 +1,5 @@
 import { choice, identifier, invalid, object, text } from "./domain.ts";
+import type { RepositoryBriefSnapshot } from "./github-context.ts";
 
 export const CONTEXT_KINDS = ["requirement", "decision", "constraint"] as const;
 export type ContextKind = typeof CONTEXT_KINDS[number];
@@ -17,7 +18,8 @@ export type TaskBriefPayload = {
   format: "stride-task-brief/1";
   task: { id: string; project_id: string; title: string; description: string };
   documents: ContextRevision[];
-  source_coverage: { github: "not_connected" };
+  source_coverage: { github: "not_connected" | "verified" };
+  repository?: RepositoryBriefSnapshot;
 };
 export type TaskBrief = {
   id: string; workspace_id: string; project_id: string; task_id: string;

@@ -262,3 +262,17 @@ Automatic approval review rejected merging PR #2 into main because it requires
 explicit authorization for that default-branch mutation. No direct push or other
 method was used to bypass the rejection. The already deployed c39487f app and
 its persisted database remain operational independently of that merge.
+
+
+## Agent context implementation, 2026-09-14
+
+The three-pane human context foundation passed CI run 34884573544 on commit
+`f81dda634c410c6f8319084aca5cde46c4d2b0e9`, tree
+`516e5c195105431cb74a3df78088cd56992a1c9b`. It is a reviewable feature branch,
+not a production release. The stacked GitHub source increment adds configured
+repository observations, durable synchronization, source-aware task briefs and
+human source review. Its 100 native tests pass; the new migration and full CI
+checks are pending. See agent-workforce/IMPLEMENTATION_STATUS.md for actual
+verification evidence and agent-workforce/GITHUB_CONTEXT_SETUP.md for setup and
+explicit source coverage. Existing production deployment evidence above remains
+unchanged. No agent execution, merge, deployment or GitHub App setup is implied.

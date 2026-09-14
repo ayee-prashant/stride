@@ -43,6 +43,7 @@
     "db/auth-schema.ts",
     "db/productivity-schema.ts",
     "db/context-schema.ts",
+    "db/github-context-schema.ts",
     "tests/**/*.ts",
     "scripts/*.ts",
     "next.config.ts",

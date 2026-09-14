@@ -12,6 +12,7 @@ import { CONTEXT_KINDS } from "@/lib/context";
 import type { ContextKind, ContextPublish, ContextRevision, ProjectBrief } from "@/lib/context";
 import type { Member } from "@/lib/domain";
 import { Choice } from "./controls";
+import { RepositoryContext } from "./repository-context";
 
 const kindLabels: Record<ContextKind, string> = { requirement: "Requirements", decision: "Decisions", constraint: "Constraints" };
 const kindHelp: Record<ContextKind, string> = {
@@ -50,7 +51,8 @@ export function ProjectContext({ workspaceId, projectId, members }: { workspaceI
       {!!data.documents.length && !visible.length && <p className="muted">No context matches these filters.</p>}
       {CONTEXT_KINDS.map(kind => { const documents = visible.filter(d => d.kind === kind); return documents.length ? <section className="brief-group" key={kind}><div><h3>{kindLabels[kind]} <span>{documents.length}</span></h3><p className="muted">{kindHelp[kind]}</p></div><div className="brief-document-list">{documents.map(doc => <article className={`brief-document ${doc.state === "retired" ? "brief-retired-document" : ""}`} key={doc.document_id}><div className="brief-document-heading"><h4>{doc.title}</h4><span className="brief-version">v{doc.version}{doc.state === "retired" ? " · Retired" : ""}</span></div><p className="brief-body">{doc.body}</p><div className="brief-document-footer"><span>Published by {person(doc.approved_by, members)} · <time dateTime={doc.approved_at}>{new Date(doc.approved_at).toLocaleDateString()}</time></span><div><Button size="sm" variant="ghost" onClick={() => setHistory(doc)} aria-label={`History of ${doc.title}`}><History size={14} />History</Button>{data.can_publish && <Button size="sm" variant="outline" onClick={() => setEditing(doc)} aria-label={`Revise ${doc.title}`}>Revise</Button>}</div></div></article>)}</div></section> : null; })}
     </>}
-    <p className="brief-integration-note">GitHub verification and agent connections are being built. Preparing a brief does not start an agent.</p>
+    <RepositoryContext key={`${workspaceId}:${projectId}`} workspaceId={workspaceId} projectId={projectId} />
+    <p className="brief-integration-note">Preparing a brief does not start an agent. Agent connections and start approvals are the next delivery stages.</p>
     {editing && <ContextDocumentEditor key={editing === "new" ? "new" : editing.document_id} workspaceId={workspaceId} projectId={projectId} document={editing === "new" ? undefined : editing} onClose={() => setEditing(null)} onPublished={() => { setEditing(null); void refresh(); }} />}
     {history && <ContextHistory document={history} members={members} onClose={() => setHistory(null)} />}
   </section>;

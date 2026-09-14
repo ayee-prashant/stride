@@ -5,6 +5,8 @@ import { parseContextPublish, parseTaskBrief } from "../context.ts";
 import type { BriefCheck, ContextRevision, ProjectBrief, TaskBrief, TaskBriefPayload, TaskBriefResult } from "../context.ts";
 import { Repository } from "./repository.ts";
 import type { Database } from "./repository.ts";
+import type { GitHubBinding } from "../github-context.ts";
+import { readSourceContext } from "./repository-source-context.ts";
 
 const missing = () => new AppError(404, "NOT_FOUND", "This project context is unavailable.");
 const conflict = (message = "The context changed. Reload the latest version before publishing.") => new AppError(409, "CONTEXT_CONFLICT", message);
@@ -29,9 +31,9 @@ function decodeBrief(row: StoredBrief): TaskBrief {
 
 /** Human-authenticated context authority. Agent proposals must use a separate actor boundary. */
 export class ContextRepository {
-  repo: Repository;
-  constructor(repo: Repository) { this.repo = repo; }
-  scoped(db: Database) { return new ContextRepository(new Repository(db, this.repo.now)); }
+  repo: Repository; bindings: GitHubBinding[];
+  constructor(repo: Repository, bindings: GitHubBinding[] = []) { this.repo = repo; this.bindings = bindings; }
+  scoped(db: Database) { return new ContextRepository(new Repository(db, this.repo.now), this.bindings); }
 
   async project(userId: string, workspaceId: string, projectId: string, write = false) {
     const role = await this.repo.membership(userId, workspaceId, write);
@@ -115,7 +117,12 @@ export class ContextRepository {
     await this.project(userId, workspaceId, projectId);
     const head = await this.repo.statement(`SELECT sequence FROM project_context_heads WHERE workspace_id=? AND project_id=? AND ${memberGuard}`, workspaceId, projectId, workspaceId, userId).first<{ sequence: number }>();
     if (after > (head?.sequence ?? 0)) throw new AppError(409, "CONTEXT_RESYNC_REQUIRED", "This cursor is ahead of the project. Reload its current brief before resuming changes.");
-    const rows = await this.repo.statement(`SELECT sequence,document_id,document_version,created_by,created_at FROM context_events WHERE workspace_id=? AND project_id=? AND sequence>? AND ${memberGuard} ORDER BY sequence LIMIT 101`, workspaceId, projectId, after, workspaceId, userId).all<{ sequence: number; document_id: string; document_version: number; created_by: string; created_at: string }>();
+    const rows = await this.repo.statement(`SELECT * FROM (
+      SELECT sequence,'document_published' AS kind,document_id,document_version,NULL AS source_id,created_by,created_at FROM context_events WHERE workspace_id=? AND project_id=? AND sequence>? AND ${memberGuard}
+      UNION ALL
+      SELECT sequence,kind,NULL AS document_id,NULL AS document_version,source_id,created_by,created_at FROM repository_source_events WHERE workspace_id=? AND project_id=? AND sequence>? AND ${memberGuard}
+    ) events ORDER BY sequence LIMIT 101`, workspaceId, projectId, after, workspaceId, userId, workspaceId, projectId, after, workspaceId, userId)
+      .all<{ sequence: number; kind: string; document_id: string | null; document_version: number | null; source_id: string | null; created_by: string | null; created_at: string }>();
     const events = rows.results.slice(0, 100);
     return { events, next_cursor: events.at(-1)?.sequence ?? after, has_more: rows.results.length > 100 };
   }
@@ -133,28 +140,31 @@ export class ContextRepository {
       const replay = await repo.statement("SELECT * FROM task_context_briefs WHERE workspace_id=? AND task_id=? AND request_id=?", workspaceId, taskId, value.request_id).first<StoredBrief>();
       if (replay) {
         if (replay.input_hash !== digest || replay.created_by !== userId) throw conflict("This request identifier was already used for a different brief.");
-        return { brief: decodeBrief(replay), check: await service.check(userId, workspaceId, task, decodeBrief(replay)) };
+        return service.result(userId, workspaceId, task, decodeBrief(replay));
       }
       if (task.version !== value.task_version || sequence !== value.context_sequence) throw conflict("The task or project context changed. Refresh and review before preparing the brief.");
       if (task.status === "done") throw conflict("Reopen the task before preparing a new brief.");
       const documents = (await service.currentDocuments(userId, workspaceId, task.project_id)).filter(d => d.state === "active");
       for (const id of value.requirement_ids) if (!documents.some(d => d.document_id === id && d.kind === "requirement")) throw new AppError(400, "REQUIREMENT_UNAVAILABLE", "Select active requirements from this project.");
       const selected = documents.filter(d => d.kind !== "requirement" || value.requirement_ids.includes(d.document_id));
-      const payload: TaskBriefPayload = { format: "stride-task-brief/1", task: taskContent(task), documents: selected, source_coverage: { github: "not_connected" } };
+      const source = await readSourceContext(repo, service.bindings, userId, workspaceId, task.project_id);
+      if (source.state === "unavailable") throw new AppError(409, "SOURCE_NOT_CURRENT", "Repository context is not verified and current. Wait for a successful sync before preparing the brief.");
+      const payload: TaskBriefPayload = { format: "stride-task-brief/1", task: taskContent(task), documents: selected,
+        source_coverage: { github: source.snapshot ? "verified" : "not_connected" }, ...(source.snapshot ? { repository: source.snapshot } : {}) };
       // Bound both the number of snapshots and their UTF-8 size before storing or returning one.
       const encoded = JSON.stringify(payload);
       if (Buffer.byteLength(encoded, "utf8") > 131_072) throw new AppError(409, "BRIEF_TOO_LARGE", "The brief exceeds 128 KiB. Shorten project decisions or split the task requirements.");
       const count = await repo.statement("SELECT COUNT(*) AS n FROM task_context_briefs WHERE workspace_id=? AND task_id=?", workspaceId, taskId).first<{ n: number | string }>();
       if (Number(count?.n ?? 0) >= 200) throw new AppError(409, "CONTEXT_LIMIT", "This task reached its brief history limit.");
       const id = randomUUID(); const now = repo.now().toISOString();
-      const fingerprint = hash({ format: payload.format, workspace_id: workspaceId, task: payload.task, documents: manifest(selected) });
+      const fingerprint = hash({ format: payload.format, workspace_id: workspaceId, task: payload.task, documents: manifest(selected), repository: source.snapshot ? { source_id: source.snapshot.source_id, policy_hash: source.snapshot.policy_hash, manifest_hash: source.snapshot.observation.manifest_hash } : null });
       await repo.statement("INSERT INTO task_context_briefs(id,workspace_id,project_id,task_id,context_sequence,task_version,fingerprint,payload,task_hash,created_by,created_at,request_id,input_hash) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)", id, workspaceId, task.project_id, taskId, sequence, task.version, fingerprint, encoded, hash(payload.task), userId, now, value.request_id, digest).run();
       await repo.statement("INSERT INTO task_context_bindings(task_id,workspace_id,project_id,brief_id) VALUES(?,?,?,?) ON CONFLICT(task_id) DO UPDATE SET brief_id=excluded.brief_id", taskId, workspaceId, task.project_id, id).run();
       return { brief: { id, workspace_id: workspaceId, project_id: task.project_id, task_id: taskId, context_sequence: sequence, task_version: task.version, fingerprint, payload, created_by: userId, created_at: now }, check: { state: "current", reasons: [], execution_ready: false } };
     });
   }
 
-  async check(userId: string, workspaceId: string, task: Task, brief: TaskBrief): Promise<BriefCheck> {
+  async check(userId: string, workspaceId: string, task: Task, brief: TaskBrief, source?: Awaited<ReturnType<typeof readSourceContext>>): Promise<BriefCheck> {
     const { project } = await this.project(userId, workspaceId, task.project_id);
     if (project.archived_at || task.archived_at || task.status === "done") return { state: "unavailable", reasons: ["The task or project is archived, or the task is complete."], execution_ready: false };
     const documents = await this.currentDocuments(userId, workspaceId, task.project_id);
@@ -163,7 +173,21 @@ export class ContextRepository {
     const reasons: string[] = [];
     if (hash(taskContent(task)) !== hash(brief.payload.task)) reasons.push("The task title or description changed.");
     if (hash(manifest(selected)) !== hash(manifest(brief.payload.documents))) reasons.push("A linked requirement or project-wide decision or constraint changed.");
+    const repository = source ?? await readSourceContext(this.repo, this.bindings, userId, workspaceId, task.project_id);
+    if (repository.state === "unavailable") return { state: "unavailable", reasons: [...reasons, "Repository context is not verified and current. Wait for a successful sync."], execution_ready: false };
+    if (brief.payload.repository?.observation.manifest_hash !== repository.snapshot?.observation.manifest_hash || brief.payload.repository?.policy_hash !== repository.snapshot?.policy_hash) reasons.push("The repository connection or commit changed. Review a new brief.");
     return { state: reasons.length ? "stale" : "current", reasons, execution_ready: false };
+  }
+
+  async result(userId: string, workspaceId: string, task: Task, brief: TaskBrief): Promise<TaskBriefResult> {
+    const source = await readSourceContext(this.repo, this.bindings, userId, workspaceId, task.project_id);
+    const bound = brief.payload.repository;
+    // Never disclose historical private files while their current grant or access is unavailable.
+    // Preserve the immutable stored packet; withholding it does not rewrite its fingerprint.
+    if (bound && (!source.snapshot || bound.source_id !== source.snapshot.source_id || bound.policy_hash !== source.snapshot.policy_hash)) {
+      return { brief: null, check: { state: "unavailable", reasons: ["This brief contains repository files whose current access cannot be verified. Restore the source connection and sync before reading it."], execution_ready: false } };
+    }
+    return { brief, check: await this.check(userId, workspaceId, task, brief, source) };
   }
 
   async taskBrief(userId: string, workspaceId: string, taskId: string, briefId?: string): Promise<TaskBriefResult> {
@@ -173,6 +197,6 @@ export class ContextRepository {
       : await this.repo.statement(`SELECT b.* FROM task_context_briefs b JOIN task_context_bindings t ON t.brief_id=b.id AND t.workspace_id=b.workspace_id AND t.task_id=b.task_id AND t.project_id=b.project_id WHERE b.workspace_id=? AND b.task_id=? AND ${memberGuard}`, workspaceId, taskId, workspaceId, userId).first<StoredBrief>();
     if (!row) { if (briefId) throw missing(); return { brief: null, check: null }; }
     const brief = decodeBrief(row);
-    return { brief, check: await this.check(userId, workspaceId, task, brief) };
+    return this.result(userId, workspaceId, task, brief);
   }
 }

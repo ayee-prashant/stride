@@ -30,6 +30,7 @@ export class SQLiteDatabase implements Database {
     if (files.length) for (const file of files) this.raw.exec(readFileSync(new URL(file, migrationRoot), "utf8"));
     else this.raw.exec(readFileSync(new URL("./fixtures/schema.sql", import.meta.url), "utf8"));
     this.raw.exec(readFileSync(new URL("./fixtures/context.sql", import.meta.url), "utf8"));
+    this.raw.exec(readFileSync(new URL("./fixtures/github-context.sql", import.meta.url), "utf8"));
   }
   prepare(sql: string) { return new SQLiteStatement(this.raw, sql); }
   async batch<T>(statements: Statement[]): Promise<SqlResult<T>[]> {
