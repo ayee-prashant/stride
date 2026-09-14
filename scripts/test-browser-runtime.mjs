@@ -13,7 +13,9 @@ export async function verifyBrowser(origin, cookie) {
   const binary = ["/usr/bin/google-chrome", "/usr/bin/chromium", "/usr/bin/chromium-browser"].find(existsSync);
   if (!binary) throw new Error("The CI runner requires installed Chrome");
   const profile = await mkdtemp(join(tmpdir(), "stride-browser-"));
-  const chrome = spawn(binary, ["--headless=new", "--no-sandbox", "--disable-gpu", "--disable-background-networking", "--disable-extensions", "--no-first-run", "--no-default-browser-check", "--remote-debugging-address=127.0.0.1", "--remote-debugging-port=9337", `--user-data-dir=${profile}`, "about:blank"], { stdio: "ignore" });
+  const chrome = spawn(binary, ["--headless=new", "--no-sandbox", "--disable-gpu", "--disable-background-networking", "--disable-extensions", "--no-first-run", "--no-default-browser-check", "--remote-debugging-address=127.0.0.1", "--remote-debugging-port=9337", `--user-data-dir=${profile}`, "about:blank"], { stdio: ["ignore", "ignore", "pipe"] });
+  let startupLog = "";
+  chrome.stderr.on("data", data => { startupLog = (startupLog + data.toString()).slice(-2000); });
   let socket;
   let stage = "chrome-start";
   const pending = new Map();
@@ -57,6 +59,7 @@ export async function verifyBrowser(origin, cookie) {
       await delay(100);
     }
     assert.ok(target?.webSocketDebuggerUrl);
+    stage = "chrome-connect";
     socket = new WebSocket(target.webSocketDebuggerUrl);
     await new Promise((resolve, reject) => { socket.addEventListener("open", resolve, { once: true }); socket.addEventListener("error", reject, { once: true }); });
     socket.addEventListener("message", event => {
@@ -67,8 +70,10 @@ export async function verifyBrowser(origin, cookie) {
         if (data.error) operation.reject(new Error("Browser protocol failed")); else operation.resolve(data.result);
       } else if (data.method === "Runtime.exceptionThrown" || (data.method === "Runtime.consoleAPICalled" && data.params.type === "error")) runtimeErrors.push(data.method);
     });
+    stage = "browser-protocol";
     await call("Page.enable"); await call("Runtime.enable"); await call("Network.enable");
     await call("Emulation.setDeviceMetricsOverride", { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
+    stage = "browser-session";
     for (const pair of cookie.split("; ")) {
       const separator = pair.indexOf("=");
       if (separator > 0) await call("Network.setCookie", { name: pair.slice(0, separator), value: pair.slice(separator + 1), url: origin, httpOnly: true, sameSite: "Lax" });
@@ -128,7 +133,7 @@ export async function verifyBrowser(origin, cookie) {
     assert.deepEqual(runtimeErrors, []);
     console.log("Browser task, comment, mention, inbox, draft and 390px layout checks passed.");
   } catch (error) {
-    console.error(JSON.stringify({ event: "browser_check_failed", stage })); throw error;
+    console.error(JSON.stringify({ event: "browser_check_failed", stage, reason: error instanceof Error ? error.message : "unknown", ...(stage === "chrome-start" ? { chromeExit: chrome.exitCode, startupLog } : {}) })); throw error;
   } finally {
     for (const operation of pending.values()) { clearTimeout(operation.timer); operation.reject(new Error("Browser closed")); }
     socket?.close(); chrome.kill("SIGTERM");
