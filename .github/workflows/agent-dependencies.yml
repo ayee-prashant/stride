@@ -1,0 +1,29 @@
+name: Prepare agent protocol dependencies
+on:
+  pull_request:
+    branches: [feature/agent-role-registry]
+    paths: [package.json, .github/workflows/agent-dependencies.yml, scripts/inspect-agent-dependencies.mjs]
+permissions:
+  contents: read
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+      - run: npm ci --no-audit --no-fund
+      - run: node scripts/inspect-agent-dependencies.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: agent-dependencies-${{ github.event.pull_request.head.sha }}
+          path: |
+            package-lock.json
+            artifacts/agent-dependency-schema.json
+          retention-days: 7
