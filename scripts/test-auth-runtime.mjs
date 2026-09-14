@@ -49,7 +49,11 @@ async function request(path, method = "GET", body, extraHeaders = {}) {
     ...(body === undefined ? {} : { body: JSON.stringify(body) }), signal: AbortSignal.timeout(10000),
   });
   const newCookies = response.headers.getSetCookie();
-  if (newCookies.length) cookie = newCookies.map(value => value.split(";")[0]).join("; ");
+  if (newCookies.length) {
+    const jar = new Map(cookie.split("; ").filter(Boolean).map(pair => [pair.slice(0, pair.indexOf("=")), pair.slice(pair.indexOf("=") + 1)]));
+    for (const value of newCookies) { const pair = value.split(";")[0]; const at = pair.indexOf("="); if (at > 0) { const name = pair.slice(0, at); const content = pair.slice(at + 1); if (content) jar.set(name, content); else jar.delete(name); } }
+    cookie = [...jar].map(([name, value]) => `${name}=${value}`).join("; ");
+  }
   return response;
 }
 async function json(response, expected = 200) {

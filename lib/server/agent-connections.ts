@@ -55,7 +55,9 @@ export class AgentConnections extends DeliveryStore {
       const c = await s.connection(workspaceId, projectId, connectionId); if (c.version !== v.expected_version) throw changed();
       await s.repo.statement("UPDATE agent_connections SET state='revoked',version=version+1,revoked_at=?,lease_until=NULL,prepared=NULL WHERE workspace_id=? AND project_id=? AND id=?", s.repo.now().toISOString(), workspaceId, projectId, connectionId).run();
       await s.repo.statement("UPDATE delivery_attempts SET state='cancelled',version=version+1,ended_at=?,lease_until=NULL WHERE workspace_id=? AND project_id=? AND connection_id=? AND state IN ('authorized','running')", s.repo.now().toISOString(), workspaceId, projectId, connectionId).run();
-      await s.event({ kind: "human", id: userId }, workspaceId, projectId, null, "connection_revoked", v.reason, v.request_id, digest({ connectionId, ...v }), { connection_id: connectionId, physical_stop: "unconfirmed" }, [c.operator_id]);
+      const affected = await s.repo.statement("SELECT id FROM delivery_tickets WHERE workspace_id=? AND project_id=? AND phase IN ('start_approved','in_progress') AND attempt_id IN (SELECT id FROM delivery_attempts WHERE workspace_id=? AND project_id=? AND connection_id=? AND state='cancelled')", workspaceId, projectId, workspaceId, projectId, connectionId).all<{ id: string }>();
+      for (const row of affected.results) { const t = await s.ticket(workspaceId, projectId, row.id); t.attempt_id = null; t.phase = "assigned"; await s.saveTicket(t); }
+      await s.event({ kind: "human", id: userId }, workspaceId, projectId, null, "connection_revoked", v.reason, v.request_id, digest({ connectionId, ...v }), { connection_id: connectionId, physical_stop: "unconfirmed", affected_ticket_ids: affected.results.map(t => t.id) }, [c.operator_id]);
       return s.connection(workspaceId, projectId, connectionId);
     });
   }

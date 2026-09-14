@@ -43,12 +43,14 @@ export class DeliveryService extends DeliveryReview {
   async companionNotices(actor: AgentActor, after: number) { await this.validateConnection(actor); return this.notices(actor.operator_id, actor.workspace_id, actor.project_id, after); }
   /** Durable reconciliation. Heartbeats themselves do not create productivity events. */
   async reconcile(limit = 50) {
+    await this.refreshClock();
     const now = this.repo.now().toISOString();
     const candidates = await this.repo.statement("SELECT a.id,a.workspace_id,a.project_id,a.ticket_id FROM delivery_attempts a JOIN agent_connections c ON c.id=a.connection_id AND c.workspace_id=a.workspace_id LEFT JOIN memberships m ON m.workspace_id=c.workspace_id AND m.user_id=c.operator_id JOIN agent_role_bindings b ON b.id=c.binding_id AND b.workspace_id=c.workspace_id WHERE a.state IN ('authorized','running') AND ((a.state='authorized' AND a.grant_expires<=?) OR (a.state='running' AND a.lease_until<=?) OR c.state<>'active' OR m.epoch IS NULL OR m.epoch<>c.membership_epoch OR b.version<>c.binding_version OR b.state<>'initialized') ORDER BY a.authorized_at LIMIT ?", now, now, Math.min(limit, 50)).all<{ id: string; workspace_id: string; project_id: string; ticket_id: string }>();
     for (const item of candidates.results) await this.repo.db.transaction(async db => {
       const s = this.scoped(db);
       await s.repo.statement("UPDATE workspaces SET name=name WHERE id=?", item.workspace_id).run();
       await s.repo.statement("UPDATE projects SET version=version WHERE workspace_id=? AND id=?", item.workspace_id, item.project_id).run();
+      await s.refreshClock();
       const a = await s.attempt(item.workspace_id, item.project_id, item.id); if (!["authorized", "running"].includes(a.state)) return;
       const c = await s.connection(item.workspace_id, item.project_id, a.connection_id); let invalid = false;
       try { await s.validateConnection({ kind: "agent", connection_id: c.id, profile_id: c.profile_id, operator_id: c.operator_id, workspace_id: c.workspace_id, project_id: c.project_id, session_id: "reconciliation" }); } catch (e) { if (!(e instanceof AppError)) throw e; invalid = true; }

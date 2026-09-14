@@ -57,6 +57,13 @@
       "when": 1789427630114,
       "tag": "0007_fat_roulette",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1789428480351,
+      "tag": "0008_vengeful_scorpion",
+      "breakpoints": true
     }
   ]
 }

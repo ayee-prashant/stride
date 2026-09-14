@@ -63,7 +63,7 @@ export class DeliveryReview extends DeliveryExecution {
         if (t.payload.rework_cycles > 2 || t.kind === "delivery" && routes.some(r => r === "requirements" || r === "architecture")) t.phase = "replan_required";
         else { t.phase = "created"; t.role_id = t.kind === "requirements" ? "business_analysis" : t.kind === "architecture" ? "solution_architecture" : "development"; }
         t.payload.todo = [`Resolve the human review: ${v.reason}`, ...report.findings.map(f => `${f.title}: reproduce ${f.reproduction}; expected ${f.expected}; actual ${f.actual}`), "Re-run the acceptance checks and submit new evidence."];
-        if (t.kind === "delivery") t.payload.candidate = null;
+        if (t.kind === "delivery") { t.payload.candidate = null; t.payload.candidate_profile = null; }
       } else {
         if (report.outcome !== "pass") throw changed("Failed or blocked evidence cannot pass this review.");
         if (evidence && evidence.observed_at < expires(s.repo.now(), -60)) throw changed("Provider evidence expired during review. Verify again.");
@@ -79,7 +79,7 @@ export class DeliveryReview extends DeliveryExecution {
         } else if (t.kind === "architecture") {
           await s.publishDocuments(userId, t, report); adopted = await s.adoptPlan(userId, t, report.plan); t.phase = "accepted";
         } else if (t.role_id === "development") {
-          t.payload.candidate = report.evidence.candidate; t.payload.remaining_reviews = [...t.payload.review_roles]; t.role_id = t.payload.remaining_reviews.shift() ?? "peer_review"; t.phase = "created"; t.payload.todo = ["Independently inspect the exact proposed commit and linked acceptance criteria.", "Check correctness, security, performance and maintainability.", "Submit findings or evidence for engineering acceptance."];
+          t.payload.candidate = report.evidence.candidate; t.payload.candidate_profile = t.attempt_id ? (await s.attempt(workspaceId, projectId, t.attempt_id)).profile_id : null; t.payload.remaining_reviews = [...t.payload.review_roles]; t.role_id = t.payload.remaining_reviews.shift() ?? "peer_review"; t.phase = "created"; t.payload.todo = ["Independently inspect the exact proposed commit and linked acceptance criteria.", "Check correctness, security, performance and maintainability.", "Submit findings or evidence for engineering acceptance."];
         } else if (SPECIALIST_REVIEWS.includes(t.role_id as typeof SPECIALIST_REVIEWS[number])) {
           t.role_id = t.payload.remaining_reviews?.shift() ?? "peer_review"; t.phase = "created";
           t.payload.todo = ["Independently review the exact candidate within this specialist role.", "Report actionable findings or passing evidence for the engineering human."];
@@ -95,7 +95,7 @@ export class DeliveryReview extends DeliveryExecution {
         const task = await s.repo.task(userId, workspaceId, t.task_id);
         await s.repo.updateTask(userId, workspaceId, t.task_id, { version: task.version, status: "done" });
       }
-      const e = await s.event(actor, workspaceId, projectId, t.id, response === "accept" ? "report_accepted" : "work_returned", v.reason, v.request_id, h, { role: reviewedRole, report_hash: reportHash, report, verified: evidence, resulting_phase: t.phase, adopted }, [currentConfig.reviewers.architecture, currentConfig.reviewers[roleGate(t.role_id)], ...(t.phase === "uat_authorization" ? [currentConfig.reviewers.uat] : []), ...(t.phase === "release_authorization" ? [currentConfig.reviewers.release] : [])]);
+      const e = await s.event(actor, workspaceId, projectId, t.id, response === "accept" ? "report_accepted" : "work_returned", v.reason, v.request_id, h, { role: reviewedRole, report_hash: reportHash, report, review_mode: reviewedPacket?.payload.review_mode ?? null, verified: evidence, resulting_phase: t.phase, adopted }, [currentConfig.reviewers.architecture, currentConfig.reviewers[roleGate(t.role_id)], ...(t.phase === "uat_authorization" ? [currentConfig.reviewers.uat] : []), ...(t.phase === "release_authorization" ? [currentConfig.reviewers.release] : [])]);
       return { ...e, ticket: t, adopted };
     });
   }
@@ -140,7 +140,7 @@ export class DeliveryReview extends DeliveryExecution {
       const previous = { phase: t.phase, role: t.role_id, candidate: t.payload.candidate };
       await s.fence(t); t.binding_id = null; t.packet_id = null;
       t.payload.rework_cycles += 1; t.phase = t.payload.rework_cycles > 2 ? "replan_required" : "created"; t.role_id = "development";
-      t.payload.candidate = null; t.payload.report = null; t.payload.reviewed_context_hash = null;
+      t.payload.candidate = null; t.payload.candidate_profile = null; t.payload.report = null; t.payload.reviewed_context_hash = null;
       t.payload.environment = null; t.payload.environment_artifact = null; t.payload.release = null;
       t.payload.remaining_reviews = [...t.payload.review_roles];
       t.payload.todo = [`Resolve the human decision: ${v.reason}`, "Recheck the current approved requirements and file scope.", "Submit a new candidate and repeat every review gate."];

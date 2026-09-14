@@ -12,3 +12,4 @@ CREATE TABLE delivery_notices(id TEXT PRIMARY KEY,workspace_id TEXT NOT NULL,pro
 CREATE INDEX idx_delivery_tickets_page ON delivery_tickets(workspace_id,project_id,created_at,id);
 CREATE INDEX idx_delivery_active_attempts ON delivery_attempts(workspace_id,profile_id,state,lease_until);
 CREATE INDEX idx_delivery_notice_cursor ON delivery_notices(workspace_id,project_id,recipient_id,sequence);
+CREATE TABLE delivery_evidence(id TEXT PRIMARY KEY,workspace_id TEXT NOT NULL,project_id TEXT NOT NULL,policy_hash TEXT NOT NULL,input TEXT NOT NULL,state TEXT NOT NULL,generation INTEGER NOT NULL DEFAULT 1,lease_id TEXT,lease_until TEXT,requested_at TEXT NOT NULL,next_refresh TEXT NOT NULL,observed_at TEXT,payload TEXT,reason TEXT,FOREIGN KEY(workspace_id,project_id) REFERENCES delivery_projects(workspace_id,project_id));

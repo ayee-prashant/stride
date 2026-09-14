@@ -12,7 +12,7 @@ export const forbidden = (message = "This action requires the assigned human rev
 export const expires = (now: Date, seconds: number) => new Date(now.getTime() + seconds * 1000).toISOString();
 export function encoded(value: unknown, max = 131072) { const result = JSON.stringify(value); if (Buffer.byteLength(result) > max) throw changed("This record is too large. Split the work into smaller tickets."); return result; }
 export type EvidenceVerifier = (input: { workspace_id: string; project_id: string; candidate: Candidate; environment?: string; artifact?: string }) => Promise<VerifiedEvidence>;
-export type DeliveryOptions = { bindings?: GitHubBinding[]; verifyEvidence?: EvidenceVerifier; sessionActive?: (sessionId: string, operatorId: string) => Promise<boolean> };
+export type DeliveryOptions = { bindings?: GitHubBinding[]; verifyEvidence?: EvidenceVerifier; databaseClock?: (repo: Repository) => Promise<Date>; sessionActive?: (sessionId: string, operatorId: string) => Promise<boolean> };
 type StoredTicket = Omit<DeliveryTicket, "payload"> & { payload: string };
 type StoredProject = Omit<DeliveryProject, "reviewers" | "baseline"> & { reviewers: string; baseline: string | null };
 type StoredConnection = Omit<AgentConnection, "prepared"> & { prepared: string | null };
@@ -22,6 +22,7 @@ export type Attempt = { agent_session_id: string | null; id: string; workspace_i
 export class DeliveryStore {
   repo: Repository; options: DeliveryOptions;
   constructor(repo: Repository, options: DeliveryOptions = {}) { this.repo = repo; this.options = options; }
+  async refreshClock() { if (this.options.databaseClock) { const at = await this.options.databaseClock(this.repo); const captured = performance.now(); this.repo.now = () => new Date(at.getTime() + performance.now() - captured); } }
   async project(userId: string, workspaceId: string, projectId: string, admin = false) {
     await this.repo.membership(userId, workspaceId, admin);
     const row = await this.repo.statement("SELECT archived_at FROM projects WHERE workspace_id=? AND id=?", workspaceId, identifier(projectId)).first<{ archived_at: string | null }>();
@@ -35,6 +36,7 @@ export class DeliveryStore {
     await this.repo.statement("UPDATE workspaces SET name=name WHERE id=?", workspaceId).run();
     const p = await this.repo.statement(`UPDATE projects SET version=version WHERE workspace_id=? AND id=? ${archived ? "" : "AND archived_at IS NULL"} RETURNING id`, workspaceId, projectId).first();
     if (!p) throw changed("The project is archived or unavailable.");
+    await this.refreshClock();
   }
   async configuration(workspaceId: string, projectId: string): Promise<DeliveryProject> {
     const row = await this.repo.statement("SELECT * FROM delivery_projects WHERE workspace_id=? AND project_id=?", workspaceId, projectId).first<StoredProject>();

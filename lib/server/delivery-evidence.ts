@@ -23,7 +23,9 @@ export class DeliveryEvidenceStore {
     await this.repo.db.transaction(async db => {
       const r = new ScopedRepository(db, this.repo.now); await r.statement("UPDATE workspaces SET name=name WHERE id=?", input.workspace_id).run();
       await r.statement("UPDATE projects SET version=version WHERE workspace_id=? AND id=?", input.workspace_id, input.project_id).run();
-      await r.statement("INSERT INTO delivery_evidence(id,workspace_id,project_id,policy_hash,input,state,requested_at,next_refresh) SELECT ?,?,?,?,?,'pending',?,? WHERE (SELECT COUNT(*) FROM delivery_evidence WHERE workspace_id=? AND project_id=?)<1000 ON CONFLICT(id) DO UPDATE SET requested_at=excluded.requested_at", id, input.workspace_id, input.project_id, policy, encoded(input, 4096), now, now, input.workspace_id, input.project_id).run();
+      const existing = await r.statement("SELECT id FROM delivery_evidence WHERE id=?", id).first();
+      if (!existing) { const count = await r.statement("SELECT COUNT(*) AS n FROM delivery_evidence WHERE workspace_id=? AND project_id=?", input.workspace_id, input.project_id).first<{ n: number | string }>(); if (Number(count?.n ?? 0) >= 1000) throw changed("The project reached its evidence cache limit. An administrator must review retention before adding candidates."); }
+      await r.statement("INSERT INTO delivery_evidence(id,workspace_id,project_id,policy_hash,input,state,requested_at,next_refresh) VALUES(?,?,?,?,?,'pending',?,?) ON CONFLICT(id) DO UPDATE SET requested_at=excluded.requested_at", id, input.workspace_id, input.project_id, policy, encoded(input, 4096), now, now).run();
     });
     throw changed(row?.reason === "checks_pending" ? "GitHub checks are not all successful yet. Review again after CI completes." : "GitHub evidence verification is queued. Keep this report open and retry after the repository worker checks it.");
   }
