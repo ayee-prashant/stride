@@ -52,7 +52,8 @@ configuration. Never run the CI fixture against production.
 - [Human-supervised agent work](docs/agent-workforce/README.md) — proposed next
   product architecture, shared project context, human/agent responsibilities,
   current MCP contracts and ordered
-  delivery plan. These agent capabilities are not implemented yet.
+  delivery plan. [Implementation status](docs/agent-workforce/IMPLEMENTATION_STATUS.md)
+  records the context foundation and remaining agent integration gates.
 
 ## Source layout
 

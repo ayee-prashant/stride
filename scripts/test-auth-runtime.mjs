@@ -74,6 +74,28 @@ try {
   assert.equal(task.archived_at !== null, true);
   task = await json(await request("/api/tasks/" + task.id + "?workspace_id=" + workspaceId, "PATCH", { version: task.version, archived: false }));
   assert.equal(task.archived_at, null);
+  stage = "project-context";
+  const contextPath = `/api/projects/${metadata.projects[0].id}/context?workspace_id=${workspaceId}`;
+  const contextInput = { request_id: crypto.randomUUID(), expected_version: 0, kind: "requirement", title: "Runtime context requirement", body: "Every task brief preserves the approved requirement version.", change_note: "Runtime contract verification" };
+  const documentPath = `/api/projects/${metadata.projects[0].id}/context/documents?workspace_id=${workspaceId}`;
+  const document = await json(await request(documentPath, "POST", contextInput), 201);
+  assert.equal((await json(await request(documentPath, "POST", contextInput), 201)).document_id, document.document_id);
+  const projectBrief = await json(await request(contextPath));
+  const taskBriefPath = `/api/tasks/${task.id}/context?workspace_id=${workspaceId}`;
+  const taskBrief = await json(await request(taskBriefPath, "POST", { request_id: crypto.randomUUID(), task_version: task.version, context_sequence: projectBrief.sequence, requirement_ids: [document.document_id] }), 201);
+  assert.equal(taskBrief.check.state, "current");
+  assert.equal(taskBrief.check.execution_ready, false);
+  await json(await request(documentPath, "POST", { ...contextInput, request_id: crypto.randomUUID(), document_id: document.document_id, expected_version: document.version, body: "Changed approved requirement." }), 201);
+  const staleBrief = await json(await request(taskBriefPath));
+  assert.equal(staleBrief.check.state, "stale");
+  assert.equal(staleBrief.brief.payload.documents[0].body, contextInput.body);
+  const restricted = new Pool({ connectionString: fixtureUrl.toString(), max: 1 });
+  try {
+    for (const table of ["context_revisions", "context_events", "task_context_briefs"]) {
+      const privileges = await restricted.query("SELECT has_table_privilege(current_user,$1,'UPDATE') AS can_update, has_table_privilege(current_user,$1,'DELETE') AS can_delete", [table]);
+      assert.deepEqual(privileges.rows[0], { can_update: false, can_delete: false });
+    }
+  } finally { await restricted.end(); }
   stage = "collaboration";
   assert.equal(created.responsible_id, bootstrap.user.userId);
   const commentsPath = "/api/tasks/" + task.id + "/comments?workspace_id=" + workspaceId;
