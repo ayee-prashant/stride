@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
@@ -48,6 +48,11 @@ export async function verifyBrowser(origin, cookie) {
     await call("Input.insertText", { text: value });
   }
   const editorClosed = "!document.querySelector('.task-sheet')";
+  async function capture(name) {
+    await mkdir("artifacts", { recursive: true });
+    const result = await call("Page.captureScreenshot", { format: "png", captureBeyondViewport: false });
+    await writeFile(join("artifacts", `${name}.png`), Buffer.from(result.data, "base64"));
+  }
   try {
     let target;
     for (let attempt = 0; attempt < 150; attempt++) {
@@ -89,9 +94,18 @@ export async function verifyBrowser(origin, cookie) {
     await fill("#context-title", requirementTitle);
     await fill("#context-body", "The user can prepare a task brief from this exact requirement. <script>window.__contextXss=true</script>");
     await fill("#context-reason", "Approved browser fixture requirement.");
+    assert.equal(await evaluate("document.querySelectorAll('form.context-three-pane > section').length"), 3);
+    await capture("context-editor-desktop");
     await clickButton("Publish approved context");
     await waitFor(`!document.querySelector('.context-editor-dialog') && Array.from(document.querySelectorAll('.brief-document h4')).some(el => el.textContent === ${JSON.stringify(requirementTitle)})`);
     assert.equal(await evaluate("window.__contextXss === undefined"), true);
+    await capture("context-project-desktop");
+    await call("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+    await delay(200);
+    assert.equal(await evaluate("document.documentElement.scrollWidth <= window.innerWidth + 1"), true);
+    await capture("context-project-mobile");
+    await call("Emulation.setDeviceMetricsOverride", { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
+    await delay(100);
     await clickButton(`History of ${requirementTitle}`);
     await waitFor("Boolean(document.querySelector('.brief-history li'))");
     await clickButton("Close", ".context-editor-dialog button");
@@ -114,6 +128,7 @@ export async function verifyBrowser(origin, cookie) {
     await clickButton(`Revise ${requirementTitle}`);
     await fill("#context-body", "The accepted requirement changed after the task brief was prepared.");
     await fill("#context-reason", "Review an updated requirement.");
+    await capture("context-editor-revision");
     await clickButton("Publish approved context");
     await waitFor("!document.querySelector('.context-editor-dialog')");
     await clickButton("My Tasks", '[data-slot="sidebar-menu-button"]');
@@ -121,6 +136,8 @@ export async function verifyBrowser(origin, cookie) {
     await evaluate(`Array.from(document.querySelectorAll('.task-open')).find(el => el.querySelector('strong')?.textContent === ${JSON.stringify(title)}).click()`);
     await evaluate("document.querySelector('.task-context-toggle').click()");
     await waitFor("document.querySelector('.task-brief-status')?.textContent.includes('Brief needs a review')");
+    await evaluate("document.querySelector('.task-context-section').scrollIntoView({block:'start'})");
+    await capture("context-task-stale");
     await clickButton("Prepare updated brief");
     await waitFor("document.querySelector('.task-brief-status')?.textContent.includes('Brief is current')");
     stage = "comments-and-mentions";

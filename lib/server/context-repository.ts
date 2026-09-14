@@ -46,6 +46,12 @@ export class ContextRepository {
    */
   async lock(userId: string, workspaceId: string, projectId: string, admin: boolean, advance: boolean) {
     const guard = admin ? adminGuard : memberGuard;
+    // Serialize permission revocation and project archival against the publication.
+    // Keep this lock order: membership, project, context head, then task.
+    const membership = await this.repo.statement(`UPDATE memberships SET role=role WHERE workspace_id=? AND user_id=? ${admin ? "AND role='admin'" : ""} RETURNING role`, workspaceId, userId).first();
+    if (!membership) throw conflict("Your project access changed. Refresh before continuing.");
+    const project = await this.repo.statement("UPDATE projects SET version=version WHERE workspace_id=? AND id=? AND archived_at IS NULL RETURNING id", workspaceId, projectId).first();
+    if (!project) throw conflict("The project is unavailable for changes.");
     await this.repo.statement(`INSERT INTO project_context_heads(project_id,workspace_id,sequence) SELECT ?,?,0 WHERE ${guard} AND EXISTS(SELECT 1 FROM projects WHERE workspace_id=? AND id=? AND archived_at IS NULL) ON CONFLICT(project_id) DO NOTHING`, projectId, workspaceId, workspaceId, userId, workspaceId, projectId).run();
     const row = await this.repo.statement(`UPDATE project_context_heads SET sequence=sequence+? WHERE workspace_id=? AND project_id=? AND ${guard} AND EXISTS(SELECT 1 FROM projects WHERE workspace_id=? AND id=? AND archived_at IS NULL) RETURNING sequence`, advance ? 1 : 0, workspaceId, projectId, workspaceId, userId, workspaceId, projectId).first<{ sequence: number }>();
     if (!row) throw conflict("Your access or the project changed. Refresh before continuing.");

@@ -40,8 +40,15 @@ and reviewed; the new task unique constraint was moved before its referencing
 foreign key in migration 0003. Existing migrations and the lockfile are unchanged.
 
 The complete PostgreSQL, concurrent-writer, runtime-role, browser and interface
-build checks are pending on the completed slice. Do not deploy from this record
-until their exact source revision has passed.
+checks passed in [CI run 34883532152](https://github.com/ayee-prashant/stride/actions/runs/34883532152)
+for source `036e89fe25df721a6c546285f1b5aea380a3df64` (tree
+`9fb2353e237fc7ec6ca12d22772a214bff60a2a0`). The browser verified publication,
+history, task preparation, a relevant revision marking the brief stale, and
+preparing an updated brief, followed by all existing productivity flows.
+
+The post-build review adds explicit serialization with permission revocation
+and project archival, concurrent context-binding checks, and desktop/mobile
+screen captures. Those changes require a fresh complete CI run before release.
 
 ## Remaining gates
 

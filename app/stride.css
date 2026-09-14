@@ -28,6 +28,29 @@
 .brief-retired-document { background: var(--muted); }
 .brief-integration-note { padding: 1rem; margin-top: 1.5rem; border: 1px solid var(--border); border-radius: .5rem; font-size: .8rem; color: var(--muted-foreground); line-height: 1.6; }
 .context-editor-dialog { width: min(720px,calc(100% - 2rem)); max-width: 720px; max-height: calc(100dvh - 2rem); overflow-y: auto; }
+.context-three-pane-dialog { width: min(1280px,calc(100% - 2rem)); max-width: 1280px; padding: 1.5rem; }
+.context-three-pane { display: grid; grid-template-columns: minmax(0, .85fr) minmax(0, 1.5fr) minmax(0, 1fr); gap: 1rem; align-items: start; }
+.context-pane { min-width: 0; border: 1px solid var(--border); border-radius: .65rem; padding: 1.1rem; }
+.context-pane-heading { display: flex; gap: .55rem; align-items: center; margin-bottom: 1rem; }
+.context-pane-heading>span { color: var(--muted-foreground); background: var(--muted); font-size: .7rem; border-radius: .3rem; padding: .2rem .35rem; }
+.context-pane-heading h3 { font-weight: 650; font-size: .95rem; }
+.context-baseline { background: var(--muted); font-size: .875rem; }
+.context-baseline h4, .context-change-summary h4, .context-impact h4 { font-weight: 600; font-size: .875rem; overflow-wrap: anywhere; }
+.context-baseline-meta { display: flex; justify-content: space-between; gap: .5rem; margin-bottom: 1rem; color: var(--muted-foreground); font-size: .75rem; text-transform: capitalize; }
+.context-baseline>.brief-body { max-height: 330px; overflow: auto; }
+.context-baseline>button, .context-baseline>.brief-comparison { margin-top: 1rem; white-space: normal; height: auto; min-height: 2rem; }
+.context-new-baseline p { margin-top: .7rem; color: var(--muted-foreground); line-height: 1.7; }
+.context-new-baseline>svg { color: var(--muted-foreground); margin: .3rem 0 1rem; }
+.context-draft.editor-fields, .context-review.editor-fields { gap: 1rem; }
+.context-draft textarea { min-height: 290px; }
+.context-character-count { font-size: .7rem; color: var(--muted-foreground); text-align: right; }
+.context-change-summary, .context-impact { font-size: .8rem; line-height: 1.6; }
+.context-change-summary p, .context-impact p { color: var(--muted-foreground); margin-top: .3rem; }
+.context-impact { border-left: 2px solid var(--primary); padding-left: .8rem; }
+.context-human-approval { display: flex; gap: .4rem; align-items: center; font-size: .75rem; color: var(--muted-foreground); }
+.context-review>button { white-space: normal; height: auto; min-height: 2.5rem; }
+@media (max-width: 1000px) { .context-three-pane { grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); } .context-review { grid-column: 1 / -1; } }
+@media (max-width: 640px) { .context-three-pane { grid-template-columns: minmax(0, 1fr); } .context-three-pane-dialog { padding: 1rem; } .context-baseline>.brief-body { max-height: 160px; } .context-draft textarea { min-height: 220px; } }
 .brief-comparison { border: 1px solid var(--border); background: var(--muted); border-radius: .5rem; padding: 1rem; }
 .brief-comparison h3 { font-weight: 650; margin-bottom: .75rem; }
 .brief-history { display: grid; gap: 1rem; }

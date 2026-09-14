@@ -96,3 +96,10 @@ jobs:
           STRIDE_RUNTIME_PASSWORD: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
           STRIDE_BOOTSTRAP_EMAIL: owner@stride.invalid
           STRIDE_BOOTSTRAP_PASSWORD: isolated-ci-owner-password-not-for-production
+      - name: Keep context interface review images
+        uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: context-ui-${{ github.event.pull_request.head.sha }}
+          path: artifacts/context-*.png
+          retention-days: 7
