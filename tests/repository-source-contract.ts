@@ -113,6 +113,10 @@ export async function repositorySourceContract(t: TestContext, fixture: () => Pr
     assert.equal((await restricted.taskBrief(f.owner.userId, f.workspace, task.id)).brief, null);
     assert.equal((await new RepositorySources(f.repo, []).view(f.owner.userId, f.workspace, f.project)).source?.repository, "Restricted repository");
     const current = await prepare(); assert.ok(current.brief);
+    // A misconfigured worker clock cannot keep a cached private file fresh indefinitely.
+    await f.repo.statement("UPDATE repository_sources SET last_verified_at=? WHERE project_id=?", new Date(f.now().getTime() + 3600000).toISOString(), f.project).run();
+    assert.equal((await f.context.taskBrief(f.owner.userId, f.workspace, task.id)).brief, null);
+    await f.repo.statement("UPDATE repository_sources SET last_verified_at=? WHERE project_id=?", f.now().toISOString(), f.project).run();
     f.advance(181);
     assert.equal((await f.context.taskBrief(f.owner.userId, f.workspace, task.id)).brief, null);
     await assert.rejects(prepare(), { code: "SOURCE_NOT_CURRENT" });

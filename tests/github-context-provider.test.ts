@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createHash, generateKeyPairSync, verify } from "node:crypto";
 import { parseBinding } from "../lib/github-context.ts";
 import type { GitHubBinding } from "../lib/github-context.ts";
-import { GitHubContextProvider, githubContextSettings } from "../lib/server/github-context-provider.ts";
+import { GitHubContextProvider, githubContextSettings, githubContextBindings } from "../lib/server/github-context-provider.ts";
 
 const keys = generateKeyPairSync("rsa", { modulusLength: 2048 });
 const binding: GitHubBinding = { key: "project-source", workspace_id: "workspace-one", project_id: "project-one", repository_id: 12345, installation_id: 67890, owner: "fixture-owner", repository: "fixture-repo", branch: "main", paths: ["README.md"] };
@@ -40,6 +40,7 @@ test("GitHub configuration is absent by default and rejects partial credentials,
   for (const branch of ["@", "../main", "-bad..branch", "main.lock", "heads//test"]) assert.throws(() => parseBinding({ ...binding, branch }), { status: 400 });
   const env = { STRIDE_GITHUB_APP_CLIENT_ID: "Iv1.fixture", STRIDE_GITHUB_APP_PRIVATE_KEY: keys.privateKey.export({ type: "pkcs8", format: "pem" }).toString(), STRIDE_GITHUB_CONTEXT_BINDINGS: JSON.stringify([binding]) };
   assert.equal(githubContextSettings(env)?.bindings[0].repository_id, binding.repository_id);
+  assert.deepEqual(githubContextBindings({ STRIDE_GITHUB_CONTEXT_BINDINGS: env.STRIDE_GITHUB_CONTEXT_BINDINGS }), [binding]);
   assert.throws(() => githubContextSettings({ ...env, STRIDE_GITHUB_CONTEXT_BINDINGS: JSON.stringify([binding, { ...binding, key: "duplicate-project" }]) }), { code: "setup_required" });
 });
 test("GitHub App tokens use a verified RS256 signature and request only the approved repository with read permissions", async () => {

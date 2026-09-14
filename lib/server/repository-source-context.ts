@@ -21,7 +21,7 @@ export async function readSourceContext(repo: Repository, bindings: GitHubBindin
     .first<RepositorySource & { observation_id: string | null; observation_policy: string | null; payload: string | null }>();
   if (!source || source.state === "disconnected") return { state: "not_connected", source, snapshot: null, reason: null };
   if (!approvedSource(bindings, source)) return { state: "unavailable", source, snapshot: null, reason: "access_changed" };
-  const fresh = source.state === "current" && source.last_verified_at !== null && source.last_verified_at >= sourceDeadline(repo.now(), -180);
+  const fresh = source.state === "current" && source.last_verified_at !== null && source.last_verified_at >= sourceDeadline(repo.now(), -180) && source.last_verified_at <= sourceDeadline(repo.now(), 5);
   if (!fresh || !source.payload || source.observation_policy !== source.policy_hash || !source.observation_id) {
     return { state: "unavailable", source, snapshot: null, reason: source.reason ?? (source.state === "current" ? "refresh_required" : source.state) };
   }
