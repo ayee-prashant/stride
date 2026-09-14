@@ -39,7 +39,10 @@ export async function provisionConnection(request: Request, workspaceId: string,
 export async function authenticateAgent(request: Request, purpose: "agent" | "companion"): Promise<AgentActor> {
   const origin = applicationOrigin(process.env); const resource = purpose === "agent" ? `${origin}/mcp` : `${origin}/api/agent-companion`;
   const suppliedOrigin = request.headers.get("origin");
-  if (suppliedOrigin && suppliedOrigin !== origin || request.headers.get("sec-fetch-site") === "cross-site" || new URL(request.url).host !== new URL(origin).host) throw new AppError(403, "ORIGIN_REJECTED", "This agent origin or host is not allowed.");
+  // Next may construct request.url with an internal listener hostname. Validate
+  // the received authority; do not trust client-supplied forwarding headers.
+  const authority = request.headers.get("host") ?? new URL(request.url).host;
+  if (suppliedOrigin && suppliedOrigin !== origin || request.headers.get("sec-fetch-site") === "cross-site" || authority.toLowerCase() !== new URL(origin).host.toLowerCase()) throw new AppError(403, "ORIGIN_REJECTED", "This agent origin or host is not allowed.");
   if (!request.headers.get("authorization") || request.headers.has("cookie")) throw new AppError(401, "AGENT_AUTH_REQUIRED", "Use the enrolled agent's OAuth token.");
   try {
     const client = createAuthClient({ plugins: [oauthProviderResourceClient(getAuth())] });

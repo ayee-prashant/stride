@@ -27,6 +27,7 @@ export async function verifyAgentRuntime({ origin, request, json, userId, worksp
     const connection = await human(`${base}/connections`, { request_id: randomUUID(), binding_id: binding.id, binding_version: binding.version, template_hash: template.hash, name: "Isolated MCP laptop", accept_responsibility: true });
     assert.equal(connection.state, "active"); assert.ok(connection.client_id); assert.notEqual(connection.client_id, connection.companion_client_id);
     const raw = (path, init = {}) => fetch(new URL(path, origin), { ...init, redirect: "manual", signal: AbortSignal.timeout(10000) });
+    stage = "oauth-discovery";
     const challenge = await raw("/mcp", { method: "POST" }); assert.equal(challenge.status, 401); assert.ok(challenge.headers.get("www-authenticate").includes("oauth-protected-resource/mcp"));
     const discovery = await (await raw("/.well-known/oauth-authorization-server")).json();
     assert.equal(discovery.issuer, origin);
@@ -40,7 +41,7 @@ export async function verifyAgentRuntime({ origin, request, json, userId, worksp
       const response = await request(endpoint.pathname + endpoint.search); assert.ok([302, 303].includes(response.status), `authorization status ${response.status}`);
       const consent = new URL(response.headers.get("location"), origin); assert.equal(consent.origin, origin); assert.equal(consent.pathname, "/connect/consent");
       const approved = await json(await request("/api/connect/consent", "POST", { accept: true, oauth_query: consent.search.slice(1) }));
-      const callback = new URL(approved.url); assert.equal(callback.origin, "http://127.0.0.1:43871"); assert.equal(callback.searchParams.get("state"), state); assert.ok(callback.searchParams.get("code"));
+      const callback = new URL(approved.url); assert.equal(callback.origin, "http://127.0.0.1:43871"); assert.equal(callback.searchParams.get("state"), state); assert.equal(callback.searchParams.get("iss"), origin); assert.ok(callback.searchParams.get("code"));
       return { code: callback.searchParams.get("code"), verifier, purpose };
     }
     async function exchange(code, verifier = code.verifier) {
@@ -86,6 +87,6 @@ export async function verifyAgentRuntime({ origin, request, json, userId, worksp
     assert.equal((await raw("/mcp", { method: "POST", headers: bearer(rotated) })).status, 401);
     console.log(JSON.stringify({ event: "agent_runtime_passed", checks: ["real_oauth_pkce", "code_single_use", "resource_isolation", "modern_mcp", "human_start", "report_requires_human_review", "refresh_rotation", "connection_revocation"] }));
     return { title, ticketId: ticket.id, workspaceId, projectId };
-  } catch (error) { console.error(JSON.stringify({ event: "agent_runtime_failed", stage, kind: error?.name, expected: typeof error?.expected === "number" ? error.expected : undefined, actual: typeof error?.actual === "number" ? error.actual : undefined, frames: error instanceof Error ? error.stack?.split("\n").slice(1, 4) : [] })); throw error; }
+  } catch (error) { console.error(JSON.stringify({ event: "agent_runtime_failed", stage, kind: error?.name, expected: typeof error?.expected === "number" ? error.expected : undefined, actual: typeof error?.actual === "number" ? error.actual : undefined, frames: error instanceof Error ? error.stack?.split("\n").filter(line => line.trim().startsWith("at ")).slice(0, 3) : [] })); throw error; }
   finally { await client?.close(); }
 }
