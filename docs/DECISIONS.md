@@ -19,6 +19,17 @@ Email delivery uses a bounded durable outbox and a verified provider; missing
 provider configuration is an explicit unavailable state. Private S3-compatible
 storage holds attachment bodies; only metadata belongs in PostgreSQL.
 
+## ADR-012: remove the superseded host build dependencies
+
+The release audit found high-severity advisories in the unused vinext/Vite/
+Cloudflare development stack retained from the original Sites starter. The
+requested production runtime is native Next.js on Railway. Retire those unused
+dependencies and keep historical integration examples outside the active source
+tree. Refresh compatible transitive fixes. The deprecated Drizzle TypeScript
+loader pulls an affected esbuild; use a scoped, pinned esbuild override and
+verify migration generation, TypeScript, builds and real database migrations.
+Do not adopt the audit command's suggested downgrade of Drizzle's schema tool.
+
 ## ADR-001: modular monolith
 
 Accepted. A single deployable app keeps the first release operable. Separate

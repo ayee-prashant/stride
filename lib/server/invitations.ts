@@ -47,9 +47,10 @@ export class Invitations {
   }
   async preview(input: unknown) {
     const { token } = object(input, ["token"]); const hash = invitationHash(token);
-    await this.repo.rateLimit(`invite:${hash}`, Date.now(), 30);
     const row = await this.repo.statement(`SELECT i.id,i.email,i.role,i.expires_at,w.name AS workspace_name FROM invitations i JOIN workspaces w ON w.id=i.workspace_id WHERE ${validInvite}`, hash, this.repo.now().toISOString()).first<StoredInvite>();
     if (!row) throw unavailable();
+    // Do not persist quota rows for arbitrary anonymous guesses.
+    await this.repo.rateLimit(`invite:${hash}`, Date.now(), 30);
     const existing = await this.repo.statement("SELECT id FROM auth_users WHERE email=?", row.email).first();
     return { email: row.email, workspace_name: row.workspace_name, expires_at: row.expires_at, existing_account: !!existing };
   }

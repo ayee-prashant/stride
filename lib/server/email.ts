@@ -4,8 +4,8 @@ import { Repository } from "./repository.ts";
 
 export type Mail = { to: string; subject: string; text: string; key: string };
 export interface MailProvider { send(mail: Mail): Promise<void> }
-export function emailConfigured(env: NodeJS.ProcessEnv): boolean { return !!env.RESEND_API_KEY?.trim() && !!env.STRIDE_EMAIL_FROM?.trim(); }
-export function createMailProvider(env: NodeJS.ProcessEnv, transport: typeof fetch = fetch): MailProvider {
+export function emailConfigured(env: Record<string, string | undefined>): boolean { return !!env.RESEND_API_KEY?.trim() && !!env.STRIDE_EMAIL_FROM?.trim(); }
+export function createMailProvider(env: Record<string, string | undefined>, transport: typeof fetch = fetch): MailProvider {
   const apiKey = env.RESEND_API_KEY; const from = env.STRIDE_EMAIL_FROM;
   if (!apiKey || !from || /[\r\n]/.test(from)) throw new AppError(503, "EMAIL_UNAVAILABLE", "The workspace email service is not connected yet.");
   return { async send(mail) {

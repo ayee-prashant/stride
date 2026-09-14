@@ -94,6 +94,20 @@ export async function verifyBrowser(origin, cookie) {
     await clickButton("Post comment");
     await waitFor("Boolean(document.querySelector('.comment-body')) && document.querySelector('#task-comment')?.value === ''");
     assert.equal(await evaluate("document.querySelector('.comment-body').textContent.includes('<img src=x') && !document.querySelector('.comment-body img') && !window.__strideXss"), true);
+    stage = "checklist-blocker-and-deep-link";
+    await fill('[aria-label="New checklist item"]', "Browser checklist step");
+    await clickButton("Add checklist item");
+    await waitFor("Boolean(document.querySelector('[aria-label=\"Complete checklist item Browser checklist step\"]'))");
+    await clickButton("Complete checklist item Browser checklist step");
+    await waitFor("document.querySelector('.checklist-progress')?.value === 1");
+    await fill("#task-blocked", "Waiting for review");
+    await clickButton("Save changes");
+    await waitFor("Array.from(document.querySelectorAll('.editor-actions button')).find(el => el.textContent==='Save changes')?.disabled === true");
+    const deepLink = await evaluate("window.location.href");
+    assert.equal(new URL(deepLink).searchParams.has("task"), true);
+    await call("Page.navigate", { url: deepLink });
+    await waitFor("document.querySelector('#task-blocked')?.value === 'Waiting for review' && document.querySelector('.checklist-progress')?.value === 1");
+    stage = "comments-and-mentions";
     await fill("#task-comment", "Unsent comment stays here");
     await clickButton("Close", ".task-sheet button");
     await clickButton("Keep editing");
@@ -122,6 +136,28 @@ export async function verifyBrowser(origin, cookie) {
     await evaluate("document.querySelector('.notification-item').click()");
     await waitFor("Boolean(document.querySelector('.task-sheet')) && !document.querySelector('.notification-sheet')");
     await clickButton("Close", ".task-sheet button"); await waitFor(editorClosed);
+    stage = "quick-edit-saved-views-bulk-and-shortcuts";
+    const bulkTitle = `Bulk browser ${crypto.randomUUID().slice(0, 8)}`;
+    await evaluate("document.activeElement?.blur()");
+    await call("Input.dispatchKeyEvent", { type: "keyDown", key: "c", code: "KeyC" });
+    await call("Input.dispatchKeyEvent", { type: "keyUp", key: "c", code: "KeyC" });
+    await waitFor("document.activeElement?.getAttribute('aria-label') === 'New task title'");
+    await fill('[aria-label="New task title"]', bulkTitle); await clickButton("Create task");
+    await waitFor(`Array.from(document.querySelectorAll('.task-open strong')).some(el => el.textContent === ${JSON.stringify(bulkTitle)})`);
+    await clickButton(`Quick edit ${bulkTitle}`);
+    await clickButton(`Priority for ${bulkTitle}`);
+    await clickButton("high priority", '[role="option"]');
+    await clickButton("Save", '[data-slot="popover-content"] button');
+    await waitFor(`Array.from(document.querySelectorAll('.inline-task-trigger')).some(el => el.getAttribute('aria-label') === ${JSON.stringify(`Quick edit ${bulkTitle}`)} && el.textContent.includes('high'))`);
+    await clickButton("Save view"); await fill('[aria-label="Saved view name"]', "Browser focus"); await clickButton("Save filters");
+    await waitFor("Array.from(document.querySelectorAll('.saved-view-chip')).some(el => el.textContent.includes('Browser focus'))");
+    await clickButton(`Select ${bulkTitle}`, 'button[role="checkbox"]');
+    await clickButton("Apply to 1");
+    await waitFor(`!Array.from(document.querySelectorAll('.task-open strong')).some(el => el.textContent === ${JSON.stringify(bulkTitle)})`);
+    await evaluate("document.activeElement?.blur()");
+    await call("Input.dispatchKeyEvent", { type: "keyDown", key: "/", code: "Slash" });
+    await call("Input.dispatchKeyEvent", { type: "keyUp", key: "/", code: "Slash" });
+    await waitFor("document.activeElement?.getAttribute('aria-label') === 'Search task titles'");
     stage = "small-screen-and-keyboard";
     await call("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
     await delay(200);
@@ -131,7 +167,7 @@ export async function verifyBrowser(origin, cookie) {
     await call("Input.dispatchKeyEvent", { type: "keyUp", key: "Tab", code: "Tab", windowsVirtualKeyCode: 9 });
     assert.equal(await evaluate("document.activeElement !== document.body"), true);
     assert.deepEqual(runtimeErrors, []);
-    console.log("Browser task, comment, mention, inbox, draft and 390px layout checks passed.");
+    console.log("Browser task, checklist, blocker, deep link, quick edit, bulk, saved view, shortcut, collaboration and 390px layout checks passed.");
   } catch (error) {
     console.error(JSON.stringify({ event: "browser_check_failed", stage, reason: error instanceof Error ? error.message : "unknown", ...(stage === "chrome-start" ? { chromeExit: chrome.exitCode, startupLog } : {}) })); throw error;
   } finally {

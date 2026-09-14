@@ -1,3 +1,5 @@
+import { Pool } from "pg";
+import { openEmail } from "../lib/server/email.ts";
 import { spawn } from "node:child_process";
 import assert from "node:assert/strict";
 import { setTimeout as delay } from "node:timers/promises";
@@ -16,6 +18,7 @@ const child = spawn(process.execPath, ["node_modules/next/dist/bin/next", "start
   env: { ...process.env, NODE_ENV: "test", APP_URL: origin, DATABASE_URL: fixtureUrl.toString(),
     BETTER_AUTH_SECRET: "isolated-ci-session-secret-do-not-use-in-production",
     STRIDE_ALLOWED_EMAILS: ownerEmail,
+    RESEND_API_KEY: "ci-fixture-no-network-delivery", STRIDE_EMAIL_FROM: "test@stride.invalid",
   },
   stdio: "ignore",
 });
@@ -88,6 +91,18 @@ try {
   stage = "origin-and-tenant";
   assert.equal((await request("/api/bootstrap", "POST", {}, { origin: "https://untrusted.example" })).status, 403);
   assert.equal((await request("/api/workspace?workspace_id=unavailable")).status, 404);
+  stage = "invitation-session-flow";
+  const ownerCookie = cookie;
+  const invitedEmail = `runtime-invite-${crypto.randomUUID()}@example.test`;
+  const invitation = await json(await request("/api/invitations?workspace_id=" + workspaceId, "POST", { email: invitedEmail, role: "member" }));
+  const inviteToken = invitation.path.split("token=")[1]; cookie = "";
+  assert.equal((await json(await request("/api/invitations/preview", "POST", { token: inviteToken }))).existing_account, false);
+  await json(await request("/api/invitations/accept", "POST", { token: inviteToken, name: "Invited runtime fixture", password: "isolated-invitation-password" }));
+  assert.equal((await request("/api/invitations/accept", "POST", { token: inviteToken, name: "Again", password: "isolated-invitation-password" })).status, 404);
+  await json(await request("/api/auth/sign-in/email", "POST", { email: invitedEmail, password: "isolated-invitation-password" }));
+  assert.equal((await json(await request("/api/workspace?workspace_id=" + workspaceId))).role, "member");
+  assert.equal((await request("/api/invitations?workspace_id=" + workspaceId, "POST", { email: "denied@example.test" })).status, 403);
+  await json(await request("/api/auth/sign-out", "POST", {})); cookie = ownerCookie;
   stage = "browser";
   await verifyBrowser(origin, cookie);
   stage = "password-change";
@@ -99,6 +114,27 @@ try {
   await json(await request("/api/auth/change-password", "POST", { currentPassword: changedPassword, newPassword: ownerPassword, revokeOtherSessions: true }));
   cookie = "";
   await json(await request("/api/auth/sign-in/email", "POST", { email: ownerEmail, password: ownerPassword }));
+  stage = "password-recovery";
+  const beforeResetCookie = cookie;
+  await json(await request("/api/auth/request-password-reset", "POST", { email: ownerEmail, redirectTo: origin + "/reset-password" }));
+  const database = new Pool({ connectionString: process.env.TEST_DATABASE_URL, max: 1 });
+  let resetUrl;
+  try {
+    const rows = await database.query("SELECT body FROM email_outbox WHERE kind='reset' AND recipient=$1 ORDER BY created_at DESC LIMIT 1", [ownerEmail]);
+    assert.equal(rows.rowCount, 1);
+    const body = openEmail(rows.rows[0].body, "isolated-ci-session-secret-do-not-use-in-production");
+    resetUrl = new URL(body.split("\n").find(line => line.startsWith(origin + "/api/auth/")));
+  } finally { await database.end(); }
+  cookie = "";
+  const redirect = await request(resetUrl.pathname + resetUrl.search);
+  assert.equal([302, 303].includes(redirect.status), true);
+  const resetToken = new URL(redirect.headers.get("location"), origin).searchParams.get("token"); assert.ok(resetToken);
+  const recoveredPassword = ownerPassword + "-recovered";
+  await json(await request("/api/auth/reset-password", "POST", { token: resetToken, newPassword: recoveredPassword }));
+  assert.equal((await request("/api/workspace?workspace_id=" + workspaceId, "GET", undefined, { cookie: beforeResetCookie })).status, 401);
+  assert.equal((await request("/api/auth/reset-password", "POST", { token: resetToken, newPassword: ownerPassword })).status >= 400, true);
+  await json(await request("/api/auth/sign-in/email", "POST", { email: ownerEmail, password: recoveredPassword }));
+  await json(await request("/api/auth/change-password", "POST", { currentPassword: recoveredPassword, newPassword: ownerPassword, revokeOtherSessions: true }));
   stage = "sign-out";
   const cookieBeforeSignOut = cookie;
   await json(await request("/api/auth/sign-out", "POST", {}));

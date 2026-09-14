@@ -6,8 +6,8 @@ import { EmailOutbox } from "./email.ts";
 import type { MailProvider } from "./email.ts";
 
 export class ScheduledWork {
-  repo: Repository; secret: string; origin: string; approved: Set<string>;
-  constructor(repo: Repository, secret: string, origin: string, approved: Set<string>) { this.repo = repo; this.secret = secret; this.origin = origin; this.approved = approved; }
+  repo: Repository; secret: string; origin: string; approved: ReadonlySet<string>;
+  constructor(repo: Repository, secret: string, origin: string, approved: ReadonlySet<string>) { this.repo = repo; this.secret = secret; this.origin = origin; this.approved = approved; }
   async run(provider: MailProvider | null) {
     const now = this.repo.now(); const lease = crypto.randomUUID();
     await this.repo.statement("INSERT INTO worker_state(name,lease_until) VALUES('daily-work','1970-01-01T00:00:00.000Z') ON CONFLICT(name) DO NOTHING").run();
