@@ -1,5 +1,41 @@
 # Release review — 2026-09-14
 
+## Productivity release
+
+Application 78cfbb02963cdf0b27bd5b9f9cd644c8213b2c3d passed
+[CI run 34864181983](https://github.com/ayee-prashant/stride/actions/runs/34864181983),
+job 104043756700: 73 native tests, PostgreSQL contracts, generated migration
+parity, typecheck, lint, production build, real invitation/reset/session flows
+and expanded browser acceptance. Browser checks covered task creation, checklist,
+blocker, direct link reload, inline edits, bulk completion, saved views, shortcuts,
+collaboration and 390px layout. No manual visual or public-edge review is claimed.
+
+The dependency refresh removed retired vinext/Vite/Cloudflare packages and their
+unused configs. At 15:45:58 UTC both production and full-tree audits reported
+zero moderate/high/critical findings and one low transitive esbuild advisory.
+Pinned override generation and compilation passed; this is not a zero-advisory
+claim. Generated migration 0002_cold_captain_universe.sql is additive; existing
+0000/0001 migration bytes are unchanged. Temporary write-capable generation
+workflows have been removed. Main is unchanged; PR #4 is the review surface.
+
+Twenty warm samples on 20,000 synthetic tasks in isolated unloaded CI measured
+p95: My Tasks 47.35 ms, project board 43.50 ms, overdue high priority 12.79 ms,
+and title search 35.69 ms. Responses were about 48.8 KB. PG18 pg_dump/pg_restore
+into the separate stride_restore database passed 11 table-count comparisons and
+an independent-write check. These are query-level measurements and a synthetic
+restore drill, not production load guarantees or verified production backup policy.
+
+The post-build review tightened invitation acceptance against concurrent admin
+revocation, template/file permissions against persisted membership, anonymous
+invite quotas, pre-buffer upload throttling, and storage quotas during cleanup.
+Bulk work and recurrence stay transaction-scoped; removed storage objects have
+a durable retry record. Existing accounts/passwords and user work are preserved.
+
+Deployment and production verification are in progress. The private Railway
+stride-files bucket is staged. Resend was rechecked and is not connected;
+reset/digest code is complete but outbound delivery is unavailable. The Vercel
+team-scope and public-edge limitations below remain unchanged.
+
 ## First-sprint collaboration completion
 
 The user reaffirmed comments, mentions, notifications and complete organization

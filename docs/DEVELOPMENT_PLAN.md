@@ -70,3 +70,11 @@ passed on d2e6c481a82d43e7da80e9fbd3e3220fd3c501a0, which is deployed on Railway
 The additive migration and all eight private live checks passed. See RELEASE_REVIEW.md. No epics, reporting, custom workflows,
 external integrations, or AI features are added. Main-branch merging remains a
 separate approval boundary; the authorized release branch can deploy this work.
+
+## Productivity implementation status
+
+All five slices in PRODUCTIVITY_RELEASE.md are implemented. Source 78cfbb0
+passed the complete CI gate, real-session invitation/reset tests and expanded
+browser checks. Deployment proceeds migration → app/private storage → worker →
+controlled live verification. Email delivery remains gated by a verified sender;
+record final infrastructure evidence in RELEASE_REVIEW.md.

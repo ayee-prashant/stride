@@ -105,3 +105,21 @@ quick creation, task sheet, mentions, escaped comment content, unsent-draft
 confirmation, board transitions, Trash/restore, inbox-to-task navigation, keyboard
 focus and 390px overflow. It records only check names, never cookies/content.
 A passing DOM/layout check is not a claim of manual visual or screen-reader QA.
+
+## Productivity release gates
+
+The native suite has 73 tests. Run the additional PostgreSQL contract with
+node --experimental-strip-types --test tests/postgres-productivity.integration.test.ts.
+It checks concurrent repeat creation, bulk rollback, template/checklist changes,
+views/preferences/ownership, one-use invitations and leased encrypted outbox work.
+The real-session runtime gate covers invited-account admission, reset token
+use/reuse and session invalidation with a fake sender; it sends no email.
+Browser coverage adds inline editing, checklist persistence, blockers, direct
+link reload, named filters, bulk completion and create/search shortcuts.
+
+The audit script emits scoped severity counts and fails on high/critical runtime
+advisories. It does not hide tooling findings. The isolated PG18 performance and
+restore script creates 20,000 synthetic tasks, measures 20 warm samples/scenario,
+restores pg_dump output into stride_restore, compares 11 table counts and proves
+independent write access. These are warm unloaded CI measurements, not a public
+latency SLA or proof of configured production backups.

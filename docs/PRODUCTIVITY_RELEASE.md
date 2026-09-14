@@ -36,10 +36,11 @@ No epics, Gantt, time tracking, automation builder, or AI features are introduce
 
 ## Configuration and evidence
 
-Railway is connected. The existing web service has no email or object-storage
-configuration. Resend is available to connect but is not connected. Implement and
-test provider boundaries without invented credentials. Determine storage and
-email provisioning access before declaring those live capabilities complete.
+Railway is connected and the private stride-files bucket has been staged with
+web-service references. Resend remains available but unconnected. Provider
+boundaries are implemented and tested without invented production credentials.
+Complete live S3 verification and inspect worker execution before declaring them
+operational; real email delivery requires a verified sender connection.
 Do not treat a test double as evidence of production email/file delivery.
 Record actual test, audit, restore, benchmark and deployment results in
 RELEASE_REVIEW.md. Main-branch merge remains separately unauthorized.

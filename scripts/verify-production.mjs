@@ -13,6 +13,13 @@ let workspaceId;
 let verificationTaskId;
 let archived = false;
 const checks = [];
+const cleanup = [];
+async function cleanOwnArtifacts() {
+  while (cleanup.length) await cleanup.pop()();
+}
+function api(path) {
+  return path + "?workspace_id=" + encodeURIComponent(workspaceId);
+}
 
 async function request(path, method = "GET", body, extraHeaders = {}) {
   const response = await fetch(new URL(path, target), {
@@ -20,11 +27,11 @@ async function request(path, method = "GET", body, extraHeaders = {}) {
     redirect: "manual",
     headers: {
       origin: expectedOrigin,
-      ...(body === undefined ? {} : { "content-type": "application/json" }),
+      ...(body === undefined ? {} : { "content-type": body instanceof Uint8Array ? "application/octet-stream" : "application/json" }),
       ...(cookie.size ? { cookie: [...cookie].map(([key, value]) => key + "=" + value).join("; ") } : {}),
       ...extraHeaders,
     },
-    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    ...(body === undefined ? {} : { body: body instanceof Uint8Array ? body : JSON.stringify(body) }),
     signal: AbortSignal.timeout(10000),
   });
   status = response.status;
@@ -132,6 +139,74 @@ try {
   await json(await request("/api/notifications/" + encodeURIComponent(overdue.id) + "?workspace_id=" + encodeURIComponent(workspaceId), "PATCH", {}));
   const filtered = await json(await request("/api/tasks?workspace_id=" + encodeURIComponent(workspaceId) + "&due=overdue&sort=priority&assignee_id=" + encodeURIComponent(bootstrap.user.userId)));
   assert.ok(filtered.tasks.some(item => item.id === verificationTaskId));
+  checks.push(stage);
+
+  stage = "productivity-task-flow";
+  task = await json(await request(taskPath(), "PATCH", { version: task.version, priority: "high", blocked_reason: "Release check", waiting_on_id: bootstrap.user.userId }));
+  assert.equal(task.priority, "high");
+  assert.equal(task.blocked_reason, "Release check");
+  const checklistPath = api("/api/tasks/" + verificationTaskId + "/checklist");
+  const checklist = await json(await request(checklistPath, "POST", { title: "Verify release" }));
+  await json(await request(api("/api/tasks/" + verificationTaskId + "/checklist/" + checklist.item.id), "PATCH", { version: checklist.item.version, completed: true }));
+  assert.equal((await json(await request(checklistPath)))[0].completed, 1);
+  const muted = await json(await request(api("/api/tasks/" + verificationTaskId + "/mute"), "PATCH", { muted: true }));
+  assert.equal(muted.muted, true);
+  assert.equal((await request("/?" + new URLSearchParams({ workspace: workspaceId, task: verificationTaskId }))).status, 200);
+  const preferences = await json(await request(api("/api/preferences")));
+  assert.equal(typeof preferences.daily_digest, "boolean");
+  const workload = await json(await request(api("/api/workload")));
+  assert.ok(workload.some(row => row.user_id === bootstrap.user.userId && row.blocked >= 1));
+  checks.push(stage);
+
+  stage = "reuse-and-bulk";
+  const view = await json(await request(api("/api/views"), "POST", { name: "Temporary release verification", filters: { priority: "high" } }));
+  cleanup.push(async () => { await json(await request(api("/api/views/" + view.id), "DELETE", { version: view.version })); });
+  assert.ok((await json(await request(api("/api/views")))).some(row => row.id === view.id));
+  const template = await json(await request(api("/api/templates"), "POST", { name: "Temporary release verification", task: { title: "Release verification " + crypto.randomUUID(), recurrence: "daily" }, checklist: ["Verification checklist"] }));
+  cleanup.push(async () => { await json(await request(api("/api/templates/" + template.id), "DELETE", { version: template.version })); });
+  const repeated = await json(await request(api("/api/templates/" + template.id + "/use"), "POST", { project_id: metadata.projects[0].id }), 201);
+  const archiveOwnTask = id => async () => {
+    const row = await json(await request(api("/api/tasks/" + id)));
+    if (!row.archived_at) await json(await request(api("/api/tasks/" + id), "PATCH", { version: row.version, archived: true }));
+  };
+  cleanup.push(archiveOwnTask(repeated.id));
+  assert.equal((await json(await request(api("/api/tasks/" + repeated.id + "/checklist")))).length, 1);
+  task = await json(await request(taskPath()));
+  const bulk = await json(await request(api("/api/tasks/bulk"), "POST", { tasks: [{ id: repeated.id, version: repeated.version }, { id: task.id, version: task.version }], changes: { status: "done" } }));
+  assert.ok(bulk.tasks.every(row => row.status === "done"));
+  const matching = await json(await request(api("/api/tasks") + "&query=" + encodeURIComponent(repeated.title) + "&include_done=true"));
+  const successor = matching.tasks.find(row => row.recurrence_parent_id === repeated.id);
+  assert.ok(successor);
+  cleanup.push(archiveOwnTask(successor.id));
+  assert.equal(successor.status, "todo");
+  assert.equal((await json(await request(api("/api/tasks/" + successor.id + "/checklist"))))[0].completed, 0);
+  checks.push(stage);
+
+  stage = "private-file-storage";
+  const capabilities = await json(await request(api("/api/capabilities")));
+  assert.equal(capabilities.attachments, true);
+  const fileBytes = new TextEncoder().encode("Stride private storage release verification.\n");
+  const file = await json(await request(api("/api/files") + "&task_id=" + verificationTaskId + "&comment_id=" + comment.id, "POST", fileBytes, { "x-file-name": "release-verification.txt" }), 201);
+  cleanup.push(async () => { await json(await request(api("/api/files/" + file.id), "DELETE", {})); });
+  assert.ok((await json(await request(api("/api/tasks/" + verificationTaskId + "/files")))).some(row => row.id === file.id && row.comment_id === comment.id));
+  const download = await request(api("/api/files") + "&id=" + file.id);
+  assert.equal(download.status, 200);
+  assert.match(download.headers.get("content-disposition"), /^attachment;/);
+  assert.equal(download.headers.get("x-content-type-options"), "nosniff");
+  assert.deepEqual(new Uint8Array(await download.arrayBuffer()), fileBytes);
+  assert.equal((await request(api("/api/files") + "&id=" + file.id, "GET", undefined, { cookie: "" })).status, 401);
+  await cleanOwnArtifacts();
+  assert.equal((await request(api("/api/files") + "&id=" + file.id)).status, 404);
+  checks.push(stage);
+
+  stage = "invitation-revocation";
+  const invite = await json(await request(api("/api/invitations"), "POST", { email: "release-verification@stride.invalid", role: "member" }));
+  cleanup.push(async () => { await json(await request(api("/api/invitations/" + invite.invitation.id), "DELETE", {})); });
+  const token = new URLSearchParams(invite.path.split("#")[1]).get("token");
+  assert.equal((await request("/api/invitations/preview", "POST", { token }, { cookie: "" })).status, 200);
+  await cleanOwnArtifacts();
+  assert.equal((await request("/api/invitations/preview", "POST", { token }, { cookie: "" })).status, 404);
+  task = await json(await request(taskPath()));
   task = await json(await request(taskPath(), "PATCH", { version: task.version, archived: true }));
   assert.ok(task.archived_at);
   archived = true;
@@ -154,7 +229,11 @@ try {
   console.error(JSON.stringify({ event: "production_verification_failed", stage, ...(status ? { status } : {}) }));
   process.exitCode = 1;
 } finally {
-  // Recover only this job's new record; never enumerate, delete, or reset user data.
+  // Recover only this job's own records; never delete or reset user data.
+  if (cleanup.length && cookie.size) {
+    try { await cleanOwnArtifacts(); }
+    catch { console.error(JSON.stringify({ event: "verification_cleanup_failed", operation: "remove-own-artifacts" })); process.exitCode = 1; }
+  }
   if (verificationTaskId && !archived && cookie.size) {
     try {
       const task = await json(await request(taskPath()));

@@ -3,6 +3,10 @@
 A small-team task app with quick creation, My Tasks, project boards, three task
 statuses, priorities, due dates, creator-default ownership, search/filters,
 comments and mentions, an in-app inbox, versioned edits, and recoverable Trash.
+The productivity release adds inline edits, task links, checklists, blockers,
+bulk actions, templates, repeat-after-completion tasks, saved filters, invitation
+links, private attachments, notification preferences, shortcuts and workload.
+Password recovery and optional digest delivery require a connected email sender.
 
 The native Next.js application and PostgreSQL run on Railway. Better Auth provides
 private email/password sessions; public registration is disabled. Vercel supplies
@@ -28,6 +32,10 @@ user or authentication bypass.
 - npm run db:provision — controlled migration, restricted role, approved account.
 - npm run test:auth-runtime — CI-only isolated session/task/password flow.
 - node scripts/verify-production.mjs — guarded Railway private-service smoke job.
+- npm run worker — bounded scheduled reminders, email outbox and file cleanup.
+- node --experimental-strip-types --test tests/postgres-productivity.integration.test.ts — isolated productivity contracts.
+- node scripts/audit-dependencies.mjs — production and complete dependency audits.
+- node --experimental-strip-types scripts/verify-performance-restore.ts — isolated benchmark and restore drill.
 
 See docs/DEPLOYMENT.md for the full release sequence and separated environment
 configuration. Never run the CI fixture against production.
@@ -52,14 +60,14 @@ configuration. Never run the CI fixture against production.
 - scripts/ — provisioning and isolated/live verification.
 - infra/ — private database TLS startup and Vercel entry source.
 
-The first-sprint release d2e6c48 passed 58 native tests, real PostgreSQL and
-session tests, browser task/comment/inbox checks, typecheck, lint, and production
-compilation. Railway deployed that exact source; all eight controlled live checks
-passed, including comments, overdue notifications, filters and persistence.
-[PR #3](https://github.com/ayee-prashant/stride/pull/3) contains the complete scope
-and release evidence. Main remains unchanged. The Vercel entry status, public-edge
-routing, load measurements, backup restore and dependency audit remain separately
-recorded limits. See docs/RELEASE_REVIEW.md for evidence and operating details.
+The productivity application 78cfbb0 passed 73 native tests, real PostgreSQL
+contracts, typecheck, lint, production compilation, real password reset and
+invitation flows, and browser acceptance. An isolated 20,000-task benchmark and
+PostgreSQL backup/restore drill passed. The dependency audit found no moderate,
+high or critical advisories and one low-severity transitive esbuild advisory.
+[PR #4](https://github.com/ayee-prashant/stride/pull/4) contains this release.
+Main remains unchanged. See docs/RELEASE_REVIEW.md for exact deployment evidence,
+measured limits, and email/Vercel connection status.
 
 The original Sites starter is retained in Git history and
 docs/HISTORICAL_SITES.md. Its provider identity headers and Worker commands do
