@@ -67,7 +67,11 @@ export class GitHubEvidenceProvider extends GitHubContextProvider {
     let deployment: VerifiedEvidence["deployment"] = null;
     if (input.environment) {
       const deployments = list(await this.request(`${prefix}/deployments?sha=${input.candidate.commit}&environment=${encodeURIComponent(input.environment)}&per_page=10`, token, signal, undefined, 262144)).map(record);
-      const d = deployments.find(d => d.sha === input.candidate.commit && d.environment === input.environment && typeof d.id === "number" && record(d.payload).artifact === input.artifact);
+      const d = deployments.find(d => {
+        let payload = d.payload;
+        if (typeof payload === "string") { try { payload = JSON.parse(payload); } catch { return false; } }
+        return d.sha === input.candidate.commit && d.environment === input.environment && Number.isSafeInteger(d.id) && Number(d.id) > 0 && !!payload && typeof payload === "object" && !Array.isArray(payload) && (payload as Record<string, unknown>).artifact === input.artifact;
+      });
       if (!d) throw new GitHubContextError("incomplete");
       const state = list(await this.request(`${prefix}/deployments/${d.id}/statuses?per_page=1`, token, signal)).map(record)[0];
       if (state?.state !== "success" || !input.artifact) throw new GitHubContextError("incomplete");

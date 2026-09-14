@@ -8,7 +8,7 @@ import { setTimeout as delay } from "node:timers/promises";
 
 // Uses the runner's installed Chrome and native Node APIs; no production target,
 // extra package download, browser profile, or authentication bypass is accepted.
-export async function verifyBrowser(origin, cookie, reconcileRepository) {
+export async function verifyBrowser(origin, cookie, reconcileRepository, deliveryReview) {
   if (process.env.CI !== "true" || origin !== "http://127.0.0.1:3107") throw new Error("Browser verification requires the isolated CI server");
   const binary = ["/usr/bin/google-chrome", "/usr/bin/chromium", "/usr/bin/chromium-browser"].find(existsSync);
   if (!binary) throw new Error("The CI runner requires installed Chrome");
@@ -87,6 +87,28 @@ export async function verifyBrowser(origin, cookie, reconcileRepository) {
     stage = "daily-view";
     await call("Page.navigate", { url: origin });
     await waitFor("document.querySelector('h1')?.textContent === 'My Tasks' && document.querySelector('[aria-label=\"New task title\"]')?.disabled === false");
+    stage = "delivery-human-review";
+    await clickButton("Agent delivery", '[data-slot="sidebar-menu-button"]');
+    await waitFor("document.querySelector('h1')?.textContent === 'Agent delivery'");
+    const deliveryRow = `Array.from(document.querySelectorAll('.delivery-ticket')).find(el => el.querySelector('h3')?.textContent === ${JSON.stringify(deliveryReview.title)})`;
+    await waitFor(`Boolean(${deliveryRow})`); await evaluate(`${deliveryRow}.click()`);
+    await waitFor("document.querySelectorAll('.delivery-dialog .context-three-pane > section').length === 3");
+    assert.equal(await evaluate("document.querySelector('.delivery-dialog').textContent.includes('Agent-reported evidence')"), true);
+    assert.equal(await evaluate("window.__deliveryXss === undefined"), true);
+    await fill("#delivery-decision-reason", "Human BA accepts the explicit approval and role boundaries");
+    await capture("context-delivery-desktop");
+    await clickButton("Close", ".delivery-dialog button"); await clickButton("Keep reviewing");
+    assert.equal(await evaluate("document.querySelector('#delivery-decision-reason').value"), "Human BA accepts the explicit approval and role boundaries");
+    await call("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+    await capture("context-delivery-mobile"); assert.equal(await evaluate("document.documentElement.scrollWidth <= 392"), true);
+    await evaluate("document.querySelector('.delivery-dialog .context-human-approval').scrollIntoView({ block: 'center' })");
+    await evaluate("document.querySelector('.delivery-dialog .context-human-approval input').click()");
+    await capture("context-delivery-mobile-review");
+    await clickButton("Approve requirements baseline", ".delivery-dialog button");
+    await waitFor("document.querySelector('.delivery-dialog').textContent.includes('This outcome is accepted')");
+    await clickButton("Close", ".delivery-dialog button");
+    await call("Emulation.setDeviceMetricsOverride", { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
+    await clickButton("Connections"); await waitFor("document.querySelector('.delivery-center').textContent.includes('Isolated MCP laptop')");
     stage = "agent-role-registration";
     const agentAlias = `BROWSER-${crypto.randomUUID().slice(0, 8)}`;
     await clickButton("Team and agents", '[data-slot="sidebar-menu-button"]');

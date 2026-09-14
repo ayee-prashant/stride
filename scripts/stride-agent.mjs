@@ -59,7 +59,7 @@ async function boundedFetch(input, init = {}) {
   if (!response.body) return response;
   const reader = response.body.getReader(); const chunks = []; let size = 0;
   try { for (;;) { const { done, value } = await reader.read(); if (done) break; size += value.byteLength; if (size > 1048576) { await reader.cancel(); throw new Error("Stride response exceeds its safe size limit."); } chunks.push(value); } } finally { reader.releaseLock(); }
-  return new Response(Buffer.concat(chunks), { status: response.status, statusText: response.statusText, headers: response.headers });
+  return new Response([204, 205, 304].includes(response.status) ? null : Buffer.concat(chunks), { status: response.status, statusText: response.statusText, headers: response.headers });
 }
 class ConnectionProvider {
   constructor(purpose, interactive = false) { this.purpose = purpose; this.interactive = interactive; this.path = join(directory, `${purpose}.json`); this.data = {}; }

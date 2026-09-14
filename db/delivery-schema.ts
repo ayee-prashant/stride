@@ -40,7 +40,7 @@ export const deliveryPackets = pgTable("delivery_packets", {
 
 export const deliveryAttempts = pgTable("delivery_attempts", {
   id: text("id").primaryKey(), workspaceId: text("workspace_id").notNull(), projectId: text("project_id").notNull(), ticketId: text("ticket_id").notNull(), packetId: text("packet_id").notNull(), connectionId: text("connection_id").notNull(), profileId: text("profile_id").notNull(),
-  state: text("state").notNull(), version: integer("version").notNull(), grantExpires: text("grant_expires").notNull(), leaseUntil: text("lease_until"), authorizedBy: text("authorized_by").notNull().references(() => users.id), authorizedAt: text("authorized_at").notNull(), startedAt: text("started_at"), endedAt: text("ended_at"), checkpoint: text("checkpoint"),
+  agentSessionId: text("agent_session_id"), state: text("state").notNull(), version: integer("version").notNull(), grantExpires: text("grant_expires").notNull(), leaseUntil: text("lease_until"), authorizedBy: text("authorized_by").notNull().references(() => users.id), authorizedAt: text("authorized_at").notNull(), startedAt: text("started_at"), endedAt: text("ended_at"), checkpoint: text("checkpoint"),
 }, t => [
   foreignKey({ columns: [t.workspaceId, t.projectId, t.ticketId], foreignColumns: [deliveryTickets.workspaceId, deliveryTickets.projectId, deliveryTickets.id] }),
   foreignKey({ columns: [t.workspaceId, t.projectId, t.packetId], foreignColumns: [deliveryPackets.workspaceId, deliveryPackets.projectId, deliveryPackets.id] }),

@@ -125,6 +125,30 @@ export class DeliveryReview extends DeliveryExecution {
       return { ...e, ticket: t };
     });
   }
+  async rework(userId: string, workspaceId: string, projectId: string, ticketId: string, input: unknown) {
+    const v = decision(input, ["accept_rework"]);
+    if (v.accept_rework !== true) throw forbidden("Confirm that the candidate must repeat development and every review.");
+    await this.project(userId, workspaceId, projectId);
+    return this.repo.db.transaction(async db => {
+      const s = this.scoped(db); await s.lock(userId, workspaceId, projectId);
+      const cfg = await s.configuration(workspaceId, projectId);
+      if (cfg.reviewers.architecture !== userId) throw forbidden();
+      const h = digest({ ticketId, action: "rework", ...v });
+      const replay = await s.replay({ kind: "human", id: userId }, workspaceId, projectId, v.request_id, h); if (replay) return replay;
+      const t = await s.ticket(workspaceId, projectId, ticketId);
+      if (t.version !== v.expected_version || t.kind !== "delivery" || ["accepted", "cancelled", "in_review", "replan_required"].includes(t.phase)) throw changed("Return a submitted report through its human review gate; completed outcomes remain immutable.");
+      const previous = { phase: t.phase, role: t.role_id, candidate: t.payload.candidate };
+      await s.fence(t); t.binding_id = null; t.packet_id = null;
+      t.payload.rework_cycles += 1; t.phase = t.payload.rework_cycles > 2 ? "replan_required" : "created"; t.role_id = "development";
+      t.payload.candidate = null; t.payload.report = null; t.payload.reviewed_context_hash = null;
+      t.payload.environment = null; t.payload.environment_artifact = null; t.payload.release = null;
+      t.payload.remaining_reviews = [...t.payload.review_roles];
+      t.payload.todo = [`Resolve the human decision: ${v.reason}`, "Recheck the current approved requirements and file scope.", "Submit a new candidate and repeat every review gate."];
+      await s.saveTicket(t);
+      const e = await s.event({ kind: "human", id: userId }, workspaceId, projectId, t.id, "candidate_withdrawn", v.reason, v.request_id, h, { previous, physical_stop: "unconfirmed" }, [cfg.reviewers.engineering]);
+      return { ...e, ticket: t };
+    });
+  }
   async stop(userId: string, workspaceId: string, projectId: string, ticketId: string, input: unknown) {
     const v = decision(input, ["cancel_ticket"]); if (typeof v.cancel_ticket !== "boolean") throw changed("Choose whether to pause work or cancel the ticket.");
     await this.project(userId, workspaceId, projectId);

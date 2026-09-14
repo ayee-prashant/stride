@@ -22,7 +22,7 @@ export class DeliveryService extends DeliveryReview {
     let packet = null; let packetError: string | null = null;
     if (t.packet_id) { try { packet = await this.currentPacket(userId, t); } catch (e) { if (!(e instanceof AppError)) throw e; packetError = e.message; } }
     const attempt = t.attempt_id ? await this.attempt(workspaceId, projectId, t.attempt_id) : null;
-    return { ticket: t, packet, packet_error: packetError, report_hash: t.payload.report ? digest(t.payload.report) : null, attempt, configuration: await this.configuration(workspaceId, projectId) };
+    return { ticket: t, packet, packet_error: packetError, report_hash: t.payload.report ? digest(t.payload.report) : null, attempt: attempt ? { id: attempt.id, state: attempt.state, version: attempt.version, grant_expires: attempt.grant_expires, lease_until: attempt.lease_until, started_at: attempt.started_at, ended_at: attempt.ended_at } : null, configuration: await this.configuration(workspaceId, projectId) };
   }
   async history(userId: string, workspaceId: string, projectId: string, ticketId: string | null, after = 0) {
     await this.project(userId, workspaceId, projectId); if (ticketId) await this.ticket(workspaceId, projectId, ticketId);
@@ -30,9 +30,9 @@ export class DeliveryService extends DeliveryReview {
     const events = rows.results.slice(0, 50).map(e => ({ ...e, payload: JSON.parse(e.payload) }));
     return { events, next_cursor: events.at(-1)?.sequence ?? after, has_more: rows.results.length > 50 };
   }
-  async notices(userId: string, workspaceId: string, projectId: string, after = 0) {
+  async notices(userId: string, workspaceId: string, projectId: string, after = 0, latest = false) {
     await this.project(userId, workspaceId, projectId);
-    const rows = await this.repo.statement("SELECT id,sequence,ticket_id,title,created_at,read_at FROM delivery_notices WHERE workspace_id=? AND project_id=? AND recipient_id=? AND sequence>? ORDER BY sequence LIMIT 51", workspaceId, projectId, userId, after).all<{ sequence: number }>();
+    const rows = await this.repo.statement(`SELECT id,sequence,ticket_id,title,created_at,read_at FROM delivery_notices WHERE workspace_id=? AND project_id=? AND recipient_id=? ${latest && !after ? "" : `AND sequence${latest ? "<" : ">"}?`} ORDER BY sequence ${latest ? "DESC" : "ASC"} LIMIT 51`, workspaceId, projectId, userId, ...(latest && !after ? [] : [after])).all<{ sequence: number }>();
     const notices = rows.results.slice(0, 50); return { notices, next_cursor: notices.at(-1)?.sequence ?? after, has_more: rows.results.length > 50 };
   }
   async readNotices(userId: string, workspaceId: string, projectId: string, input: unknown) {

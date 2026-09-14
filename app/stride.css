@@ -384,3 +384,5 @@ ul.delivery-bullets { list-style:disc; } ol.delivery-bullets { list-style:decima
 .delivery-notices time { color:var(--muted-foreground); font-size:.8rem; }
 @media(max-width:640px) { .delivery-reviewers { grid-template-columns:minmax(0,1fr); } .delivery-ticket { align-items:flex-start; flex-direction:column; padding:1rem; } .delivery-ticket-next { width:100%; justify-content:space-between; } .delivery-setup { padding:1rem; } .delivery-tabs button { flex:1 1 auto; } }
 @media(max-width:640px) { .agent-card { padding: 1rem; } .agent-toolbar .inline-actions { flex-wrap: wrap; } .agent-card-actions button { flex: 1 1 auto; } }
+
+.delivery-dialog .context-pane { display: flex; flex-direction: column; gap: 0.8rem; align-items: stretch; }

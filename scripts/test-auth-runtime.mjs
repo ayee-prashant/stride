@@ -3,6 +3,7 @@ import { openEmail } from "../lib/server/email.ts";
 import { spawn } from "node:child_process";
 import assert from "node:assert/strict";
 import { setTimeout as delay } from "node:timers/promises";
+import { verifyAgentRuntime } from "./test-agent-runtime.mjs";
 import { verifyBrowser } from "./test-browser-runtime.mjs";
 import { Repository } from "../lib/server/repository.ts";
 import { PostgresDatabase } from "../lib/server/postgres-adapter.ts";
@@ -128,7 +129,7 @@ try {
   assert.equal(staleBrief.brief.payload.documents[0].body, contextInput.body);
   const restricted = new Pool({ connectionString: fixtureUrl.toString(), max: 1 });
   try {
-    for (const table of ["context_revisions", "context_events", "task_context_briefs", "repository_observations", "repository_source_events", "repository_source_receipts", "agent_profiles", "agent_role_events"]) {
+    for (const table of ["context_revisions", "context_events", "task_context_briefs", "repository_observations", "repository_source_events", "repository_source_receipts", "agent_profiles", "agent_role_events", "delivery_packets", "delivery_events"]) {
       const privileges = await restricted.query("SELECT has_table_privilege(current_user,$1,'UPDATE') AS can_update, has_table_privilege(current_user,$1,'DELETE') AS can_delete", [table]);
       assert.deepEqual(privileges.rows[0], { can_update: false, can_delete: false });
     }
@@ -162,6 +163,8 @@ try {
   assert.equal((await json(await request("/api/workspace?workspace_id=" + workspaceId))).role, "member");
   assert.equal((await request("/api/invitations?workspace_id=" + workspaceId, "POST", { email: "denied@example.test" })).status, 403);
   await json(await request("/api/auth/sign-out", "POST", {})); cookie = ownerCookie;
+  stage = "agent-runtime";
+  const deliveryReview = await verifyAgentRuntime({ origin, request, json, userId: bootstrap.user.userId, workspaceId, projectId: metadata.projects[0].id });
   stage = "browser";
   const sourcePool = new Pool({ connectionString: fixtureUrl.toString(), max: 1 });
   try {
@@ -173,7 +176,7 @@ try {
       const claim = await sources.claim(); assert.ok(claim);
       const result = head === "unavailable" ? new GitHubContextError("access_unavailable") : { ...observation(repositoryBinding, head, "CI repository fact <script>window.__repositoryXss=true</script>"), observed_at: new Date().toISOString() };
       assert.equal(await sources.finish(claim, result), true);
-    });
+    }, deliveryReview);
   } finally { await sourcePool.end(); }
   stage = "password-change";
   const changedPassword = ownerPassword + "-changed";

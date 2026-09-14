@@ -5,6 +5,30 @@ import { digest } from "../lib/server/delivery-store.ts";
 import { parseReport, validatePlan } from "../lib/delivery.ts";
 import { setupDelivery, completeDelivery, report, rid } from "./delivery-contract.ts";
 const setup = () => setupDelivery(fixture);
+test("another sign-in cannot resume a running attempt, and revoked sign-in fences it", async () => {
+  const f = await setup(); const authorized = await f.s.authorizeStart(f.owner.userId, f.workspace, f.project, f.t.id, f.startInput);
+  const claim = { request_id: rid(), ticket_id: f.t.id, attempt_id: authorized.ticket!.attempt_id, packet_hash: f.packet.hash };
+  await f.s.claim(f.actor, claim);
+  const fresh = { ...f.actor, session_id: "another-isolated-sign-in" };
+  await assert.rejects(f.s.claim(fresh, claim));
+  await assert.rejects(f.s.writeAttempt(fresh, "submit", { request_id: rid(), attempt_id: claim.attempt_id, expected_version: 2, submit: report() }));
+  assert.equal((await f.s.agentPacket(fresh, f.t.id)).execution_authorized, false);
+  f.c.options.sessionActive = async () => false;
+  await f.prepare();
+  assert.equal((await f.s.attempt(f.workspace, f.project, claim.attempt_id!)).state, "lease_lost");
+});
+test("notifications page from newest for humans and forward for companions without losing events", async () => {
+  const f = await setup();
+  const initial = (await f.repo.statement("SELECT MAX(sequence) AS n FROM delivery_events").first<{ n: number }>())!.n;
+  for (let i = 1; i <= 55; i++) await f.s.event({ kind: "human", id: f.owner.userId }, f.workspace, f.project, f.t.id, "test_notice", "Isolated notification fixture", rid(), digest(i), {}, [f.owner.userId]);
+  const latest = await f.s.notices(f.owner.userId, f.workspace, f.project, 0, true);
+  assert.equal(latest.notices[0].sequence, initial + 55); assert.equal(latest.has_more, true);
+  const older = await f.s.notices(f.owner.userId, f.workspace, f.project, latest.next_cursor, true);
+  assert.ok(older.notices.every(n => n.sequence < latest.next_cursor));
+  const forward = await f.s.companionNotices(f.actor, initial + 50); assert.deepEqual(forward.notices.map(n => n.sequence), [51, 52, 53, 54, 55].map(n => n + initial));
+  await f.repo.addMember(f.owner.userId, f.workspace, { email: f.other.email, role: "member" });
+  assert.equal((await f.s.notices(f.other.userId, f.workspace, f.project)).notices.length, 0);
+});
 test("full BA, architecture, specialist review, failed QA rework, UAT and production acceptance flow", async () => { await completeDelivery(fixture); });
 test("BA work needs role acknowledgement, companion preparation and a separate exact human start", async () => {
   const f = await setup();
