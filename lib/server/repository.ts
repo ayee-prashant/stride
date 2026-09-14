@@ -64,7 +64,7 @@ export class Repository {
   async addMember(userId: string, workspaceId: string, input: unknown) {
     await this.membership(userId, workspaceId, true); const value = parseMember(input);
     const target = await this.statement("SELECT id FROM users WHERE email=?", value.email).first<{ id: string }>();
-    if (!target) throw new AppError(400, "MEMBER_UNAVAILABLE", "That person must have Site access and sign in once before being added.");
+    if (!target) throw new AppError(400, "MEMBER_UNAVAILABLE", "That person must have approved access and sign in once before being added.");
     const owner = await this.statement("SELECT owner_id FROM workspaces WHERE id=?", workspaceId).first<{ owner_id: string }>();
     if (owner?.owner_id === target.id) throw new AppError(400, "OWNER_PROTECTED", "The workspace owner's role cannot be changed.");
     const result = await this.statement(`INSERT INTO memberships(workspace_id,user_id,role) SELECT ?,?,? WHERE ${adminGuard} AND (EXISTS(SELECT 1 FROM memberships WHERE workspace_id=? AND user_id=?) OR ((SELECT COUNT(*) FROM memberships WHERE workspace_id=?) < 200 AND (SELECT COUNT(*) FROM memberships WHERE user_id=?) < 50)) ON CONFLICT(workspace_id,user_id) DO UPDATE SET role=excluded.role`, workspaceId, target.id, value.role, workspaceId, userId, workspaceId, target.id, workspaceId, target.id).run();
