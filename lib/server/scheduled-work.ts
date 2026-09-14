@@ -25,7 +25,7 @@ export class ScheduledWork {
         const clock = localClock(now, preferences.timezone); if (clock.hour < preferences.reminder_hour) continue;
         if (preferences.due_reminders) {
           // Catch up on overdue work, with the same persisted per-recipient preferences.
-          const offset = Math.round((now.getTime() - new Date(`${clock.day}T${String(clock.hour).padStart(2, "0")}:00:00Z`).getTime()) / 60000);
+          const offset = Math.round((now.getTime() - new Date(`${clock.day}T${String(clock.hour).padStart(2, "0")}:${String(clock.minute).padStart(2, "0")}:00Z`).getTime()) / 60000);
           await this.repo.notifications(member.user_id, member.workspace_id, { tz_offset: Math.max(-840, Math.min(840, offset)) }, true);
           await this.repo.statement(`INSERT INTO notifications(id,workspace_id,task_id,recipient_id,kind,event_key,created_at)
             SELECT 'reminder:'||t.id||':'||t.due_date||':'||?,t.workspace_id,t.id,?,'reminder','reminder:'||t.id||':'||t.due_date||':'||?,?
@@ -39,7 +39,7 @@ export class ScheduledWork {
           const summary = await this.repo.statement(`SELECT CAST(COUNT(*) AS INTEGER) AS open,CAST(COALESCE(SUM(CASE WHEN t.due_date<=? THEN 1 ELSE 0 END),0) AS INTEGER) AS due,
             CAST(COALESCE(SUM(CASE WHEN t.blocked_reason<>'' THEN 1 ELSE 0 END),0) AS INTEGER) AS blocked
             FROM tasks t JOIN projects p ON p.id=t.project_id AND p.workspace_id=t.workspace_id WHERE t.workspace_id=? AND COALESCE(t.assignee_id,t.created_by)=?
-            AND t.archived_at IS NULL AND p.archived_at IS NULL AND t.status<>'done' AND ${notificationAllowed("t.workspace_id", "t.id", "COALESCE(t.assignee_id,t.created_by)", "reminder")}`, clock.day, member.workspace_id, member.user_id).first<{ open: number; due: number; blocked: number }>();
+            AND t.archived_at IS NULL AND p.archived_at IS NULL AND t.status<>'done' AND NOT EXISTS(SELECT 1 FROM task_notification_settings nm WHERE nm.workspace_id=t.workspace_id AND nm.task_id=t.id AND nm.user_id=COALESCE(t.assignee_id,t.created_by) AND nm.muted=1)`, clock.day, member.workspace_id, member.user_id).first<{ open: number; due: number; blocked: number }>();
           const link = new URL(`/?${new URLSearchParams({ workspace: member.workspace_id })}`, this.origin).href;
           await outbox.enqueue({ to: member.email, subject: "Your daily Stride summary", text: `${member.workspace_name}\n\n${summary?.open ?? 0} open tasks\n${summary?.due ?? 0} due today or overdue\n${summary?.blocked ?? 0} blocked\n\nOpen your workspace: ${link}\n\nYou can turn off daily summaries in notification preferences.`, key: `digest:${member.workspace_id}:${member.user_id}:${clock.day}` }, "digest", new Date(now.getTime() + 12 * 3600000).toISOString(), member.workspace_id, member.user_id);
         }

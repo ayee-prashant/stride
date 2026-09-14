@@ -27,6 +27,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
@@ -50,6 +51,24 @@ jobs:
         env:
           NODE_ENV: test
           TEST_DATABASE_URL: postgresql://stride_test:isolated_ci_fixture@127.0.0.1:5432/stride_test
+      - name: Verify productivity on PostgreSQL
+        run: node --experimental-strip-types --test tests/postgres-productivity.integration.test.ts
+        env:
+          TEST_DATABASE_URL: postgresql://stride_test:isolated_ci_fixture@127.0.0.1:5432/stride_test
+      - name: Audit dependencies
+        run: node scripts/audit-dependencies.mjs
+        if: ${{ !cancelled() && steps.generated.outcome == 'success' }}
+      - name: Verify query performance and backup restoration
+        run: node --experimental-strip-types scripts/verify-performance-restore.ts
+        env:
+          TEST_DATABASE_URL: postgresql://stride_test:isolated_ci_fixture@127.0.0.1:5432/stride_test
+          TEST_POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: dependency-audit-${{ github.event.pull_request.head.sha }}
+          path: audit-*.json
+          retention-days: 7
       - run: npm run typecheck
         if: ${{ !cancelled() && steps.generated.outcome == 'success' }}
       - run: npm run lint

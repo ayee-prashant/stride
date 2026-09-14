@@ -84,10 +84,10 @@ export function safeReturnTo(input: unknown): string {
     return url.pathname + url.search;
   } catch { return "/"; }
 }
-export function localClock(now: Date, timezone: string): { day: string; hour: number } {
-  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hourCycle: "h23" }).formatToParts(now);
+export function localClock(now: Date, timezone: string): { day: string; hour: number; minute: number } {
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(now);
   const part = (type: string) => parts.find(item => item.type === type)!.value;
-  return { day: `${part("year")}-${part("month")}-${part("day")}`, hour: Number(part("hour")) };
+  return { day: `${part("year")}-${part("month")}-${part("day")}`, hour: Number(part("hour")), minute: Number(part("minute")) };
 }
 export function parseMute(input: unknown): boolean { return boolean(object(input, ["muted"]).muted); }
 export function parseRecurrence(input: unknown): Recurrence { return choice(input, ["none", "daily", "weekly", "monthly"], "repeat schedule"); }

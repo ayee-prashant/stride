@@ -226,9 +226,9 @@ export class Repository {
     const visible = `n.workspace_id=? AND n.recipient_id=? AND ${memberGuard} AND t.archived_at IS NULL AND p.archived_at IS NULL
       AND NOT EXISTS(SELECT 1 FROM task_notification_settings nm WHERE nm.workspace_id=n.workspace_id AND nm.task_id=n.task_id AND nm.user_id=n.recipient_id AND nm.muted=1)
       AND NOT EXISTS(SELECT 1 FROM notification_preferences np WHERE np.workspace_id=n.workspace_id AND np.user_id=n.recipient_id AND ((n.kind='assignment' AND np.assignments=0) OR (n.kind='mention' AND np.mentions=0) OR (n.kind IN ('overdue','reminder') AND np.due_reminders=0)))
-      AND (n.kind<>'reminder' OR (t.status<>'done' AND COALESCE(t.assignee_id,t.created_by)=n.recipient_id AND n.event_key='reminder:'||t.id||':'||t.due_date||':'||n.recipient_id))
+      AND (n.kind<>'reminder' OR (t.status<>'done' AND t.due_date=? AND COALESCE(t.assignee_id,t.created_by)=n.recipient_id AND n.event_key='reminder:'||t.id||':'||t.due_date||':'||n.recipient_id))
       AND (n.kind<>'overdue' OR (t.status<>'done' AND t.due_date<? AND COALESCE(t.assignee_id,t.created_by)=n.recipient_id AND n.event_key='overdue:'||t.id||':'||t.due_date||':'||n.recipient_id))`;
-    const values: SqlValue[] = [workspaceId, userId, workspaceId, userId, today];
+    const values: SqlValue[] = [workspaceId, userId, workspaceId, userId, today, today];
     const [rows, count] = await Promise.all([
       this.statement(`SELECT n.id,n.task_id,n.kind,n.created_at,n.read_at,t.title AS task_title,p.name AS project_name,a.name AS actor_name ${join} WHERE ${visible} ORDER BY n.created_at DESC,n.id DESC LIMIT ? OFFSET ?`, ...values, query.limit + 1, query.offset).all<TaskNotification>(),
       this.statement(`SELECT COUNT(*) AS n ${join} WHERE ${visible} AND n.read_at IS NULL`, ...values).first<{ n: number | string }>(),
