@@ -4,6 +4,7 @@ import type { Repository } from "./repository.ts";
 import type { Invitations } from "./invitations.ts";
 import type { Attachments } from "./attachments.ts";
 import { ProductivityRepository } from "./productivity-repository.ts";
+import { contextRoute } from "./context-http.ts";
 
 // Enough for 8,000 Unicode description characters plus metadata, still bounded.
 export const MAX_BODY_BYTES = 32_768;
@@ -69,7 +70,9 @@ export async function handleApi(request: Request, dependencies: Dependencies): P
       result = await repository.bootstrap(user);
     } else {
       const workspaceId = identifier(url.searchParams.get("workspace_id"));
-      if (route === "/api/capabilities" && request.method === "GET") { await repository.membership(user.userId, workspaceId); result = dependencies.capabilities?.() ?? { email: false, attachments: false }; }
+      const context = await contextRoute(repository, user.userId, workspaceId, url, request.method, input);
+      if (context) { result = context.body; status = context.status; }
+      else if (route === "/api/capabilities" && request.method === "GET") { await repository.membership(user.userId, workspaceId); result = dependencies.capabilities?.() ?? { email: false, attachments: false }; }
       else if (route === "/api/invitations" && ["GET", "POST"].includes(request.method) && dependencies.invitations) result = request.method === "GET" ? await dependencies.invitations().list(user.userId, workspaceId) : await dependencies.invitations().create(user.userId, workspaceId, input);
       else if (/^\/api\/invitations\/[^/]+$/.test(route) && request.method === "DELETE" && dependencies.invitations) result = await dependencies.invitations().revoke(user.userId, workspaceId, routeIdentifier(route.split("/")[3]), input);
       else if (route === "/api/tasks/bulk" && request.method === "POST") result = await productivity.bulk(user.userId, workspaceId, input);

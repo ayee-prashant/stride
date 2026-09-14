@@ -1,7 +1,7 @@
 name: Verify hosting migration
 on:
   pull_request:
-    branches: [main]
+    branches: [main, design/human-agent-workforce]
 permissions:
   contents: read
 concurrency:
@@ -34,8 +34,6 @@ jobs:
           node-version: '24'
       - run: npm ci --no-audit --no-fund
       - run: npm run db:generate
-      - name: Check committed migration history
-        run: test -z "$(git status --porcelain -- package-lock.json drizzle-postgres)"
       - uses: actions/upload-artifact@v4
         id: generated
         with:
@@ -44,6 +42,8 @@ jobs:
             package-lock.json
             drizzle-postgres/
           retention-days: 7
+      - name: Check committed migration history
+        run: test -z "$(git status --porcelain -- package-lock.json drizzle-postgres)"
       - run: bash -n infra/postgres/tls-start.sh
       - run: node --check scripts/verify-production.mjs
       - run: npm test
@@ -53,6 +53,10 @@ jobs:
           TEST_DATABASE_URL: postgresql://stride_test:isolated_ci_fixture@127.0.0.1:5432/stride_test
       - name: Verify productivity on PostgreSQL
         run: node --experimental-strip-types --test tests/postgres-productivity.integration.test.ts
+        env:
+          TEST_DATABASE_URL: postgresql://stride_test:isolated_ci_fixture@127.0.0.1:5432/stride_test
+      - name: Verify context authority and competing writers on PostgreSQL
+        run: node --experimental-strip-types --test tests/postgres-context.integration.test.ts
         env:
           TEST_DATABASE_URL: postgresql://stride_test:isolated_ci_fixture@127.0.0.1:5432/stride_test
       - name: Audit dependencies
