@@ -1,5 +1,15 @@
 # Stride — focused team task management
 
+## Requested hosting migration
+
+The target for the user's hosting request is Vercel for the application and
+Railway for PostgreSQL.
+Initial database adapter/schema work is prepared in the deployment migration
+branch. The running application wiring still targets Sites/D1: authentication,
+driver wiring, native Next.js build, generated migrations, and hosted checks
+must be completed before deployment. See docs/DEPLOYMENT.md for the ordered
+migration and its current access requirements.
+
 ## Current state
 
 Application source is written: authenticated page/API wiring, workspace-scoped

@@ -86,6 +86,17 @@ test("mutation quota resets in the next window and is persisted", async t => {
   await f.repo.rateLimit("owner", 120000);
   assert.equal(f.db.raw.prepare("SELECT hits FROM mutation_limits WHERE user_id='owner'").get()?.hits, 1);
 });
+test("search treats percent, underscore and its escape marker as literal text", async t => {
+  const f = await fixture(); t.after(() => f.db.raw.close());
+  for (const title of ["Fix_100%!Done", "FixX100ZDone", "Ordinary work"]) {
+    await f.repo.createTask("owner", f.workspace, { title, project_id: f.project });
+  }
+  for (const term of ["_", "%", "!", "fix_100%!done"]) {
+    const params = new URLSearchParams({ query: term });
+    const result = await f.repo.listTasks("owner", f.workspace, parseTaskQuery(params));
+    assert.deepEqual(result.tasks.map(task => task.title), ["Fix_100%!Done"]);
+  }
+});
 test("database rejects cross-tenant project references independent of service validation", async t => {
   const f = await fixture(); t.after(() => f.db.raw.close());
   const task = await f.repo.createTask("owner", f.workspace, { title: "Safe", project_id: f.project });

@@ -34,3 +34,16 @@ where drag-and-drop is supported so keyboard/touch use is not blocked.
 
 Accepted. Indexed, bounded SQL and stateless compute are a growth foundation,
 not evidence of unlimited scale. Measure before sharding or adding a cache.
+
+## ADR-007: requested Vercel and Railway migration
+
+Target selected; implementation in progress. The user's explicit host request
+supersedes ADR-002's deployment-provider choice, while preserving its requirement
+for verified identity, durable SQL, and private task data. Run native Next.js on
+Vercel and PostgreSQL on Railway. Keep UI/API same-origin and retain the existing
+repository boundary. Sites-supplied identity headers are not trusted on these
+hosts. Adopt a maintained session/authentication library with closed enrollment;
+never simulate the original dispatch identity in production.
+
+The PostgreSQL adapter and schema are initial preparation, not a verified
+database migration or runtime switch. See DEPLOYMENT.md for remaining work.

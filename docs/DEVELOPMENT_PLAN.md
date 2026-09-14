@@ -40,3 +40,12 @@ fix findings, and rerun affected gates before release.
   typecheck, lint, schema migration parity, framework build, and hosted checks
   are blocked on the unresolved dependency installation.
 - Slice 7: source checkpoint only. No deployment until all required gates pass.
+
+## Requested hosting migration
+
+Vercel plus Railway is now the target for the user's deployment request.
+See DEPLOYMENT.md for the migration sequence. PostgreSQL adapter/schema source
+and portable repository queries are prepared; 44 native tests pass. Provider
+authorization, session authentication, pool/runtime wiring, generated migrations,
+real PostgreSQL tests, compilation, and deployment remain outstanding. Keep the
+migration in a draft branch until its complete release gates pass.

@@ -2,6 +2,22 @@
 
 Status: first-release source authored; NOT compiled or deployed.
 
+## Latest checkpoint: Vercel and Railway preparation
+
+The user requested these hosts after the original Sites build block. Initial
+PostgreSQL adapter/schema work and compatible repository queries are now prepared.
+`node scripts/test.mjs` on Node 24 passes **44 tests; 0 failed**. The eight new
+PostgreSQL adapter tests use a scripted client, and task-search coverage now
+checks literal percent, underscore, and escape-marker characters.
+
+The repository suite still uses SQLite. There is no successful PostgreSQL
+integration run, generated PostgreSQL migration, native Next.js build, or hosted
+deployment. Authentication and runtime wiring still depend on Sites. Vercel and
+Railway authorization are pending. The migration remains in a draft branch;
+docs/DEPLOYMENT.md records the remaining work and release gates.
+
+The evidence below describes the original Sites implementation checkpoint.
+
 ## Source completed in this iteration
 
 - Shared TypeScript task/project/member contracts and strict validation.

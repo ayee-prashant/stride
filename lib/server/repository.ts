@@ -86,7 +86,7 @@ export class Repository {
     if (query.priority) { conditions.push("t.priority=?"); values.push(query.priority); }
     if (query.status) { conditions.push("t.status=?"); values.push(query.status); }
     else if (!query.include_done) conditions.push("t.status!='done'");
-    if (query.query) { conditions.push("instr(lower(t.title),lower(?))>0"); values.push(query.query); }
+    if (query.query) { conditions.push("lower(t.title) LIKE lower(?) ESCAPE '!'"); values.push(`%${query.query.replace(/[!%_]/g, character => `!${character}`)}%`); }
     const result = await this.statement(`${taskSelect} WHERE ${conditions.join(" AND ")} ORDER BY (t.status='done'),(t.due_date IS NULL),t.due_date,CASE t.priority WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END,t.id LIMIT ? OFFSET ?`, ...values, query.limit + 1, query.offset).all<Task>();
     return { tasks: result.results.slice(0, query.limit), hasMore: result.results.length > query.limit, nextOffset: query.offset + query.limit };
   }
@@ -98,7 +98,7 @@ export class Repository {
     await this.membership(userId, workspaceId); const value = parseTaskCreate(input);
     const now = new Date().toISOString(); const id = crypto.randomUUID(); const mutation = crypto.randomUUID();
     const result = await this.db.batch([
-      this.statement(`INSERT INTO tasks(id,workspace_id,project_id,title,description,status,priority,assignee_id,due_date,completed_at,last_mutation_id,created_by,updated_by,created_at,updated_at) SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,? WHERE ${memberGuard} AND EXISTS (SELECT 1 FROM projects WHERE id=? AND workspace_id=? AND archived_at IS NULL) AND (? IS NULL OR EXISTS(SELECT 1 FROM memberships WHERE workspace_id=? AND user_id=?)) RETURNING *`, id, workspaceId, value.project_id, value.title, value.description, value.status, value.priority, value.assignee_id, value.due_date, value.status === "done" ? now : null, mutation, userId, userId, now, now, workspaceId, userId, value.project_id, workspaceId, value.assignee_id, workspaceId, value.assignee_id),
+      this.statement(`INSERT INTO tasks(id,workspace_id,project_id,title,description,status,priority,assignee_id,due_date,completed_at,last_mutation_id,created_by,updated_by,created_at,updated_at) SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,? WHERE ${memberGuard} AND EXISTS (SELECT 1 FROM projects WHERE id=? AND workspace_id=? AND archived_at IS NULL) AND (CAST(? AS TEXT) IS NULL OR EXISTS(SELECT 1 FROM memberships WHERE workspace_id=? AND user_id=?)) RETURNING *`, id, workspaceId, value.project_id, value.title, value.description, value.status, value.priority, value.assignee_id, value.due_date, value.status === "done" ? now : null, mutation, userId, userId, now, now, workspaceId, userId, value.project_id, workspaceId, value.assignee_id, workspaceId, value.assignee_id),
       this.event(mutation, workspaceId, id, userId, "created", now),
     ]);
     if (!result[0].results.length) throw new AppError(400, "INVALID_REFERENCE", "Choose an active project and an assignee from this workspace.");
@@ -113,7 +113,7 @@ export class Repository {
     const action = patch.archived === true ? "archived" : patch.archived === false ? "restored" : status !== current.status ? `status:${status}` : "updated";
     const completed = status === "done" ? current.completed_at ?? now : null;
     const result = await this.db.batch([
-      this.statement(`UPDATE tasks SET title=?,description=?,status=?,priority=?,assignee_id=?,due_date=?,completed_at=?,archived_at=?,version=version+1,last_mutation_id=?,updated_by=?,updated_at=? WHERE id=? AND workspace_id=? AND version=? AND ${memberGuard} AND EXISTS(SELECT 1 FROM projects WHERE id=tasks.project_id AND workspace_id=? AND archived_at IS NULL) AND (? IS NULL OR EXISTS(SELECT 1 FROM memberships WHERE workspace_id=? AND user_id=?)) RETURNING *`, patch.title ?? current.title, patch.description ?? current.description, status, patch.priority ?? current.priority, assignee, patch.due_date === undefined ? current.due_date : patch.due_date, completed, patch.archived === undefined ? current.archived_at : patch.archived ? now : null, mutation, userId, now, taskId, workspaceId, patch.version, workspaceId, userId, workspaceId, assignee, workspaceId, assignee),
+      this.statement(`UPDATE tasks SET title=?,description=?,status=?,priority=?,assignee_id=?,due_date=?,completed_at=?,archived_at=?,version=version+1,last_mutation_id=?,updated_by=?,updated_at=? WHERE id=? AND workspace_id=? AND version=? AND ${memberGuard} AND EXISTS(SELECT 1 FROM projects WHERE id=tasks.project_id AND workspace_id=? AND archived_at IS NULL) AND (CAST(? AS TEXT) IS NULL OR EXISTS(SELECT 1 FROM memberships WHERE workspace_id=? AND user_id=?)) RETURNING *`, patch.title ?? current.title, patch.description ?? current.description, status, patch.priority ?? current.priority, assignee, patch.due_date === undefined ? current.due_date : patch.due_date, completed, patch.archived === undefined ? current.archived_at : patch.archived ? now : null, mutation, userId, now, taskId, workspaceId, patch.version, workspaceId, userId, workspaceId, assignee, workspaceId, assignee),
       this.event(mutation, workspaceId, taskId, userId, action, now),
     ]);
     if (!result[0].results.length) throw new AppError(409, "CONFLICT", "The item, project, assignee, or your access changed. Refresh before retrying.");
@@ -126,7 +126,7 @@ export class Repository {
   }
   async rateLimit(userId: string, now = Date.now()) {
     const window = Math.floor(now / 60000);
-    const row = await this.statement("INSERT INTO mutation_limits(user_id,window_start,hits) VALUES(?,?,1) ON CONFLICT(user_id) DO UPDATE SET hits=CASE WHEN window_start=excluded.window_start THEN hits+1 ELSE 1 END,window_start=excluded.window_start RETURNING hits", userId, window).first<{ hits: number }>();
+    const row = await this.statement("INSERT INTO mutation_limits(user_id,window_start,hits) VALUES(?,?,1) ON CONFLICT(user_id) DO UPDATE SET hits=CASE WHEN mutation_limits.window_start=excluded.window_start THEN mutation_limits.hits+1 ELSE 1 END,window_start=excluded.window_start RETURNING hits", userId, window).first<{ hits: number }>();
     if (!row || row.hits > 120) throw new AppError(429, "RATE_LIMITED", "Too many changes. Wait a minute before trying again.");
   }
 }

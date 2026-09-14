@@ -38,3 +38,13 @@ Track create/start/complete usability with real users before asserting 10 second
 Run `node scripts/test.mjs` on Node 24. No package download is required for this
 suite. Native TypeScript stripping executes TS but does not perform TypeScript
 type checking or compile JSX. Do not confuse the passing suite with a full build.
+
+## PostgreSQL migration checks
+
+The test command also runs postgres-adapter.test.ts against a scripted client.
+It verifies driver contract behavior: parameter separation, same-connection
+transactions, rollback, resource cleanup, and no automatic write retries. This
+does not prove PostgreSQL accepts the SQL or enforces the intended constraints.
+Before releasing the new host target, run the existing repository/HTTP contracts
+against a fresh PostgreSQL database created from generated target migrations,
+including concurrent writes and quota checks. Record that evidence separately.
