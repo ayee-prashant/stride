@@ -2,9 +2,11 @@
 
 ## Trust boundary
 
-Production identity is injected by the trusted Sites dispatcher. Do not expose
-the Worker through a separate direct origin that accepts spoofed identity
-headers. No app passwords, test-user fallbacks, or client-supplied roles.
+Production identity comes from Better Auth's verified database session plus the
+persisted GitHub provider account. Check that account's numeric ID against
+STRIDE_ALLOWED_GITHUB_IDS on every request; email and login names are not access
+credentials. Caller-supplied oai-authenticated-* headers are ignored. There are
+no app passwords, public email signup, test-user fallbacks, or client-supplied roles.
 Missing identity returns 401. Unauthorized resource access returns a generic
 404 or 403 without record details. Authorization is repeated on every request.
 
@@ -14,6 +16,10 @@ Missing identity returns 401. Unauthorized resource access returns a generic
 - Admin role for project and membership administration; members manage tasks.
 - Owner cannot be removed by member administration.
 - Mutation requests require same-origin JSON and are capped in size.
+- The trusted mutation origin is APP_URL, not a forwarded host header.
+- OAuth state and callback checks stay enabled. Cookies are HttpOnly, SameSite=Lax,
+  Secure for HTTPS, and scoped to one host; account linking is disabled.
+- Database TLS verifies certificates. URL ssl parameters cannot weaken it.
 - Strict input schemas reject unknown fields, invalid dates, excessive text,
   invalid enums, and invalid versions. SQL uses bound values only.
 - All task content is plain text rendered through React escaping; no raw HTML.

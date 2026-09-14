@@ -1,6 +1,27 @@
 # Implementation review and release gates
 
-Status: first-release source authored; NOT compiled or deployed.
+Status: first-release source authored; working application NOT compiled or deployed.
+
+## Hosting retry checkpoint: 2026-09-14
+
+Native Next.js routes, Better Auth GitHub sessions, a persisted provider-account
+allowlist check, PostgreSQL pool, auth schema, migration runner, and auth UI are
+authored. The previous caller-header identity helper is removed. Runtime database
+connections enforce certificate verification and bounded timeouts/pool size.
+Configured APP_URL, rather than a forwarded host, governs mutation origins.
+
+48 dependency-free tests pass. These include explicit configuration denial,
+TLS override rejection, and proxy-origin regression checks. New dependency
+installation/lockfile generation, actual PostgreSQL integration, full typecheck,
+lint, and native Next.js build are pending the GitHub CI workflow. Auth schema
+parity with the installed Better Auth version must also be verified there.
+
+The Railway project and persistent database service exist. A Vercel static setup
+preview was created, containing no application data or authentication routes.
+This is not a completed deployment. Provider details/access failures and the
+remaining OAuth/TLS configuration are recorded in DEPLOYMENT.md.
+
+The older checkpoints below describe earlier source states.
 
 ## Latest checkpoint: Vercel and Railway preparation
 

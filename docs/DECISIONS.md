@@ -47,3 +47,14 @@ never simulate the original dispatch identity in production.
 
 The PostgreSQL adapter and schema are initial preparation, not a verified
 database migration or runtime switch. See DEPLOYMENT.md for remaining work.
+
+## ADR-008: Better Auth and owner-approved GitHub accounts
+
+Selected for the requested native Next.js runtime. Better Auth owns OAuth state,
+session cookies, and session persistence. GitHub owns passwords and account recovery.
+No email/password registration is exposed. Enrollment checks immutable numeric
+GitHub IDs, initially the repository owner's ID, configured explicitly at the host.
+Session authorization rechecks the persisted provider account on every request;
+no editable profile claim, email, or identity header grants access. Auth records
+use separate tables from domain users. A dedicated OAuth application and host
+secrets still need provisioning; the code fails closed until configuration exists.

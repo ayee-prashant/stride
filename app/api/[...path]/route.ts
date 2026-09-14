@@ -1,18 +1,15 @@
-import { env } from "cloudflare:workers";
-import { getChatGPTUser } from "@/app/chatgpt-auth";
-import { AppError } from "@/lib/domain";
+import { getSessionIdentity } from "@/lib/server/auth";
+import { getRepository } from "@/lib/server/database";
+import { applicationOrigin } from "@/lib/server/deployment-config";
 import { handleApi } from "@/lib/server/http";
-import { Repository } from "@/lib/server/repository";
-import type { Database } from "@/lib/server/repository";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 function handle(request: Request) {
   return handleApi(request, {
-    identity: getChatGPTUser,
-    repository: () => {
-      if (!env.DB) throw new AppError(503, "STORAGE_UNAVAILABLE", "Workspace storage is not available yet. Please try again later.");
-      return new Repository(env.DB as unknown as Database);
-    },
+    identity: () => getSessionIdentity(request.headers),
+    repository: getRepository,
+    origin: () => applicationOrigin(process.env),
   });
 }
 export const GET = handle;

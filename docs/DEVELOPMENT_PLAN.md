@@ -49,3 +49,10 @@ and portable repository queries are prepared; 44 native tests pass. Provider
 authorization, session authentication, pool/runtime wiring, generated migrations,
 real PostgreSQL tests, compilation, and deployment remain outstanding. Keep the
 migration in a draft branch until its complete release gates pass.
+
+Retry checkpoint: Railway project/Postgres storage and a Vercel static setup
+preview are created. Native Next.js, PostgreSQL pool, Better Auth GitHub sessions,
+closed enrollment, and the sign-in/sign-out UI are now wired in source. There are
+47 passing dependency-free tests. A GitHub CI workflow is prepared to resolve
+the new lockfile, generate migrations, and run real PostgreSQL/type/lint/build
+gates. This is not evidence that those gates passed.

@@ -8,7 +8,7 @@ unmeasured claim. Primary user: team contributor. Secondary user: team lead.
 
 ## Committed release scope
 
-- Platform sign-in/sign-out; private deployment; persistent workspaces.
+- GitHub sign-in/sign-out with approved accounts; persistent private workspaces.
 - Admin/member authorization; add existing signed-in users by exact email.
 - Create, rename, archive, and restore projects.
 - Title-only quick task creation inside a project. Optional description,
@@ -37,6 +37,6 @@ automations, external integrations, and AI generation. Do not add these to v1.
 ## Release boundary
 
 The initial deployment remains private to its owner. Team membership features
-are implemented, but other users need authorized Site-level access and must sign
-in once before an admin can add them. The application never silently makes a
-private Site public or sends invitations/email.
+are implemented, but other users must be explicitly approved in the server's
+GitHub account allowlist and sign in once before an admin can add them. The
+application never silently opens enrollment or sends invitations/email.

@@ -8,7 +8,7 @@
    are preferred automatically. Until Drizzle can run, an explicitly identified
    test-only schema fixture is used; production migration parity is unverified.
 3. Lint application, tests, and configuration.
-4. Production ESM Worker build.
+4. Native Next.js production build for the requested Vercel target.
 5. Review generated migrations and inspect query plans for common list queries.
 6. Post-build security/architecture review, corrections, and gate rerun.
 7. Verify terminal deployment status for the exact saved source version.
@@ -48,3 +48,11 @@ does not prove PostgreSQL accepts the SQL or enforces the intended constraints.
 Before releasing the new host target, run the existing repository/HTTP contracts
 against a fresh PostgreSQL database created from generated target migrations,
 including concurrent writes and quota checks. Record that evidence separately.
+
+`npm run test:postgres` requires an isolated loopback PostgreSQL database named
+stride_test, supplied as TEST_DATABASE_URL. It applies generated target migrations
+and checks onboarding, tenant/role denial, task lifecycle, literal search, real
+concurrent compare-and-swap, rollback on a failed audit FK, archive/restore, and
+rate-limit SQL. It does not use production credentials or reset a database.
+The GitHub workflow provisions that temporary service. An authored test is not
+a passing test; see RELEASE_REVIEW.md for what actually ran.

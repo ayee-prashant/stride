@@ -4,11 +4,11 @@
 
 The target for the user's hosting request is Vercel for the application and
 Railway for PostgreSQL.
-Initial database adapter/schema work is prepared in the deployment migration
-branch. The running application wiring still targets Sites/D1: authentication,
-driver wiring, native Next.js build, generated migrations, and hosted checks
-must be completed before deployment. See docs/DEPLOYMENT.md for the ordered
-migration and its current access requirements.
+The deployment migration branch now wires native Next.js, a bounded PostgreSQL
+pool, and Better Auth sessions with an explicit GitHub account allowlist.
+Dependencies, generated migrations, OAuth credentials, and hosted verification
+remain release gates. The Vercel setup preview is a static placeholder, not the
+functional application. See docs/DEPLOYMENT.md for the current provider state.
 
 ## Current state
 
@@ -63,9 +63,10 @@ or install unreviewed alternate dependency versions. Generate and inspect the
 Drizzle migration, then run the suite against it, full type checking, lint,
 production compilation, and the release review before publishing.
 
-Use the delegated Sign in with ChatGPT flow. Never add a development identity
-fallback to production or expose this Worker directly outside its trusted host.
-The initial Site is private; app membership does not grant Site-level access.
+The material below is retained as the original Sites starter reference only.
+The current migration's runtime and authentication requirements are in
+docs/ARCHITECTURE.md and docs/DEPLOYMENT.md. Do not use the old identity headers
+or the original Worker deployment workflow on the new hosts.
 
 ## Original starter operations reference
 

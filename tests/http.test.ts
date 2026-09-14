@@ -16,6 +16,14 @@ test("cross-origin and non-JSON mutations are rejected", async t => {
   assert.equal((await handleApi(request("bootstrap", {}, { "Content-Type": "text/plain" }), deps)).status, 415);
   assert.equal((await handleApi(request("bootstrap", {}, { "Sec-Fetch-Site": "cross-site" }), deps)).status, 403);
 });
+test("configured public origin governs mutations behind a proxy", async t => {
+  const f = await fixture(); t.after(() => f.db.raw.close());
+  const deps = { identity: async () => f.owner, repository: () => f.repo, origin: () => "https://stride.example.test" };
+  const proxied = new Request("http://internal-worker/api/bootstrap", { method: "POST", body: "{}", headers: { Origin: "https://stride.example.test", "Content-Type": "application/json" } });
+  assert.equal((await handleApi(proxied, deps)).status, 200);
+  const forged = new Request("https://attacker.example/api/bootstrap", { method: "POST", body: "{}", headers: { Origin: "https://attacker.example", "X-Forwarded-Host": "attacker.example", "Content-Type": "application/json" } });
+  assert.equal((await handleApi(forged, deps)).status, 403);
+});
 test("bounded streaming body handling rejects oversized requests", async t => {
   const f = await fixture(); t.after(() => f.db.raw.close());
   const response = await handleApi(request("bootstrap", { value: "x".repeat(MAX_BODY_BYTES + 1) }), { identity: async () => f.owner, repository: () => f.repo });

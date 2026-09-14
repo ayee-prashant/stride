@@ -4,9 +4,9 @@ import type { Repository } from "./repository.ts";
 
 // Enough for 8,000 Unicode description characters plus metadata, still bounded.
 export const MAX_BODY_BYTES = 32_768;
-export function assertMutationOrigin(request: Request) {
+export function assertMutationOrigin(request: Request, expectedOrigin = new URL(request.url).origin) {
   const origin = request.headers.get("origin");
-  if (!origin || origin !== new URL(request.url).origin || request.headers.get("sec-fetch-site") === "cross-site") {
+  if (!origin || origin !== expectedOrigin || request.headers.get("sec-fetch-site") === "cross-site") {
     throw new AppError(403, "ORIGIN_REJECTED", "This change must come from the application itself.");
   }
   if (request.headers.get("content-type")?.split(";")[0].trim().toLowerCase() !== "application/json") {
@@ -31,19 +31,19 @@ export async function readJson(request: Request): Promise<unknown> {
   try { return JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(joined)); }
   catch { throw new AppError(400, "INVALID_JSON", "Enter a valid JSON request."); }
 }
-export type Dependencies = { identity: () => Promise<Identity | null>; repository: () => Repository };
+export type Dependencies = { identity: () => Promise<Identity | null>; repository: () => Repository; origin?: () => string };
 function routeIdentifier(value: string): string {
   try { return identifier(decodeURIComponent(value)); }
   catch { throw new AppError(400, "INVALID_INPUT", "Invalid record identifier."); }
 }
 export async function handleApi(request: Request, dependencies: Dependencies): Promise<Response> {
   const requestId = crypto.randomUUID(); const started = Date.now();
-  const headers = new Headers({ "Content-Type": "application/json; charset=utf-8", "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff", "X-Request-Id": requestId, "Vary": "Cookie, oai-authenticated-user-id" });
+  const headers = new Headers({ "Content-Type": "application/json; charset=utf-8", "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff", "X-Request-Id": requestId, "Vary": "Cookie" });
   try {
     const user = await dependencies.identity();
     if (!user) throw new AppError(401, "SIGN_IN_REQUIRED", "Sign in to access your workspace.");
     const mutation = !["GET", "HEAD"].includes(request.method);
-    if (mutation) assertMutationOrigin(request);
+    if (mutation) assertMutationOrigin(request, dependencies.origin?.());
     const repository = dependencies.repository();
     let input: unknown;
     if (mutation) { await repository.rateLimit(user.userId); input = await readJson(request); }

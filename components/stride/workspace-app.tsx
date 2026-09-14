@@ -13,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Toaster } from "@/components/ui/sonner";
 import { api, workspacePath } from "@/lib/client-api";
+import { authClient } from "@/lib/auth-client";
 import { localToday, PRIORITIES, STATUSES, STATUS_LABEL, taskGroup } from "@/lib/domain";
 import type { Identity, Member, Project, ProjectInput, Task, TaskPatch, Workspace } from "@/lib/domain";
 import { Avatar, Choice, EmptyWork } from "./controls";
@@ -31,6 +32,15 @@ function SidebarMenuButton(props: ComponentProps<typeof BaseSidebarMenuButton>) 
 }
 
 export function WorkspaceApp({ identity }: { identity: Identity }) {
+  const [signingOut, setSigningOut] = useState(false);
+  async function signOut() {
+    setSigningOut(true);
+    try {
+      const result = await authClient.signOut();
+      if (result.error) throw new Error("Sign-out failed");
+      window.location.assign("/sign-in");
+    } catch { setSigningOut(false); toast.error("Could not sign out. Please try again."); }
+  }
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]); const [workspaceId, setWorkspaceId] = useState("");
   const [metadata, setMetadata] = useState<Metadata | null>(null); const [bootError, setBootError] = useState(""); const [bootRetry, setBootRetry] = useState(0);
   const [view, setView] = useState<View>("my"); const [projectId, setProjectId] = useState("");
@@ -119,10 +129,10 @@ export function WorkspaceApp({ identity }: { identity: Identity }) {
   return <SidebarProvider><Sidebar className="stride-sidebar"><SidebarHeader><div className="brand"><span className="brand-mark"><CheckCheck size={23} /></span><span>stride<span className="brand-period">.</span></span></div>{workspaces.length > 1 ? <Choice label="Workspace" value={workspaceId} onChange={changeWorkspace} options={workspaces.map(w => ({ value: w.id, label: w.name }))} /> : <p className="workspace-label">{workspace?.name ?? "Your workspace"}</p>}</SidebarHeader>
     <SidebarContent><SidebarGroup><SidebarGroupLabel>WORKSPACE</SidebarGroupLabel><SidebarMenu>{([{ view: "my", label: "My Work", icon: ListTodo }, { view: "board", label: "Project board", icon: FolderKanban }, { view: "projects", label: "Projects", icon: Folder }, { view: "members", label: "People", icon: Users }] as const).map(item => <SidebarMenuItem key={item.view}><SidebarMenuButton isActive={view === item.view} onClick={() => navigate(item.view)} className="nav-item"><item.icon /><span>{item.label}</span></SidebarMenuButton></SidebarMenuItem>)}</SidebarMenu></SidebarGroup>
       <SidebarGroup><SidebarGroupLabel>PROJECTS</SidebarGroupLabel><SidebarMenu>{activeProjects.slice(0, 12).map(p => <SidebarMenuItem key={p.id}><SidebarMenuButton isActive={view === "board" && projectId === p.id} onClick={() => { setProjectId(p.id); navigate("board"); }}><span className="project-symbol"><Folder size={14} /></span><span>{p.name}</span></SidebarMenuButton></SidebarMenuItem>)}</SidebarMenu>{metadata?.role === "admin" && <Button variant="ghost" className="sidebar-add" onClick={() => setProjectDialog("new")}><Plus size={16} />New project</Button>}</SidebarGroup>
-    </SidebarContent><SidebarFooter><div className="account"><Avatar name={identity.displayName} /><div><strong>{identity.displayName}</strong><span>{metadata?.role === "admin" ? "Workspace admin" : "Team member"}</span></div><a aria-label="Sign out" href="/signout-with-chatgpt?return_to=%2F" target="_top"><LogOut size={17} /></a></div></SidebarFooter></Sidebar>
+    </SidebarContent><SidebarFooter><div className="account"><Avatar name={identity.displayName} /><div><strong>{identity.displayName}</strong><span>{metadata?.role === "admin" ? "Workspace admin" : "Team member"}</span></div><button type="button" aria-label="Sign out" disabled={signingOut || busy} onClick={signOut}><LogOut size={17} /></button></div></SidebarFooter></Sidebar>
     <SidebarInset className="stride-main"><header className="topbar"><div><SidebarTrigger /><span className="breadcrumb">Workspace <span>/</span> {headings[view]}</span></div><span className="private-label">Private workspace</span></header>
       <main id="main-content" className="workspace-content"><div className="page-heading"><div><p className="eyebrow">{view === "my" ? "YOUR DAILY WORKSPACE" : view === "board" ? "WORK IN MOTION" : "WORKSPACE"}</p><h1>{headings[view]}</h1><p className="page-description">{view === "my" ? "A clear place to start. One task at a time." : view === "board" ? "See what’s next, what’s moving, and what’s done." : view === "projects" ? "Keep related work together." : "The people who share this workspace."}</p></div>{["my", "board"].includes(view) ? <Button onClick={() => composer.current?.focus()} disabled={!activeProjects.length || archived}><Plus size={17} />Add task</Button> : view === "projects" && metadata?.role === "admin" ? <Button onClick={() => setProjectDialog("new")}><Plus size={17} />New project</Button> : null}</div>
-      {bootError ? <div className="error-box" role="alert"><p>{bootError}</p><div className="inline-actions"><Button variant="outline" onClick={() => { setBootRetry(n => n + 1); setMetadataRevision(n => n + 1); }}>Try again</Button><a href="/signin-with-chatgpt?return_to=%2F" target="_top">Sign in again</a></div></div> : !metadata ? <div aria-label="Loading your workspace" className="loading-state"><Skeleton className="h-14 w-full" /><Skeleton className="h-36 w-full" /></div> : <>
+      {bootError ? <div className="error-box" role="alert"><p>{bootError}</p><div className="inline-actions"><Button variant="outline" onClick={() => { setBootRetry(n => n + 1); setMetadataRevision(n => n + 1); }}>Try again</Button><a href="/sign-in">Sign in again</a></div></div> : !metadata ? <div aria-label="Loading your workspace" className="loading-state"><Skeleton className="h-14 w-full" /><Skeleton className="h-36 w-full" /></div> : <>
         {["my", "board"].includes(view) && <>
           <div className="work-context"><div className="context-title">{view === "board" ? <FolderKanban size={18} /> : <LayoutList size={18} />}<span>{view === "board" ? "Project" : "Create in"}</span><Choice label={view === "board" ? "Project board" : "Project for new tasks"} value={projectId || "none"} onChange={value => { setProjectId(value); setOffset(0); }} options={activeProjects.length ? activeProjects.map(p => ({ value: p.id, label: p.name })) : [{ value: "none", label: "No active projects" }]} disabled={!activeProjects.length} /></div><span className="context-note">{view === "my" ? "Showing work assigned to you" : "Team view"}</span></div>
           {!archived && <form className="quick-create" onSubmit={createTask}><Plus size={20} aria-hidden="true" /><Input ref={composer} aria-label="New task title" placeholder="What needs to get done?" value={title} maxLength={200} onChange={e => setTitle(e.target.value)} required disabled={busy || !activeProjects.length} /><Button type="submit" variant="ghost" disabled={busy || !title.trim() || !activeProjects.length}>{busy ? <Loader2 size={17} className="animate-spin" /> : <ArrowRight size={18} />}<span className="sr-only">Create task</span></Button></form>}
