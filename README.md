@@ -1,8 +1,8 @@
 # Stride — focused task management
 
-A small-team task app with quick creation, My Work, project boards, three task
-statuses, priorities, optional due dates and assignees, search/filters,
-versioned edits, and recoverable archive/restore.
+A small-team task app with quick creation, My Tasks, project boards, three task
+statuses, priorities, due dates, creator-default ownership, search/filters,
+comments and mentions, an in-app inbox, versioned edits, and recoverable Trash.
 
 The native Next.js application and PostgreSQL run on Railway. Better Auth provides
 private email/password sessions; public registration is disabled. Vercel supplies
@@ -35,7 +35,7 @@ configuration. Never run the CI fixture against production.
 ## Agent and product contracts
 
 - AGENTS.md — agent rules and definition of done.
-- docs/PRODUCT.md — committed scope and deferred work.
+- docs/PRODUCT.md and docs/REQUIREMENTS.md — agreed scope and acceptance matrix.
 - docs/ARCHITECTURE.md and docs/DECISIONS.md — module boundaries and decisions.
 - docs/DEVELOPMENT_PLAN.md — ordered delivery and current progress.
 - docs/API.md — request/response contracts.
@@ -55,8 +55,8 @@ configuration. Never run the CI fixture against production.
 The app's c39487f release passed 48 native tests, real PostgreSQL tests, full
 session/task/password runtime checks, typecheck, lint, and production compilation.
 Railway confirms the exact source is healthy, and the controlled production
-session/task verification passed. The complete release is in PR #2; merging it
-into main is awaiting explicit merge authorization. Public-edge/browser acceptance,
+session/task verification passed. The baseline release is in PR #2. First-sprint collaboration completion is in
+PR #3; main is unchanged. See RELEASE_REVIEW.md for current validation/deployment. Public-edge/browser acceptance,
 load measurements, backup restore, and dependency audit are separately recorded
 limits, not assumed passes.
 

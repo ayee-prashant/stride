@@ -67,3 +67,21 @@ validate against the dedicated volume's public CA. Private keys remain in the
 database container. No TLS verification override is introduced. Renewing the leaf
 certificate leaves database records and keys intact. Public certificate retrieval
 does not establish that a TLS handshake passed; verify using the deployed client.
+
+## First-sprint collaboration review
+
+- Comment input is plain text, capped at 4000 characters and 10 distinct mentions.
+  Workspace membership is rechecked inside the write; forged recipient and author
+  fields are rejected. Atomic rollback protects comment/activity/notification
+  consistency. Comment rendering uses React escaping, with no HTML interpreter.
+- Inbox reads and read acknowledgements bind the authenticated recipient. A
+  workspace admin cannot read or acknowledge a teammate's inbox. Archived records
+  cannot expose notification content or accept new comments.
+- Overdue synchronization uses server time and a bounded timezone offset, unique
+  event keys, bounded insert batches, and the same JSON/origin/rate-limit guards.
+  Untrusted date or sort strings never become SQL operators or clauses.
+- Ambiguous write errors preserve drafts and instruct refresh/check before retry.
+  Changing task fields does not overwrite or silently discard an unsent comment.
+- Existing production migrations and credentials are preserved. Migration 0001 is
+  additive; the temporary trusted-branch generation workflow was removed after it
+  committed generated files. The normal verification job has read-only access.

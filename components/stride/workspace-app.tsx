@@ -121,7 +121,7 @@ export function WorkspaceApp({ identity }: { identity: Identity }) {
     setSelected(task);
   }
   function navigate(next: View) { setView(next); setOffset(0); setSelected(null); }
-  function changeWorkspace(id: string) { setWorkspaceId(id); setMetadata(null); setProjectId(""); setTaskResult({ key: "", page: emptyPage, error: "" }); setBootError(""); setSelected(null); setOffset(0); setAssignee("all"); setTitle(""); }
+  function changeWorkspace(id: string) { if (title.trim()) { toast.info("Finish or clear your task draft before switching workspaces."); return; } setWorkspaceId(id); setMetadata(null); setProjectId(""); setTaskResult({ key: "", page: emptyPage, error: "" }); setBootError(""); setSelected(null); setOffset(0); setAssignee("all"); }
   async function mutation<T>(action: () => Promise<T>): Promise<T> {
     if (lock.current) throw new Error("Please wait for the current change to finish.");
     lock.current = true; setBusy(true);

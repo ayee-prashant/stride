@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import assert from "node:assert/strict";
 import { setTimeout as delay } from "node:timers/promises";
+import { verifyBrowser } from "./test-browser-runtime.mjs";
 
 const fixtureUrl = new URL(process.env.TEST_DATABASE_URL ?? "");
 if (process.env.CI !== "true" || !["127.0.0.1", "localhost"].includes(fixtureUrl.hostname) || fixtureUrl.pathname !== "/stride_test") {
@@ -87,6 +88,8 @@ try {
   stage = "origin-and-tenant";
   assert.equal((await request("/api/bootstrap", "POST", {}, { origin: "https://untrusted.example" })).status, 403);
   assert.equal((await request("/api/workspace?workspace_id=unavailable")).status, 404);
+  stage = "browser";
+  await verifyBrowser(origin, cookie);
   stage = "password-change";
   const changedPassword = ownerPassword + "-changed";
   await json(await request("/api/auth/change-password", "POST", { currentPassword: ownerPassword, newPassword: changedPassword, revokeOtherSessions: true }));

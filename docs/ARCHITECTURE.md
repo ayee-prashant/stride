@@ -27,7 +27,8 @@ Users are keyed by Better Auth's persisted user ID. Every request revalidates it
 database session and persisted credential account against the server allowlist. Workspace membership
 authorizes access; authentication alone does not. Projects and tasks include
 workspace_id, and all task queries are scoped. One workspace may contain many
-projects; each task belongs to one project and optionally one workspace member.
+projects; each task belongs to one project and has a responsible person: the selected
+workspace member or its creator. Quick creation defaults to the creator.
 The personal workspace is provisioned idempotently after authenticated bootstrap.
 
 Integer record versions implement compare-and-swap updates. Stale updates return
@@ -53,5 +54,25 @@ Initial target: small teams, hundreds to low thousands of tasks per workspace.
 Before materially larger traffic: measure query plans, p95 latency, response
 bytes, error rate, and database contention. Database capacity is finite;
 partition independent tenant data if measured contention warrants it. Move
-notification work to a queue when notifications actually enter scope. Do not
+notification delivery to a queue if measured load or external delivery requires it. Do not
 claim enterprise scale or a latency SLA without deployed load tests.
+
+## Collaboration consistency
+
+Comments, their audit entries and member mention notifications share one
+transaction. Assignment notifications use the task mutation token, so stale
+writes cannot emit alerts. Mention membership is checked before and inside the
+write. Inbox queries always bind the authenticated recipient and workspace;
+admins have no cross-recipient inbox endpoint.
+
+An additive migration introduces comments and notifications, composite tenant
+foreign keys, and recipient/created-time/read-state indexes. Due indexes support
+assignee and creator fallback paths. Comment/inbox pages contain at most 50 rows;
+no per-row queries or rich-HTML rendering are used. Overdue catch-up inserts at
+most 100 missing reminders and uses a unique event key for concurrent tabs. It
+runs on same-origin inbox sync, not GET; a visible tab polls every 30 seconds.
+Server time plus the viewer's bounded offset determines the calendar date.
+
+My open tasks is a built-in saved view, so it survives browser/device changes
+without adding a custom view model. Priority sorting applies across the filtered
+result before pagination; default due-date sorting retains the daily sections.

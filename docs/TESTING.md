@@ -86,3 +86,22 @@ cookie, password, or task contents. This job requires no direct database access.
 
 Do not use this private service check as evidence of public routing or browser
 interaction. Keep the CI-only test:auth-runtime fixture guarded and isolated.
+
+## Collaboration release checks
+
+The native suite covers default responsibility, same-workspace mentions,
+recipient-only inbox access, stale assignment suppression, atomic notification
+failure rollback, archived task/project guards, due buckets/timezones, bounded
+catch-up beyond 100 tasks, deduplication, and HTTP origin/body/identifier guards.
+The real PostgreSQL suite also checks concurrent overdue sync, comments, inbox
+privacy and lifecycle visibility against the generated additive migration.
+
+The CI runtime test extends the real session flow with comment persistence,
+self-mention suppression, overdue notification/read acknowledgement and filters.
+It calls scripts/test-browser-runtime.mjs against that isolated loopback server.
+The browser check uses the runner's installed Chrome and Node's native protocol
+client; it adds no package and accepts no production destination. It exercises
+quick creation, task sheet, mentions, escaped comment content, unsent-draft
+confirmation, board transitions, Trash/restore, inbox-to-task navigation, keyboard
+focus and 390px overflow. It records only check names, never cookies/content.
+A passing DOM/layout check is not a claim of manual visual or screen-reader QA.
