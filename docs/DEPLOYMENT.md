@@ -14,6 +14,7 @@ The app remains private through server sessions and closed enrollment.
 | Railway production environment | 36f9def0-14ef-4b84-b789-ecb893dd37a1 |
 | PostgreSQL service | 2dc67d03-febe-45de-82b0-00075e942aa5 |
 | Web service | 02968ece-d1c9-4782-b105-4c75f9662af0 |
+| Provisioning service | 1b76c2b4-d393-4984-a2e6-43393fe1b269 |
 | App origin | https://stride-app-production-d72b.up.railway.app |
 
 The existing PostgreSQL volume is 5000 MB in sfo. No public PostgreSQL endpoint
@@ -31,7 +32,8 @@ is needed. Keep the application in the same region where available.
 3. Generate distinct cryptographically random session, runtime-database, and
    initial-owner credentials. Put them in provider environment stores only.
 4. Run npm run db:provision as a separate controlled service/job with no public
-   domain. Give it MIGRATION_DATABASE_URL via Postgres.DATABASE_URL, the public CA,
+   domain. Give it MIGRATION_DATABASE_URL assembled from Postgres references with the
+   existing postgres database name, the public CA,
    STRIDE_RUNTIME_PASSWORD, STRIDE_ALLOWED_EMAILS, and the three STRIDE_BOOTSTRAP_*
    values. It applies committed migrations, grants a restricted runtime role,
    and creates the approved owner only if absent. It preserves existing passwords.
@@ -39,9 +41,13 @@ is needed. Keep the application in the same region where available.
    BETTER_AUTH_SECRET, STRIDE_ALLOWED_EMAILS, and APP_URL. It does not receive
    the admin/migration URL or initial owner password. Set /api/health as the
    readiness check and keep instance/connection counts bounded.
-6. Verify readiness, private signup, actual sign-in, mutation origin enforcement,
-   create/edit/complete/reopen/archive/restore, session invalidation, and task
-   persistence. Inspect provider logs without exposing credentials or task bodies.
+6. Run node scripts/verify-production.mjs as a controlled, non-restarting job
+   inside this project's production environment. STRIDE_INTERNAL_URL must be
+   http://stride-app.railway.internal:8080 and STRIDE_VERIFY_ORIGIN must equal
+   APP_URL. The job uses the approved owner credentials, checks the private app,
+   archives only its own new verification task, and signs out. It does not reset
+   data or change the owner password. Inspect the production_verified log event,
+   including structured attributes. This is not a public-edge/browser check.
 7. Deploy the Vercel entry redirect to the canonical app origin, then verify its
    real response and the destination. Production status requires more than a
    provider build-success message.
@@ -69,6 +75,17 @@ the previous leaf certificate for recovery. Confirm provider backups and practic
 restore before claiming business-critical readiness. Backup configuration alone
 is not a verified restore.
 
-The original cfdc751 baseline passes all compile/database checks and has a
-successful Railway build. The new authentication/provisioning release is still
-under validation; see RELEASE_REVIEW.md for actual, dated results.
+The c39487f application passed the complete CI runtime gate and Railway's live
+database-backed readiness check. Provisioning created the restricted role and
+approved owner. See RELEASE_REVIEW.md for exact source and deployment evidence.
+
+Do not trust a configured source branch alone. Confirm list-deployments commitHash:
+the provider's first create-deployment used main despite the requested branch,
+and redeploy reused the old snapshot. Push a reviewed commit to the configured
+branch to deploy the intended source. Configuration changes also need a fresh
+deployment. Never force an unreviewed branch or weaken TLS to recover readiness.
+
+The Vercel entry source is infra/vercel/. Deploy those two files with no framework,
+install, or build command. The current production submission has an unverified
+terminal status because the Vercel connector denies the team's scope.
+The Railway app is the canonical runtime; the Vercel entry stores no credentials.

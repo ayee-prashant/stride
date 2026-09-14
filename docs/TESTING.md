@@ -4,11 +4,11 @@
 
 1. TypeScript no-emit type checking.
 2. Node test runner: pure domain tests, client transport tests, and repository /
-   HTTP integration tests against a fresh SQLite database. Generated migrations
-   are preferred automatically. Until Drizzle can run, an explicitly identified
-   test-only schema fixture is used; production migration parity is unverified.
+   HTTP integration tests against a fresh SQLite database. The SQLite adapter
+   uses its isolated contract schema; real PostgreSQL tests use the committed
+   generated production migrations, whose parity is checked in CI.
 3. Lint application, tests, and configuration.
-4. Native Next.js production build for the requested Vercel target.
+4. Native Next.js production build for Railway.
 5. Review generated migrations and inspect query plans for common list queries.
 6. Post-build security/architecture review, corrections, and gate rerun.
 7. Verify terminal deployment status for the exact saved source version.
@@ -72,3 +72,16 @@ The test server allows HTTP only under the existing nonproduction loopback rule.
 Production connections still require HTTPS and verified PostgreSQL TLS.
 Production verification must separately confirm the provider's actual certificate,
 canonical origin, health response, authenticated behavior, and persistence.
+
+## Controlled live verification
+
+node scripts/verify-production.mjs rejects other Railway projects/environments
+and any destination except the private Stride app on port 8080. It uses an actual
+approved account and tests secure cookie attributes, session enforcement,
+workspace SSR, task persistence and transitions, conflicts, tenant/origin denial,
+and sign-out. It archives its own new QA task and never resets a database or
+changes the owner password. It emits only stages/status/check names, not account,
+cookie, password, or task contents. This job requires no direct database access.
+
+Do not use this private service check as evidence of public routing or browser
+interaction. Keep the CI-only test:auth-runtime fixture guarded and isolated.

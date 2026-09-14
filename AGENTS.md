@@ -33,5 +33,6 @@ build. Review the diff against SECURITY.md and record actual results and known
 limitations in docs/RELEASE_REVIEW.md. Never describe an unrun test as passed.
 Deploy only an immutable, tested source version through the host workflow
 explicitly chosen by the user. The current requested Vercel/Railway migration
-is described in docs/DEPLOYMENT.md; it is not yet a deployable release.
+is described in docs/DEPLOYMENT.md; consult docs/RELEASE_REVIEW.md for the
+exact tested application and deployment evidence.
 Scalability and performance budgets are targets until measured, not guarantees.

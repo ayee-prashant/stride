@@ -33,15 +33,14 @@ fix findings, and rerun affected gates before release.
 
 ## Current progress
 
-- Slices 1–6: native Next.js baseline cfdc751 passes the 48-test suite, real
-  PostgreSQL contract test, migration parity, typecheck, lint, and production
-  build in GitHub Actions run 34828808360.
-- Railway built and started that exact baseline from the private repository.
-- Current release work: private password sign-in, account password changes,
-  restricted runtime role, separately controlled provisioning, verified private
-  database TLS, and an authenticated runtime test.
-- The deployment branch stays on the tested baseline while the new work passes
-  CI in build/railway-runtime.
-- Release remains incomplete until provisioning, readiness, live session/task
-  behavior, and the final public URL are verified. Update RELEASE_REVIEW.md with
-  actual evidence after the next compilation and deployment.
+- Slices 1–6: application c39487f passed the 48-test suite, real PostgreSQL
+  contract tests, migration parity, typecheck, lint, production build, and full
+  authenticated runtime flow in GitHub Actions run 34831794534.
+- Slice 7: that exact application is healthy on Railway, with a restricted
+  database role, verified private database TLS, and separately provisioned owner.
+- The production smoke job verifies the real session/task flow within Railway.
+  Its actual log result belongs in RELEASE_REVIEW.md.
+- Vercel accepted the entry redirect submission but its status API denies the
+  team scope; public-edge and browser checks remain unverified.
+- Future work must preserve the approved private audience and use this release
+  process. Do not reopen completed code slices or add deferred product scope.

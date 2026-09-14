@@ -8,7 +8,7 @@ CQRS, event sourcing, or generic dependency injection without concrete need.
 
 ## ADR-002: platform identity and D1
 
-Accepted. Use the supported host's identity and durable SQL capabilities. Keep
+Superseded by ADR-007 and ADR-009. Originally accepted. Use the supported host's identity and durable SQL capabilities. Keep
 provider access behind small server helpers. No browser-only source of truth,
 password storage, or ad-hoc auth framework. Private deployment is the default.
 
@@ -37,7 +37,7 @@ not evidence of unlimited scale. Measure before sharding or adding a cache.
 
 ## ADR-007: requested Vercel and Railway migration
 
-Target selected; implementation in progress. The user's explicit host request
+Superseded in part by ADR-009; retained as the original requested target. The user's explicit host request
 supersedes ADR-002's deployment-provider choice, while preserving its requirement
 for verified identity, durable SQL, and private task data. Run native Next.js on
 Vercel and PostgreSQL on Railway. Keep UI/API same-origin and retain the existing
@@ -50,7 +50,7 @@ database migration or runtime switch. See DEPLOYMENT.md for remaining work.
 
 ## ADR-008: Better Auth and owner-approved GitHub accounts
 
-Selected for the requested native Next.js runtime. Better Auth owns OAuth state,
+Superseded by ADR-009. Originally selected for the requested native Next.js runtime. Better Auth owns OAuth state,
 session cookies, and session persistence. GitHub owns passwords and account recovery.
 No email/password registration is exposed. Enrollment checks immutable numeric
 GitHub IDs, initially the repository owner's ID, configured explicitly at the host.
@@ -63,8 +63,8 @@ secrets still need provisioning; the code fails closed until configuration exist
 
 Accepted for this release after access checks on 2026-09-14. Vercel project
 management repeatedly returns 403 and no teams; the separate GitHub OAuth client
-has not been provisioned. Railway successfully built the tested Next.js revision
-from the private repository. Run the app and PostgreSQL there, with a Vercel
+has not been provisioned. Railway provides authenticated repository builds and private database access;
+the completed source and deployment checks are recorded in RELEASE_REVIEW.md. Run the app and PostgreSQL there, with a Vercel
 entry URL redirecting to the canonical Railway HTTPS address.
 
 This supersedes ADR-007's placement of app compute and ADR-008's OAuth provider,

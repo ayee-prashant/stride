@@ -1,151 +1,89 @@
-# Implementation review and release gates
+# Release review — 2026-09-14
 
-Status: first-release source authored; working application NOT compiled or deployed.
+## Current verified application
 
-## Hosting retry checkpoint: 2026-09-14
+Application source c39487f01083aa945683075f89a4c7b5af7f0cfe passed GitHub Actions
+[run 34831794534](https://github.com/ayee-prashant/stride/actions/runs/34831794534),
+job 103936585084. The gates passed: clean npm ci, generated/committed migration
+parity, 48 native tests, real PostgreSQL contract tests, typecheck, lint,
+Next.js production build, isolated account provisioning, and the complete
+authenticated Next.js/PostgreSQL runtime flow.
 
-Native Next.js routes, Better Auth GitHub sessions, a persisted provider-account
-allowlist check, PostgreSQL pool, auth schema, migration runner, and auth UI are
-authored. The previous caller-header identity helper is removed. Runtime database
-connections enforce certificate verification and bounded timeouts/pool size.
-Configured APP_URL, rather than a forwarded host, governs mutation origins.
+The runtime test used a restricted database role and real hashed credentials.
+It checked closed registration, forged identity rejection, login, workspace
+bootstrap, rendered workspace HTML, task create/complete/reopen/reload,
+stale-version rejection, archive/restore, origin and tenant denial, password
+change, old-password rejection, sign-out, and old-session invalidation.
+These are API/SSR checks, not browser interaction tests.
 
-48 dependency-free tests pass. These include explicit configuration denial,
-TLS override rejection, and proxy-origin regression checks. New dependency
-installation/lockfile generation, actual PostgreSQL integration, full typecheck,
-lint, and native Next.js build are pending the GitHub CI workflow. Auth schema
-parity with the installed Better Auth version must also be verified there.
+## Production evidence
 
-The Railway project and persistent database service exist. A Vercel static setup
-preview was created, containing no application data or authentication routes.
-This is not a completed deployment. Provider details/access failures and the
-remaining OAuth/TLS configuration are recorded in DEPLOYMENT.md.
+- Railway web deployment f3d48a4a-61dd-47ec-8210-297c8f83d57d is SUCCESS and
+  identifies exactly c39487f01083aa945683075f89a4c7b5af7f0cfe. Its production
+  build passed and /api/health succeeded at 10:26:47 UTC. The readiness handler
+  queries the auth table through the restricted runtime role with verified TLS.
+- PostgreSQL deployment 6e1ec0ac-b452-45fb-b835-bd165be01c30 issued a leaf
+  certificate for postgres.railway.internal using the existing volume's CA/key
+  and started PostgreSQL 18.6. No private key left the database container.
+- Provisioning deployment a25ecf70-712b-45a8-91ba-db00aa4ca48f emitted
+  database_provisioned with ownerCreated=true and runtimeRole=stride_app at
+  10:24:36 UTC. Its source 27dd06bca30a44a27cc3d75b736d8c9a2da2db92 has the
+  exact same tree as the tested application. Migrations, role grants, and the
+  real owner account were created successfully through verified database TLS.
+- The app and database run in sfo. PostgreSQL uses a persistent 5000 MB volume
+  and private networking. Web runtime variables contain no migration credential
+  or bootstrap password.
+- A separate, guarded production verification job is prepared. Its result
+  must be recorded from the actual log event before live session/task checks
+  are described as passed.
 
-The older checkpoints below describe earlier source states.
+## Vercel and public checks
 
-## Latest checkpoint: Vercel and Railway preparation
+The Vercel entry redirect was submitted as production deployment
+dpl_C4JL5hun7wMVYJfEgmH7PjE6kGNo. The connector returned INITIALIZING and alias
+https://stride-prashant-sharma-s-projects1.vercel.app. Its source is committed
+under infra/vercel/. It redirects to the canonical Railway application and
+contains no application secrets.
 
-The user requested these hosts after the original Sites build block. Initial
-PostgreSQL adapter/schema work and compatible repository queries are now prepared.
-`node scripts/test.mjs` on Node 24 passes **44 tests; 0 failed**. The eight new
-PostgreSQL adapter tests use a scripted client, and task-search coverage now
-checks literal percent, underscore, and escape-marker characters.
+Vercel status inspection returns 403 requiring reauthentication for team scope
+prashant-sharma-s-projects1. Terminal Vercel status is therefore unverified.
+The available public web checks reject the Railway and Vercel addresses as
+non-retryable unsafe URLs. No alternate fetch or browser was used to bypass
+those denials. Public DNS/CDN routing and browser interaction remain unverified.
 
-The repository suite still uses SQLite. There is no successful PostgreSQL
-integration run, generated PostgreSQL migration, native Next.js build, or hosted
-deployment. Authentication and runtime wiring still depend on Sites. Vercel and
-Railway authorization are pending. The migration remains in a draft branch;
-docs/DEPLOYMENT.md records the remaining work and release gates.
+## Second architecture and security review
 
-The evidence below describes the original Sites implementation checkpoint.
+Reviewed after compilation: real library-owned sessions, persisted allowlist
+checks, per-request workspace authorization, same-origin mutation enforcement,
+prepared SQL, bounded queries/pools/timeouts, immutable migrations, optimistic
+versions, recoverable archives, private response caching, secure cookies, safe
+errors, and credential separation. No public registration, header identity
+fallback, insecure TLS override, production fixture credentials, or plaintext
+password logging was introduced.
 
-## Source completed in this iteration
+Corrections made during compilation and deployment included missing icon exports,
+generic test typing, stale frontend response isolation, Zod 4 compatibility,
+composite unique constraints before dependent foreign keys, hostname-correct
+database TLS, the existing PostgreSQL database name, and deployment source
+verification.
 
-- Shared TypeScript task/project/member contracts and strict validation.
-- Drizzle schema with tenant-consistent foreign keys, indexes, and status checks.
-- D1-compatible repository with idempotent bootstrap, admin/member checks,
-  bounded task queries, versioned edits, archive/restore, and atomic audit writes.
-- Platform-authenticated page and HTTP adapter; same-origin mutation protection,
-  32 KiB streaming body cap, write quota, private no-store responses, safe errors.
-- My Work, project board, task editor, project administration, people management,
-  filtering/search, explicit pagination, keyboard-accessible status controls,
-  drag-and-drop source, loading/empty/error states, and responsive styling.
-- Client cancellation, 30-second request timeout, draft-preserving failures,
-  explicit edit-conflict recovery, and completion undo using the saved version.
-- Optional agent tool stages the visible task composer without claiming to save.
+The first Railway create-deployment calls accepted a release branch in service
+configuration but actually deployed old main commit fa813c9. Redeploy reused
+that snapshot. Earlier claims that deployment 2b55f23a was the tested cfdc751
+baseline were incorrect. A normal push to the configured branch and fresh
+configuration deployment resolved it; source hashes and actual log events were
+then checked. A one-off job's provider SUCCESS alone is not proof it completed:
+structured JSON events may appear in log attributes with an empty message.
 
-## Evidence actually obtained
+## Remaining limits
 
-`node scripts/test.mjs` on Node 24: **35 tests passed; 0 failed**.
+Browser, keyboard, screen-reader, mobile, and drag/drop acceptance checks have
+not run in the current hosted environment. Load/latency budgets are unmeasured;
+there is no enterprise-scale or SLA claim. Backup restore and a dated dependency
+vulnerability audit have not been verified. Self-service emailed account recovery
+is deferred. The initial audience is the approved owner; adding team accounts
+requires controlled enrollment.
 
-Coverage includes domain validation, date-only urgency, SQL tenant isolation,
-role denial, forged assignment, task lifecycle, archive/restore, pagination,
-literal search/SQL metacharacters, rate windows, database foreign keys,
-query-plan index selection, HTTP identity/origin/body checks, and client transport.
-Additional tests simulate an update between read and write, prove no phantom
-audit record after that conflict, and verify rollback when audit insertion fails.
-
-Node syntax checks passed for the framework-independent TS modules, Drizzle
-schema source, and HTTP adapter. These checks strip types: they are not a full
-TypeScript typecheck and do not validate JSX, third-party APIs, or the Worker.
-
-Repository tests used **tests/fixtures/schema.sql**, not generated production
-migrations. The adapter automatically prefers generated migrations when present.
-Drizzle-to-fixture parity remains an explicit release gate.
-
-## Review findings fixed
-
-1. Increased the body cap from 16 to 32 KiB so valid long Unicode descriptions
-   fit while retaining bounded memory usage.
-2. Lost mutation responses now say the write may already have succeeded; the
-   client preserves its draft and never retries a mutation automatically.
-3. Malformed percent-encoded path IDs now produce 400 instead of a generic 503.
-4. Existing membership role updates remain possible when membership caps are
-   reached; the owner is still protected from role changes.
-5. Audit insertion uses a unique mutation token within the same atomic batch,
-   preventing stale edits from emitting misleading activity.
-6. Personal workspace names identify their owner when users belong to more
-   than one workspace.
-7. Manual JSX review corrected a missing conditional fallback in the work view.
-   Full JSX parsing/compilation is still pending; this correction is not a build pass.
-8. Mobile navigation closes after selection and the mobile task-row layout keeps
-   due dates visible. Both changes still require browser verification.
-
-## Blocked / not verified
-
-The earlier required installer exited 65 with
-`GET https://registry.npmjs.org/@babel%2Fcore: Forbidden - 403`.
-Dependencies remain unavailable. This turn did not retry the denied request,
-change the registry, replace the installer, or modify dependency manifests/locks.
-
-Not run: framework type checking, lint, Drizzle migration generation/parity,
-React/Worker production compilation, browser/keyboard/screen-reader QA, real
-hosted sign-in, WebMCP registration/execution, D1 runtime integration, deployed
-latency/load tests, dependency vulnerability audit, backup/restore, or deployment.
-There is no live application URL. Source is not production-certified.
-
-## Remaining implementation/release review
-
-- Execute framework checks after a successful authorized installation; fix any
-  JSX, component API, hook-lint, or server-runtime issues they reveal.
-- Generate/inspect migrations and rerun the complete SQL suite against them.
-- Validate the host preserves the request origin used by the mutation guard.
-- Validate mobile navigation and task metadata visibility in a real browser.
-- Validate the accessible task sheet, nested discard confirmation, and drag/drop.
-- Verify the agent tool in a supported browser; currently unavailable here.
-- Offset pagination can shift under concurrent changes; use a fresh view when
-  reviewing a changing backlog. Keyset pagination is a later measured refinement.
-- Role changes currently use admin-authorized upsert rather than a membership
-  version. Add audited/versioned membership administration before broader rollout.
-- Current activity records contain action/actor/time, not full before/after data.
-- Security headers are authored, not verified on deployed responses. A nonce-
-  compatible CSP and operational monitoring need a hosted security review.
-
-## Resume safely
-
-Reuse this project and its saved source; do not initialize another Site. Read
-AGENTS.md and the Sites setup skill. Once authorized registry access exists,
-resume the original preferred-pnpm installer attempt, retaining its lockfile
-policy. Complete the remaining gates, correct findings, rerun checks, and only
-then create and publish the immutable release version.
-
-## Native baseline verified and release continuation: 2026-09-14
-
-Commit cfdc751c5f503d9752ca0a3e135dc578f4c18aea passed GitHub Actions
-run 34828808360, job 103927010961: clean npm ci, committed migration parity,
-48 native tests, real PostgreSQL contract test, typecheck, lint, and Next.js
-production build. This supersedes earlier statements that these baseline gates
-were unrun. Reviewed generated SQL includes the composite unique constraints
-before dependent foreign keys and separate auth tables.
-
-Railway deployment 2b55f23a-79ff-4e7d-bcc9-969a5757518d reports SUCCESS for that
-baseline. It is not yet a working release because authentication and database
-runtime configuration remain incomplete. The Vercel native upload was canceled
-without a verified result; management still returns 403. A private database
-certificate was read from the provider container: the original leaf only covers
-localhost. A hostname-correct leaf and CA trust must pass a real connection test.
-
-ADR-009 records the subsequent hosting/authentication decision. Its new password,
-provisioning, certificate, and runtime test changes require fresh CI and a second
-review before the deployment branch advances. Backup restoration, browser checks,
-load measurements, and production session/task verification are not yet claimed.
+The earlier native baseline cfdc751 passed run 34828808360; initial Sites-only
+source and registry blocks are historical and do not describe the current
+compiled Railway runtime. See DEPLOYMENT.md for current operating instructions.

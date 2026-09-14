@@ -44,6 +44,7 @@ jobs:
             drizzle-postgres/
           retention-days: 7
       - run: bash -n infra/postgres/tls-start.sh
+      - run: node --check scripts/verify-production.mjs
       - run: npm test
       - run: npm run test:postgres
         env:
