@@ -16,7 +16,7 @@ export function AgentRegistry({ workspaceId, projectId, members, userId }: { wor
   const controller = useRef<AbortController | null>(null);
   const path = workspacePath(`projects/${encodeURIComponent(projectId)}/agents`, workspaceId);
   const refresh = useCallback(() => {
-    controller.current?.abort(); const c = new AbortController(); controller.current = c; setLoading(true);
+    controller.current?.abort(); const c = new AbortController(); controller.current = c;
     return api<Registry>(`${path}&offset=${offset}`, { signal: c.signal }).then(result => { if (!c.signal.aborted) { setData(result); setError(""); } })
       .catch(e => { if (!c.signal.aborted) { setData(null); setNotice(""); setError(e instanceof Error ? e.message : "Agent roles could not be loaded."); } })
       .finally(() => { if (!c.signal.aborted) setLoading(false); });

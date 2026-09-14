@@ -118,7 +118,8 @@ export class AgentRegistryRepository {
     });
   }
   async mutate(userId: string, workspaceId: string, projectId: string, bindingId: string, action: "configure" | "initialize" | "revoke", input: unknown): Promise<AgentMutationResult> {
-    const v = action === "configure" ? parseAgentConfiguration(input) : parseAgentDecision(input, action === "initialize");
+    const configuration = action === "configure" ? parseAgentConfiguration(input) : null;
+    const v = configuration ?? parseAgentDecision(input, action === "initialize");
     const digest = hash({ action, binding_id: bindingId, value: v });
     const initial = await this.binding(userId, workspaceId, projectId, bindingId);
     if (action === "configure") await this.project(userId, workspaceId, projectId, true);
@@ -134,9 +135,9 @@ export class AgentRegistryRepository {
       const template = s.template(current.role_id);
       let state = current.state; let reads = current.read_paths; let writes = current.write_paths; let prompt = current.template_body; let promptHash = current.template_hash;
       let approver: string | null = null; let approvedAt: string | null = null; const now = repo.now().toISOString();
-      if (action === "configure" && "read_paths" in v) {
-        if (v.template_hash !== template.hash) throw conflict("Review the current role template before configuring it.");
-        state = "pending"; reads = v.read_paths; writes = v.write_paths; prompt = template.body; promptHash = template.hash;
+      if (action === "configure" && configuration) {
+        if (configuration.template_hash !== template.hash) throw conflict("Review the current role template before configuring it.");
+        state = "pending"; reads = configuration.read_paths; writes = configuration.write_paths; prompt = template.body; promptHash = template.hash;
       } else if (action === "initialize") {
         if (current.state !== "pending" || !current.template_current || v.template_hash !== current.template_hash) throw conflict("Review a current pending role before accepting it.");
         state = "initialized"; approver = userId; approvedAt = now;
