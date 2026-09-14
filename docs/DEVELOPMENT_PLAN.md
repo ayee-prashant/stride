@@ -2,21 +2,25 @@
 
 Each slice includes validation and tests, rather than postponing security to the end.
 
+The active next release is ordered in PRODUCTIVITY_RELEASE.md. Its ten approved
+improvements, reliability checks, and deployment are in progress. The completed
+first-sprint evidence below remains the regression baseline.
+
 | Order | Slice | Exit criterion |
 |---|---|---|
 | 1 | Agent setup, product contract, ADRs | Explicit scope, boundaries, commands, release gates |
 | 2 | Schema, identity, memberships | Isolated authenticated workspace, idempotent onboarding |
 | 3 | Project/task vertical flow | Create -> assign -> start -> complete -> reopen persists |
-| 4 | Daily work UX | My Work, detail editing, board and quick actions |
-| 5 | Organization and recovery | Filters, search, pagination, archive/restore, edit conflicts |
-| 6 | Hardening | Unit/integration tests, permissions, bounds, lint, typecheck, build |
-| 7 | Release | Second review, documented limits, immutable source, private deployment |
+| 4 | Daily work UX | My Tasks, detail editing, board and quick actions |
+| 5 | Collaboration | Comments, mentions, assignment/overdue inbox, activity |
+| 6 | Find and organize | Complete filters, due/priority sort, My open tasks |
+| 7 | Hardening and release | Tests, typecheck, lint, build, second review, tested deployment |
 
 ## Change control
 
-P0: identity/authorization, durable CRUD, My Work, board, recovery, accessibility,
-and validation. P1: drag-and-drop, title search, activity display. These are
-bounded enhancements after P0 is functioning. Never cut permission checks or
+P0: identity/authorization, durable task CRUD, ownership, My Tasks, board,
+comments, mentions, in-app notifications, complete search/filters, recovery,
+accessibility, and validation. Drag/drop supplements keyboard status controls. Never cut permission checks or
 input validation to meet a deadline. Future sprints remain in PRODUCT.md.
 
 ## Agent work protocol
@@ -31,12 +35,46 @@ input validation to meet a deadline. Future sprints remain in PRODUCT.md.
 The author must conduct a second architecture/security review after compilation,
 fix findings, and rerun affected gates before release.
 
-## Current progress
+## Previous release evidence
 
-- Slices 1–3: source complete and covered by the available Node/SQLite tests.
-- Slices 4–5: frontend source authored and connected to the API, not compiled or
-  exercised in a browser yet.
-- Slice 6: 35 native tests passed and a second source review completed. Full
-  typecheck, lint, schema migration parity, framework build, and hosted checks
-  are blocked on the unresolved dependency installation.
-- Slice 7: source checkpoint only. No deployment until all required gates pass.
+- Slices 1–6: application c39487f passed the 48-test suite, real PostgreSQL
+  contract tests, migration parity, typecheck, lint, production build, and full
+  authenticated runtime flow in GitHub Actions run 34831794534.
+- Slice 7: that exact application is healthy on Railway, with a restricted
+  database role, verified private database TLS, and separately provisioned owner.
+- The production smoke job passed all seven checks at 10:45:43 UTC, including
+  real sign-in, persistence, permission denials, and sign-out. Its QA task is
+  archived. The immutable source and log evidence are in RELEASE_REVIEW.md.
+- Vercel accepted the entry redirect submission but its status API denies the
+  team scope; public-edge and browser checks remain unverified.
+- Future work must preserve the approved private audience and use this release
+  process. Preserve completed task flows while implementing the user-reaffirmed collaboration scope.
+
+PR #2 contains the reviewable release. Its main-branch merge was rejected by
+automatic approval review as requiring explicit merge authorization; deployment
+and live verification are complete on the existing Railway release branch.
+Vercel terminal status and public-edge/browser verification remain the stated
+access limitations, not unfinished application implementation.
+
+## Reaffirmed first-sprint completion
+
+1. Restore the agreed requirement matrix and acceptance checks.
+2. Add additive comment/inbox schema, authorization, and atomic event writes.
+3. Add task discussion with mentions and the in-app notification inbox.
+4. Complete ownership defaults, task filters/sorts, My open tasks, and always-visible creation.
+5. Run SQLite and PostgreSQL contracts, real session flows, typecheck, lint, and build.
+6. Review security and migration compatibility; provision and deploy the tested source.
+
+All six completion steps are complete. Full CI and isolated browser acceptance
+passed on d2e6c481a82d43e7da80e9fbd3e3220fd3c501a0, which is deployed on Railway.
+The additive migration and all eight private live checks passed. See RELEASE_REVIEW.md. No epics, reporting, custom workflows,
+external integrations, or AI features are added. Main-branch merging remains a
+separate approval boundary; the authorized release branch can deploy this work.
+
+## Productivity implementation status
+
+All five slices in PRODUCTIVITY_RELEASE.md are implemented. Source 78cfbb0
+passed the complete CI gate, real-session invitation/reset tests and expanded
+browser checks. Migration, app/private storage and worker deployment are complete on 919d0d8;
+all 12 controlled live checks passed. Email delivery remains gated by a verified sender;
+record final infrastructure evidence in RELEASE_REVIEW.md.

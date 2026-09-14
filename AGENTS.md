@@ -5,7 +5,8 @@
 Read README.md, docs/PRODUCT.md, docs/ARCHITECTURE.md, docs/DEVELOPMENT_PLAN.md,
 docs/SECURITY.md, and docs/TESTING.md before changing product code. Read
 docs/DECISIONS.md before introducing a new dependency or architectural pattern.
-The active scope is the first release, not every future sprint.
+The active scope is the user-approved team productivity release in
+docs/PRODUCTIVITY_RELEASE.md. Preserve the completed first-release flows.
 
 ## Operating rules
 
@@ -31,5 +32,8 @@ The active scope is the first release, not every future sprint.
 Run type checking, automated unit/integration tests, lint, and the production
 build. Review the diff against SECURITY.md and record actual results and known
 limitations in docs/RELEASE_REVIEW.md. Never describe an unrun test as passed.
-Deploy only an immutable, tested source version through the Sites workflow.
+Deploy only an immutable, tested source version through the host workflow
+explicitly chosen by the user. The current requested Vercel/Railway migration
+is described in docs/DEPLOYMENT.md; consult docs/RELEASE_REVIEW.md for the
+exact tested application and deployment evidence.
 Scalability and performance budgets are targets until measured, not guarantees.

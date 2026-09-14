@@ -16,9 +16,13 @@ class SQLiteStatement implements Statement {
   async run() { const result = this.db.prepare(this.sql).run(...this.values); return { meta: { changes: Number(result.changes) } }; }
 }
 export class SQLiteDatabase implements Database {
-  raw = new DatabaseSync(":memory:");
+  raw: DatabaseSync;
+  inTransaction: boolean;
   schemaSource: "migrations" | "fixture";
-  constructor() {
+  constructor(raw?: DatabaseSync, inTransaction = false) {
+    this.raw = raw ?? new DatabaseSync(":memory:"); this.inTransaction = inTransaction;
+    this.schemaSource = "fixture";
+    if (raw) return;
     this.raw.exec("PRAGMA foreign_keys = ON");
     const migrationRoot = new URL("../drizzle/", import.meta.url);
     const files = readdirSync(migrationRoot).filter(name => name.endsWith(".sql")).sort();
@@ -28,10 +32,17 @@ export class SQLiteDatabase implements Database {
   }
   prepare(sql: string) { return new SQLiteStatement(this.raw, sql); }
   async batch<T>(statements: Statement[]): Promise<SqlResult<T>[]> {
-    this.raw.exec("BEGIN");
-    try {
+    return this.transaction(async () => {
       const result: SqlResult<T>[] = [];
       for (const statement of statements) result.push(await statement.all<T>());
+      return result;
+    });
+  }
+  async transaction<T>(operation: (database: Database) => Promise<T>): Promise<T> {
+    if (this.inTransaction) return operation(this);
+    this.raw.exec("BEGIN");
+    try {
+      const result = await operation(new SQLiteDatabase(this.raw, true));
       this.raw.exec("COMMIT"); return result;
     } catch (error) { this.raw.exec("ROLLBACK"); throw error; }
   }

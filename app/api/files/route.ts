@@ -1,0 +1,11 @@
+import { getSessionIdentity } from "@/lib/server/auth";
+import { getRepository } from "@/lib/server/database";
+import { applicationOrigin } from "@/lib/server/deployment-config";
+import { createObjectStorage } from "@/lib/server/s3-storage";
+import { Attachments } from "@/lib/server/attachments";
+import { handleFile } from "@/lib/server/file-http";
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+const handle = (request: Request) => handleFile(request, { identity: () => getSessionIdentity(request.headers), origin: applicationOrigin(process.env), attachments: () => new Attachments(getRepository(), createObjectStorage(process.env)) });
+export const GET = handle;
+export const POST = handle;
