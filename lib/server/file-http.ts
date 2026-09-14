@@ -28,6 +28,7 @@ export async function handleFile(request: Request, dependencies: { identity: () 
     if (request.headers.get("content-type") !== "application/octet-stream") throw new AppError(415, "BINARY_REQUIRED", "Upload the file as binary data.");
     const taskId = identifier(url.searchParams.get("task_id"));
     await attachments.repo.membership(user.userId, workspace);
+    await attachments.repo.rateLimit(`upload:${user.userId}`, Date.now(), 10);
     let filename: string;
     try { filename = decodeURIComponent(request.headers.get("x-file-name") ?? ""); } catch { throw new AppError(400, "INVALID_FILE", "Invalid filename."); }
     const commentId = url.searchParams.get("comment_id");

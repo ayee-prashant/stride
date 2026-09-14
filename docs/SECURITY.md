@@ -1,5 +1,36 @@
 # Security model and review checklist
 
+## Approved productivity expansion
+
+The user approved admin-issued invitations as an explicit enrollment extension.
+Public signup stays disabled. A valid invitation is email-bound, expires after
+seven days, and is stored as a SHA-256 hash of a 256-bit random token. The UI
+uses a URL fragment and temporary tab storage; tokens are not server query
+parameters. Existing accounts must prove identity with their Better Auth session.
+Acceptance locks the invitation and inviter's current admin membership and
+atomically creates credentials, admission and membership. It cannot overwrite
+an existing password. Anonymous invalid-token guesses create no quota records.
+
+Recovery uses Better Auth's expiring, one-use reset tokens and revokes sessions.
+The email outbox encrypts message bodies with AES-GCM, has bounded retries and
+leases, uses provider idempotency keys, and erases delivered/expired contents.
+Daily summaries are opt-in and recheck recipient membership before delivery.
+Missing email credentials are surfaced as unavailable, not simulated delivery.
+
+Attachments use private S3-compatible object storage. File bodies are bounded
+to 5 MB, type/extension checked, and capped at 20 per task and 200 MB per workspace.
+Pending cleanup still occupies the workspace byte quota. Downloads recheck
+membership, active task and project; all files are forced downloads with
+nosniff and a sandbox policy. SVG, HTML, executable files, archives and Office
+containers are not accepted. Format checks do not constitute antivirus scanning.
+Only uploaders and current admins can remove files. Failed uploads retain a
+durable cleanup record. The scheduler purges abandoned uploads.
+
+Checklist/view/template edits have version checks; bulk changes and repeat-task
+creation share one transaction. Repeat predecessors are unique and tenant-bound.
+The scheduled worker uses a restricted runtime database role and has no public
+endpoint; it never receives migration credentials.
+
 ## Trust boundary
 
 Production identity comes from Better Auth's verified database session and

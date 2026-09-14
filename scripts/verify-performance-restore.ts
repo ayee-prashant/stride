@@ -47,8 +47,8 @@ try {
   const restoredUrl = new URL(url); restoredUrl.pathname = "/stride_restore"; restorePool = new Pool({ connectionString: restoredUrl.href, max: 1 });
   const tables = ["tasks", "checklist_items", "memberships", "comments", "notifications", "invitations", "account_admissions", "saved_views", "task_templates", "attachments", "email_outbox"];
   for (const table of tables) {
-    const sourceCount = await pool.query<{ n: number }>(`SELECT COUNT(*)::integer AS n FROM ${table}`);
-    const restoredCount = await restorePool.query<{ n: number }>(`SELECT COUNT(*)::integer AS n FROM ${table}`);
+    const sourceCount: { rows: { n: number }[] } = await pool.query(`SELECT COUNT(*)::integer AS n FROM ${table}`);
+    const restoredCount: { rows: { n: number }[] } = await restorePool.query(`SELECT COUNT(*)::integer AS n FROM ${table}`);
     assert.equal(sourceCount.rows[0].n, restoredCount.rows[0].n, `Restored count differs for ${table}`);
   }
   const restoredRepo = new Repository(new PostgresDatabase(restorePool));

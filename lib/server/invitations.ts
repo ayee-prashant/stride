@@ -33,7 +33,8 @@ export class Invitations {
       if (member) throw new AppError(409, "ALREADY_MEMBER", "This person is already a workspace member.");
       const row = await repo.statement(`INSERT INTO invitations(id,workspace_id,email,role,token_hash,created_by,expires_at,created_at)
         SELECT ?,?,?,?,?,?,?,? WHERE (SELECT COUNT(*) FROM invitations WHERE workspace_id=? AND accepted_at IS NULL AND revoked_at IS NULL AND expires_at>?)<50
-        RETURNING id,email,role,expires_at,revoked_at,accepted_at,created_at`, crypto.randomUUID(), workspaceId, value.email, value.role, hash, userId, new Date(now.getTime() + 7 * 86400_000).toISOString(), now.toISOString(), workspaceId, now.toISOString()).first<Invitation>();
+        AND EXISTS(SELECT 1 FROM memberships WHERE workspace_id=? AND user_id=? AND role='admin')
+        RETURNING id,email,role,expires_at,revoked_at,accepted_at,created_at`, crypto.randomUUID(), workspaceId, value.email, value.role, hash, userId, new Date(now.getTime() + 7 * 86400_000).toISOString(), now.toISOString(), workspaceId, now.toISOString(), workspaceId, userId).first<Invitation>();
       if (!row) throw new AppError(409, "INVITATION_LIMIT", "Revoke an unused invitation before creating more. The limit is 50 active links.");
       // Tokens are returned once. Only the hash persists; the fragment never reaches access logs.
       return { invitation: row, path: `/join#token=${token}` };
@@ -71,6 +72,8 @@ export class Invitations {
       const locked = await repo.statement(`UPDATE invitations SET token_hash=token_hash WHERE id IN(SELECT i.id FROM invitations i WHERE ${validInvite}) RETURNING *`, hash, now).first<StoredInvite>();
       if (!locked) throw unavailable();
       await repo.membership(locked.created_by, locked.workspace_id, true);
+      const authority = await repo.statement("UPDATE memberships SET role=role WHERE workspace_id=? AND user_id=? AND role='admin' RETURNING user_id", locked.workspace_id, locked.created_by).first();
+      if (!authority) throw unavailable();
       await repo.statement("UPDATE workspaces SET name=name WHERE id=?", locked.workspace_id).run();
       const existing = await repo.statement("SELECT id,email,name FROM auth_users WHERE email=?", locked.email).first<{ id: string; email: string; name: string }>();
       let user: Identity;

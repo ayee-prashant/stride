@@ -2,6 +2,14 @@
 
 ## System
 
+The approved productivity extension is specified in PRODUCTIVITY_RELEASE.md.
+An additional job runs the same application modules for reminders, encrypted
+email delivery and object cleanup. It processes a bounded member page using a
+persisted cursor and lease, with deduplicated notifications and delivery keys.
+The web and job use the restricted database role; migrations stay separate.
+Private S3 storage holds attachment bodies, with transactional metadata/quota
+reservations and compensating cleanup. No task content is stored in a public CDN.
+
 React + TypeScript with native Next.js App Router, running beside PostgreSQL on
 Railway. Vercel supplies an entry address that redirects to the canonical HTTPS
 application origin. This avoids cross-origin cookies and removes runtime secrets

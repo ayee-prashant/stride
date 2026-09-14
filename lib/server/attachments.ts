@@ -17,14 +17,13 @@ export class Attachments {
   }
   async upload(userId: string, workspaceId: string, taskId: string, commentId: string | null, filename: string, bytes: Uint8Array): Promise<Attachment> {
     const file = verifyFile(filename, bytes); const id = crypto.randomUUID(); const objectKey = `tasks/${workspaceId}/${id}`;
-    await this.repo.rateLimit(`upload:${userId}`, Date.now(), 10);
     await this.repo.db.transaction(async database => {
       const repo = new Repository(database, this.repo.now);
       await new ProductivityRepository(repo).lockTask(userId, workspaceId, taskId);
       // Serialize workspace byte reservations so parallel uploads cannot bypass the quota.
       await repo.statement("UPDATE workspaces SET name=name WHERE id=?", workspaceId).run();
       if (commentId && !await repo.statement("SELECT id FROM comments WHERE id=? AND workspace_id=? AND task_id=?", identifier(commentId), workspaceId, taskId).first()) throw missing();
-      const totals = await repo.statement("SELECT COALESCE(SUM(byte_size),0) AS bytes FROM attachments WHERE workspace_id=? AND status IN ('pending','ready')", workspaceId).first<{ bytes: number | string }>();
+      const totals = await repo.statement("SELECT COALESCE(SUM(byte_size),0) AS bytes FROM attachments WHERE workspace_id=?", workspaceId).first<{ bytes: number | string }>();
       const count = await repo.statement("SELECT COUNT(*) AS n FROM attachments WHERE workspace_id=? AND task_id=? AND status IN ('pending','ready')", workspaceId, taskId).first<{ n: number | string }>();
       if (Number(totals?.bytes ?? 0) + bytes.length > MAX_WORKSPACE_BYTES || Number(count?.n ?? 0) >= MAX_TASK_FILES) throw new AppError(409, "FILE_LIMIT", "The limit is 20 files per task and 200 MB per workspace. Remove an unused attachment first.");
       await repo.statement("INSERT INTO attachments(id,workspace_id,task_id,comment_id,object_key,filename,media_type,byte_size,uploaded_by,status,created_at) VALUES(?,?,?,?,?,?,?,?,?,'pending',?)", id, workspaceId, taskId, commentId, objectKey, file.filename, file.mediaType, bytes.length, userId, repo.now().toISOString()).run();
@@ -53,9 +52,9 @@ export class Attachments {
     return { metadata: row, stream: await this.storage.get(row.object_key) };
   }
   async remove(userId: string, workspaceId: string, id: string) {
-    const role = await this.repo.membership(userId, workspaceId);
-    const row = await this.repo.statement(`UPDATE attachments SET status='removed' WHERE id=? AND workspace_id=? AND status='ready' AND (uploaded_by=? OR ?='admin')
-      AND EXISTS(SELECT 1 FROM memberships WHERE workspace_id=? AND user_id=?) RETURNING *`, identifier(id), workspaceId, userId, role, workspaceId, userId).first<StoredAttachment>();
+    await this.repo.membership(userId, workspaceId);
+    const row = await this.repo.statement(`UPDATE attachments SET status='removed' WHERE id=? AND workspace_id=? AND status='ready' AND (uploaded_by=? OR EXISTS(SELECT 1 FROM memberships WHERE workspace_id=? AND user_id=? AND role='admin'))
+      AND EXISTS(SELECT 1 FROM memberships WHERE workspace_id=? AND user_id=?) RETURNING *`, identifier(id), workspaceId, userId, workspaceId, userId, workspaceId, userId).first<StoredAttachment>();
     if (!row) throw missing();
     try { await this.storage.remove(row.object_key); await this.repo.statement("DELETE FROM attachments WHERE id=? AND status='removed'", row.id).run(); } catch { /* Hide immediately; the worker retries storage cleanup. */ }
     return { removed: true };

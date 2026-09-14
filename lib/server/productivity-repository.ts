@@ -46,7 +46,7 @@ export class ProductivityRepository {
         else result = await repo.statement("UPDATE checklist_items SET title=COALESCE(?,title),completed=COALESCE(?,completed),version=version+1 WHERE id=? AND workspace_id=? AND task_id=? AND version=? RETURNING *", value.title ?? null, "completed" in value ? Number(value.completed) : null, identifier(itemId), workspaceId, taskId, value.version!).first<ChecklistItem>();
         if (!result) throw conflict();
       }
-      await repo.statement("INSERT INTO activity(id,workspace_id,task_id,actor_id,action,created_at) VALUES(?,?,?,?,'checklist updated',?)", crypto.randomUUID(), workspaceId, taskId, userId, repo.now().toISOString()).run();
+      await repo.statement("INSERT INTO activity(id,workspace_id,task_id,actor_id,action,created_at) VALUES(?,?,?,?,'updated the checklist on',?)", crypto.randomUUID(), workspaceId, taskId, userId, repo.now().toISOString()).run();
       return { item: result, removed: "remove" in value && !!value.remove };
     });
   }
@@ -91,19 +91,19 @@ export class ProductivityRepository {
   async saveTemplate(userId: string, workspaceId: string, id: string | null, input: unknown): Promise<TaskTemplate> {
     const value = parseTemplate(input, !!id);
     return this.repo.db.transaction(async database => {
-      const repo = new Repository(database, this.repo.now); const role = await repo.membership(userId, workspaceId);
+      const repo = new Repository(database, this.repo.now); await repo.membership(userId, workspaceId);
       await repo.statement("UPDATE workspaces SET name=name WHERE id=?", workspaceId).run();
       if (value.task.assignee_id) await repo.membership(value.task.assignee_id, workspaceId);
       let row: TemplateRow | null;
-      if (id) row = await repo.statement("UPDATE task_templates SET name=?,task=?,checklist=?,version=version+1 WHERE id=? AND workspace_id=? AND version=? AND (created_by=? OR ?='admin') RETURNING *", value.name, JSON.stringify(value.task), JSON.stringify(value.checklist), identifier(id), workspaceId, value.version!, userId, role).first<TemplateRow>();
+      if (id) row = await repo.statement("UPDATE task_templates SET name=?,task=?,checklist=?,version=version+1 WHERE id=? AND workspace_id=? AND version=? AND (created_by=? OR EXISTS(SELECT 1 FROM memberships WHERE workspace_id=? AND user_id=? AND role='admin')) RETURNING *", value.name, JSON.stringify(value.task), JSON.stringify(value.checklist), identifier(id), workspaceId, value.version!, userId, workspaceId, userId).first<TemplateRow>();
       else row = await repo.statement("INSERT INTO task_templates(id,workspace_id,created_by,name,task,checklist,created_at) SELECT ?,?,?,?,?,?,? WHERE (SELECT COUNT(*) FROM task_templates WHERE workspace_id=?)<50 RETURNING *", crypto.randomUUID(), workspaceId, userId, value.name, JSON.stringify(value.task), JSON.stringify(value.checklist), repo.now().toISOString(), workspaceId).first<TemplateRow>();
       if (!row) throw new AppError(409, "TEMPLATE_UNAVAILABLE", "This template changed, is managed by another teammate, or the 50-template limit was reached.");
       return templateValue(row);
     });
   }
   async removeTemplate(userId: string, workspaceId: string, id: string, input: unknown) {
-    const v = version(object(input, ["version"]).version); const role = await this.repo.membership(userId, workspaceId);
-    const row = await this.repo.statement(`DELETE FROM task_templates WHERE id=? AND workspace_id=? AND version=? AND (created_by=? OR ?='admin') AND ${memberGuard} RETURNING id`, identifier(id), workspaceId, v, userId, role, workspaceId, userId).first();
+    const v = version(object(input, ["version"]).version); await this.repo.membership(userId, workspaceId);
+    const row = await this.repo.statement(`DELETE FROM task_templates WHERE id=? AND workspace_id=? AND version=? AND (created_by=? OR EXISTS(SELECT 1 FROM memberships WHERE workspace_id=? AND user_id=? AND role='admin')) AND ${memberGuard} RETURNING id`, identifier(id), workspaceId, v, userId, workspaceId, userId, workspaceId, userId).first();
     if (!row) throw conflict(); return { removed: true };
   }
   async useTemplate(userId: string, workspaceId: string, id: string, input: unknown): Promise<Task> {

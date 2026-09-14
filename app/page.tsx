@@ -13,6 +13,6 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
   let user;
   try { user = await getSessionIdentity(await headers()); }
   catch (error) { if (!(error instanceof AppError && error.code === "SETUP_REQUIRED")) throw error; }
-  if (!user) redirect(`/sign-in?${new URLSearchParams({ next: workspaceId && taskId ? taskLink(workspaceId, taskId) : "/" })}`);
+  if (!user) redirect(`/sign-in?${new URLSearchParams({ next: workspaceId ? taskId ? taskLink(workspaceId, taskId) : `/?${new URLSearchParams({ workspace: workspaceId })}` : "/" })}`);
   return <WorkspaceApp identity={{ userId: user.userId, email: user.email, displayName: user.displayName }} initialLink={{ workspaceId, taskId }} />;
 }
