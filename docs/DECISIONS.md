@@ -79,3 +79,22 @@ The operator can provision additional approved accounts through the same job.
 Build changes in build/railway-runtime and verify them before advancing the
 deployed deploy/vercel-railway branch. The database job has no public endpoint;
 the app has no migration credential. No extra application microservice is added.
+
+## ADR-010: complete the reaffirmed collaboration MVP
+
+Accepted after the user restated the first-sprint requirements. Comments, mentions,
+assignment/overdue notifications, and full filters/sorting belong in this release.
+Use two additive PostgreSQL tables and the existing modular repository boundary.
+Comments, activity, and mention notifications commit atomically. Notifications
+are recipient-scoped and recheck persisted workspace/task access on every read.
+
+Delivery is an in-app inbox, refreshed on focus and periodically while visible.
+Overdue reminders synchronize through an authenticated same-origin mutation,
+using server time and a bounded viewer timezone offset. A unique event key
+prevents duplicate reminders for the same task, due date, and responsible user.
+No outbound email, push service, scheduler, or message queue is needed for v1.
+
+Quick creation defaults to the authenticated creator. Existing tasks without
+an assignee retain the creator as their responsible person. Delete uses the
+existing archive timestamp and a Trash/restore interface. The built-in saved
+My open tasks view resets filters with one click and is the initial landing view.

@@ -44,10 +44,23 @@ fix findings, and rerun affected gates before release.
 - Vercel accepted the entry redirect submission but its status API denies the
   team scope; public-edge and browser checks remain unverified.
 - Future work must preserve the approved private audience and use this release
-  process. Do not reopen completed code slices or add deferred product scope.
+  process. Preserve completed task flows while implementing the user-reaffirmed collaboration scope.
 
 PR #2 contains the reviewable release. Its main-branch merge was rejected by
 automatic approval review as requiring explicit merge authorization; deployment
 and live verification are complete on the existing Railway release branch.
 Vercel terminal status and public-edge/browser verification remain the stated
 access limitations, not unfinished application implementation.
+
+## Reaffirmed first-sprint completion
+
+1. Restore the agreed requirement matrix and acceptance checks.
+2. Add additive comment/inbox schema, authorization, and atomic event writes.
+3. Add task discussion with mentions and the in-app notification inbox.
+4. Complete ownership defaults, task filters/sorts, My open tasks, and always-visible creation.
+5. Run SQLite and PostgreSQL contracts, real session flows, typecheck, lint, and build.
+6. Review security and migration compatibility; provision and deploy the tested source.
+
+This is the next uncompleted slice. No epics, reporting, custom workflows,
+external integrations, or AI features are added. Main-branch merging remains a
+separate approval boundary; the authorized release branch can deploy this work.

@@ -34,6 +34,8 @@ export const tasks = pgTable("tasks", {
   unique("uq_task_workspace").on(t.workspaceId, t.id),
   index("idx_tasks_workspace_project_archive").on(t.workspaceId, t.projectId, t.archivedAt),
   index("idx_tasks_workspace_assignee_archive").on(t.workspaceId, t.assigneeId, t.archivedAt),
+  index("idx_tasks_creator_due").on(t.workspaceId, t.createdBy, t.archivedAt, t.dueDate),
+  index("idx_tasks_assignee_due").on(t.workspaceId, t.assigneeId, t.archivedAt, t.dueDate),
   check("task_status", sql`${t.status} IN ('todo','in_progress','done')`),
   check("task_priority", sql`${t.priority} IN ('low','medium','high')`),
   check("task_version", sql`${t.version} > 0`),
@@ -46,3 +48,26 @@ export const activity = pgTable("activity", {
 export const mutationLimits = pgTable("mutation_limits", {
   userId: text("user_id").primaryKey(), windowStart: integer("window_start").notNull(), hits: integer("hits").notNull(),
 });
+
+export const comments = pgTable("comments", {
+  id: text("id").primaryKey(), workspaceId: text("workspace_id").notNull(), taskId: text("task_id").notNull(),
+  authorId: text("author_id").notNull().references(() => users.id), body: text("body").notNull(),
+  mentionedUserIds: text("mentioned_user_ids").notNull().default("[]"), createdAt: text("created_at").notNull(),
+}, t => [
+  foreignKey({ columns: [t.workspaceId, t.taskId], foreignColumns: [tasks.workspaceId, tasks.id] }),
+  index("idx_comments_task_created").on(t.workspaceId, t.taskId, t.createdAt, t.id),
+  check("comment_body_length", sql`length(${t.body}) > 0 AND length(${t.body}) <= 4000`),
+]);
+export const notifications = pgTable("notifications", {
+  id: text("id").primaryKey(), workspaceId: text("workspace_id").notNull(), taskId: text("task_id").notNull(),
+  recipientId: text("recipient_id").notNull(), actorId: text("actor_id").references(() => users.id),
+  kind: text("kind", { enum: ["assignment", "mention", "overdue"] }).notNull(),
+  eventKey: text("event_key").notNull(), createdAt: text("created_at").notNull(), readAt: text("read_at"),
+}, t => [
+  foreignKey({ columns: [t.workspaceId, t.taskId], foreignColumns: [tasks.workspaceId, tasks.id] }),
+  foreignKey({ columns: [t.workspaceId, t.recipientId], foreignColumns: [memberships.workspaceId, memberships.userId] }),
+  unique("uq_notification_event").on(t.recipientId, t.eventKey),
+  index("idx_notifications_inbox").on(t.workspaceId, t.recipientId, t.createdAt, t.id),
+  index("idx_notifications_unread").on(t.workspaceId, t.recipientId, t.readAt),
+  check("notification_kind", sql`${t.kind} IN ('assignment','mention','overdue')`),
+]);

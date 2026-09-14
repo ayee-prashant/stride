@@ -16,21 +16,26 @@ unmeasured claim. Primary user: team contributor. Secondary user: team lead.
 - To do / In progress / Done, with reopen and undo after completion.
 - My Work grouped into Overdue, Today, Upcoming, and No due date.
 - Project board, status actions, drag-and-drop with keyboard alternatives.
-- Assignee/priority filtering, task title search, completed toggle.
+- Assignee/status/priority/due-date filtering, task title search, and priority/due-date sorting.
+- A built-in My open tasks view, default on sign-in and available with one click.
+- Persistent comments with explicit teammate mentions and task activity.
+- A private in-app inbox for assignment, mention, and overdue notifications, with read controls.
 - Task details, archive/restore, creator/editor metadata and activity records.
 - Responsive, accessible states and recoverable network/conflict handling.
 
 ## Scope clarification
 
-No mandatory assignee: unassigned work is visible on the board. In My Work,
-quick-create defaults to the current user; on the team board it can be unassigned.
+Only title and project are required. The server assigns quick-created tasks to
+the creator by default. A task without an explicit assignee remains the creator’s
+responsibility, including older tasks. Reassignment uses existing workspace members.
+Deleting a task moves it to Trash using the existing recoverable archive model.
 No hidden automatic due dates. Done tasks are not overdue. Date-only comparisons
 use the viewer's local calendar date. Archiving a project hides, not deletes, its
 tasks; restore the project to continue edits.
 
 ## Deferred
 
-Comments, mentions, email/in-app notifications, attachments, checklists,
+Outbound email/push delivery, attachments, checklists,
 dependencies, labels, custom workflows, sprint planning, reports, time tracking,
 automations, external integrations, and AI generation. Do not add these to v1.
 
@@ -40,3 +45,9 @@ The initial deployment remains private to its owner. Team membership features
 are implemented, but other users must be explicitly approved in the server's
 approved account allowlist and sign in once before an admin can add them. The
 application never silently opens enrollment or sends invitations/email.
+
+## Requirement correction
+
+The user reaffirmed comments, mentions, notifications, and complete task filters
+as first-sprint scope. Their earlier placement under Deferred was incorrect.
+The requirement-by-requirement acceptance matrix is in REQUIREMENTS.md.

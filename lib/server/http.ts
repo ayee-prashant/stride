@@ -1,4 +1,4 @@
-import { AppError, identifier, parseTaskQuery } from "../domain.ts";
+import { AppError, identifier, parsePageQuery, parseTaskQuery, text } from "../domain.ts";
 import type { Identity } from "../domain.ts";
 import type { Repository } from "./repository.ts";
 
@@ -60,6 +60,19 @@ export async function handleApi(request: Request, dependencies: Dependencies): P
       else if (route === "/api/members" && request.method === "POST") { result = await repository.addMember(user.userId, workspaceId, input); status = 201; }
       else if (route === "/api/tasks" && request.method === "GET") result = await repository.listTasks(user.userId, workspaceId, parseTaskQuery(url.searchParams));
       else if (route === "/api/tasks" && request.method === "POST") { result = await repository.createTask(user.userId, workspaceId, input); status = 201; }
+      else if (/^\/api\/tasks\/[^/]+\/comments$/.test(route) && ["GET", "POST"].includes(request.method)) {
+        const taskId = routeIdentifier(route.split("/")[3]);
+        if (request.method === "POST") { result = await repository.createComment(user.userId, workspaceId, taskId, input); status = 201; }
+        else result = await repository.comments(user.userId, workspaceId, taskId, parsePageQuery(url.searchParams));
+      }
+      else if (route === "/api/notifications/sync" && request.method === "POST") result = await repository.notifications(user.userId, workspaceId, input, true);
+      else if (route === "/api/notifications/read" && request.method === "POST") result = await repository.readNotification(user.userId, workspaceId, null, input);
+      else if (/^\/api\/notifications\/[^/]+$/.test(route) && request.method === "PATCH") {
+        let id: string;
+        try { id = text(decodeURIComponent(route.split("/")[3]), "Notification identifier", 1024); }
+        catch { throw new AppError(400, "INVALID_INPUT", "Invalid notification identifier."); }
+        result = await repository.readNotification(user.userId, workspaceId, id, input);
+      }
       else if (/^\/api\/tasks\/[^/]+\/activity$/.test(route) && request.method === "GET") result = await repository.activity(user.userId, workspaceId, routeIdentifier(route.split("/")[3]));
       else if (/^\/api\/tasks\/[^/]+$/.test(route) && ["GET", "PATCH"].includes(request.method)) {
         const id = routeIdentifier(route.split("/")[3]);

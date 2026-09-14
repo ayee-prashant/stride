@@ -147,3 +147,38 @@ h1 { font-size: clamp(1.9rem, 3vw, 2.4rem); font-weight: 700; letter-spacing: -.
   [data-sidebar="sidebar"][data-mobile="true"] [data-slot="sidebar-footer"] { border-top: 1px solid var(--sidebar-border); padding: 1.1rem; }
 }
 @media (prefers-reduced-motion: reduce) { *,*::before,*::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
+.heading-actions, .saved-view-row { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
+.saved-view-row { margin-top: 1rem; }
+.saved-view-row + .toolbar { margin-top: .7rem; }
+.notification-trigger { position: relative; }
+.notification-count { border-radius: 1rem; padding: .05rem .4rem; background: var(--primary); color: var(--primary-foreground); font-size: .7rem; }
+.notification-sheet { width: min(440px, 100%) !important; max-width: min(440px, 100%) !important; overflow-y: auto; }
+.notification-sheet [data-slot="sheet-header"] { padding: 2rem 1.4rem 1rem; }
+.inbox-content { padding: 0 1.4rem 2rem; }
+.inbox-heading, .comment-actions { display: flex; align-items: center; justify-content: space-between; gap: .5rem; font-size: .875rem; }
+.notification-list { margin-top: .8rem; }
+.notification-item { display: grid; width: 100%; text-align: left; gap: .35rem; padding: 1rem .75rem; border-bottom: 1px solid var(--border); border-radius: .35rem; overflow-wrap: anywhere; font-size: .8125rem; }
+.notification-item:hover { background: var(--muted); }
+.notification-item.is-unread { background: var(--accent); }
+.notification-item strong { font-size: .9375rem; font-weight: 600; }
+.notification-action { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+.notification-item time { color: var(--muted-foreground); font-size: .75rem; }
+.unread-dot { width: .45rem; height: .45rem; flex-shrink: 0; border-radius: 50%; background: var(--primary); }
+.inbox-empty { padding: 3rem .5rem; text-align: center; font-size: .9375rem; color: var(--muted-foreground); }
+.discussion-section { padding: 1.5rem 1.7rem 0; border-top: 1px solid var(--border); margin-top: 1rem; }
+.discussion-section h3 { font-size: .9375rem; font-weight: 600; margin-bottom: 1rem; }
+.discussion-section form { display: grid; gap: .65rem; margin-bottom: 1.25rem; }
+.discussion-section textarea { font-size: 1rem; }
+.mention-chips { display: flex; flex-wrap: wrap; gap: .4rem; }
+.mention-chips li { display: flex; align-items: center; padding-left: .5rem; border-radius: .5rem; background: var(--accent); font-size: .8125rem; }
+.mention-chips button { width: 1.75rem; height: 1.75rem; }
+.mention-picker { padding: .5rem; border: 1px solid var(--border); border-radius: .5rem; }
+.mention-picker li button { display: flex; flex-wrap: wrap; justify-content: flex-start; width: 100%; height: auto; text-align: left; overflow-wrap: anywhere; white-space: normal; }
+.mention-picker li span { font-size: .75rem; }
+.comment-list li { padding: 1rem 0; border-bottom: 1px solid var(--border); }
+.comment-heading { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: .5rem; font-size: .875rem; }
+.comment-heading strong { font-weight: 600; }
+.comment-heading time { color: var(--muted-foreground); font-size: .75rem; }
+.comment-body { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .9375rem; line-height: 1.6; margin-top: .45rem; }
+.comment-pagination { display: flex; justify-content: space-between; gap: .6rem; flex-wrap: wrap; margin-top: 1rem; }
+@media (max-width: 600px) { .heading-actions { justify-content: flex-end; } .discussion-section { padding-inline: 1.1rem; } .saved-view-row>span { display: none; } }

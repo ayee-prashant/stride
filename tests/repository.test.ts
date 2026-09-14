@@ -106,7 +106,7 @@ test("common project and assignee queries use their intended indexes", async t =
   const f = await fixture(); t.after(() => f.db.raw.close());
   for (const [field, index] of [["project_id", "idx_tasks_workspace_project_archive"], ["assignee_id", "idx_tasks_workspace_assignee_archive"]]) {
     const plan = f.db.raw.prepare(`EXPLAIN QUERY PLAN SELECT id FROM tasks WHERE workspace_id=? AND ${field}=? AND archived_at IS NULL`).all(f.workspace, f.project);
-    assert.ok(plan.some(row => String(row.detail).includes(index)));
+    assert.ok(plan.some(row => String(row.detail).includes(index) || (field === "assignee_id" && String(row.detail).includes("idx_tasks_assignee_due"))));
   }
 });
 test("a concurrent update after the read is stopped by SQL compare-and-swap", async t => {
@@ -131,6 +131,6 @@ test("forged reassignment preserves both task and history", async t => {
   const f = await fixture(); t.after(() => f.db.raw.close());
   const task = await f.repo.createTask("owner", f.workspace, { title: "Private", project_id: f.project });
   await assert.rejects(f.repo.updateTask("owner", f.workspace, task.id, { version: 1, assignee_id: "other" }), { status: 409 });
-  assert.equal((await f.repo.task("owner", f.workspace, task.id)).assignee_id, null);
+  assert.equal((await f.repo.task("owner", f.workspace, task.id)).assignee_id, "owner");
   assert.equal((await f.repo.activity("owner", f.workspace, task.id)).length, 1);
 });
