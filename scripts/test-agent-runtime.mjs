@@ -8,7 +8,12 @@ export async function verifyAgentRuntime({ origin, request, json, userId, worksp
   if (process.env.CI !== "true" || origin !== "http://127.0.0.1:3107") throw new Error("Agent verification requires the isolated CI server");
   let stage = "enrollment"; let client;
   const suffix = `?workspace_id=${workspaceId}`; const base = `/api/projects/${projectId}/delivery`;
-  const human = (path, body) => request(path + suffix, "POST", body).then(r => json(r));
+  const human = async (path, body) => {
+    stage = `human_${path.split("/").at(-1)}`;
+    const response = await request(path + suffix, "POST", body);
+    if (response.status !== 200) { const data = await response.clone().json(); const code = data.error?.code; console.error(JSON.stringify({ event: "agent_human_request_failed", stage, status: response.status, code: typeof code === "string" && /^[A-Z_]{1,60}$/.test(code) ? code : "unknown" })); }
+    return json(response);
+  };
   const decision = version => ({ request_id: randomUUID(), expected_version: version, reason: "Isolated human review of exact agent work" });
   try {
     await human(base, { ...decision(0), reviewers: Object.fromEntries(REVIEW_GATES.map(g => [g, userId])) });
@@ -81,6 +86,6 @@ export async function verifyAgentRuntime({ origin, request, json, userId, worksp
     assert.equal((await raw("/mcp", { method: "POST", headers: bearer(rotated) })).status, 401);
     console.log(JSON.stringify({ event: "agent_runtime_passed", checks: ["real_oauth_pkce", "code_single_use", "resource_isolation", "modern_mcp", "human_start", "report_requires_human_review", "refresh_rotation", "connection_revocation"] }));
     return { title, ticketId: ticket.id, workspaceId, projectId };
-  } catch (error) { console.error(JSON.stringify({ event: "agent_runtime_failed", stage })); throw error; }
+  } catch (error) { console.error(JSON.stringify({ event: "agent_runtime_failed", stage, kind: error?.name, expected: typeof error?.expected === "number" ? error.expected : undefined, actual: typeof error?.actual === "number" ? error.actual : undefined, frames: error instanceof Error ? error.stack?.split("\n").slice(1, 4) : [] })); throw error; }
   finally { await client?.close(); }
 }

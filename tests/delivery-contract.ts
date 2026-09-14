@@ -48,7 +48,7 @@ export async function completeDelivery(makeFixture: () => Promise<DeliveryFixtur
   const binding = parseBinding({ key: `test_${rid()}`, workspace_id: f.workspace, project_id: f.project, repository_id: 1234, installation_id: 5678, owner: "fixture", repository: "project", branch: "main", paths: ["docs/ARCHITECTURE.md"] });
   const sources = new RepositorySources(f.repo, [binding]); await sources.connect(user, f.workspace, f.project, { request_id: rid(), binding_key: binding.key, version: 0 });
   const sourceClaim = await sources.claim(); assert.ok(sourceClaim); await sources.finish(sourceClaim, { ...observation(binding), observed_at: f.repo.now().toISOString() });
-  const options = { sessionActive: async () => true, bindings: [binding], verifyEvidence: async (input: { candidate: Candidate; environment?: string; artifact?: string }): Promise<VerifiedEvidence> => ({ provenance: "github_verified", ...input.candidate, checks: [{ name: "Independent provider fixture", conclusion: "success" }], deployment: input.environment ? { id: "fixture-deployment", environment: input.environment, artifact: input.artifact!, state: "success" } : null, observed_at: f.repo.now().toISOString() }) };
+  const options = { sessionActive: async () => true, bindings: [binding], verifyEvidence: async (input: { candidate: Candidate; environment?: string; artifact?: string }): Promise<VerifiedEvidence> => ({ provenance: "github_verified", changed_paths: ["docs/ARCHITECTURE.md"], ...input.candidate, checks: [{ name: "Independent provider fixture", conclusion: "success" }], deployment: input.environment ? { id: "fixture-deployment", environment: input.environment, artifact: input.artifact!, state: "success" } : null, observed_at: f.repo.now().toISOString() }) };
   f.s = new DeliveryService(f.repo, options); f.c = new AgentConnections(f.repo, options);
   const actors = new Map<AgentRole, { actor: AgentActor; bindingId: string; connectionId: string }>();
   async function stage(ticket: DeliveryTicket, result: AgentReport) {
@@ -71,11 +71,17 @@ export async function completeDelivery(makeFixture: () => Promise<DeliveryFixtur
   const baseline = (await f.s.configuration(f.workspace, f.project)).baseline!;
   const design: AgentReport = { ...report(), summary: "Plan prepared", requirements: [{ title: "Approved architecture", body: "Use the existing modular monolith and explicit human gates." }], plan: [{ key: "TASK-1", title: "Implement task completion", description: "Implement only the accepted task behavior", requirement_ids: baseline.documents.map(d => d.id), acceptance: ["Task completion is authorized and logged"], todo: ["Implement", "Test", "Submit evidence"], read_paths: ["docs"], write_paths: ["docs"], depends_on: [], review_roles: ["security_review", "ux_accessibility", "performance_data", "documentation"] }] };
   await accept(await stage(architecture, design), design);
+  await assert.rejects(f.s.adoptPlan(user, architecture, design.plan), /duplicates an active ticket/);
   const ticketRows = await f.repo.statement("SELECT id FROM delivery_tickets WHERE workspace_id=? AND project_id=? AND kind='delivery'", f.workspace, f.project).all<{ id: string }>(); assert.equal(ticketRows.results.length, 1);
   current = await f.s.ticket(f.workspace, f.project, ticketRows.results[0].id);
   const candidate: Candidate = { repository_id: 1234, commit: "b".repeat(40), pull_request: 8 };
   const implementation: AgentReport = { ...report(), summary: "Implementation checked", requirements: [], evidence: { ...report().evidence, candidate } };
   current = await accept(await stage(current, implementation), implementation);
+  const selfTemplate = f.roles.template("security_review");
+  const selfRole = (await f.roles.register(user, f.workspace, f.project, { request_id: rid(), role_id: "security_review", template_hash: selfTemplate.hash, profile: { id: actors.get("development")!.actor.profile_id }, read_paths: ["docs/"], write_paths: [], reason: "Explicit solo-profile review policy fixture" })).binding;
+  const selfApproved = (await f.roles.mutate(user, f.workspace, f.project, selfRole.id, "initialize", { request_id: rid(), expected_version: selfRole.version, template_hash: selfTemplate.hash, reason: "Operator understands the self-review boundary" })).binding;
+  current = (await f.s.assign(user, f.workspace, f.project, current.id, { request_id: rid(), expected_version: current.version, binding_id: selfApproved.id, reason: "Review the self-review packet before selecting an independent profile" })).ticket!;
+  assert.equal((await f.s.detail(user, f.workspace, f.project, current.id)).packet!.payload.review_mode, "self_review");
   for (const role of ["security_review", "ux_accessibility", "performance_data", "documentation", "peer_review"] as const) { assert.equal(current.role_id, role); current = await accept(await stage(current, implementation), implementation); }
   assert.equal(current.role_id, "quality_assurance");
   const failure: AgentReport = { ...implementation, outcome: "issues", findings: [{ title: "Missing negative case", reproduction: "Use a revoked session", expected: "Access denied", actual: "Request accepted", route: "development" }] };
@@ -89,6 +95,13 @@ export async function completeDelivery(makeFixture: () => Promise<DeliveryFixtur
   assert.equal(current.phase, "uat_authorization");
   current = (await f.s.authorizeEnvironment(user, f.workspace, f.project, current.id, "uat", { request_id: rid(), expected_version: current.version, environment: "uat", artifact: "immutable-test-artifact", reason: "Reviewed the deployed UAT candidate", accept_authorization: true })).ticket!;
   const uat: AgentReport = { ...implementation, evidence: { ...implementation.evidence, environment: "uat", artifact: "immutable-test-artifact" } };
+  const uatFailure: AgentReport = { ...uat, outcome: "issues", findings: [{ title: "Business scenario failed", reproduction: "Complete a blocked task in UAT", expected: "Blocker prevents completion", actual: "Task completed", route: "development" }] };
+  current = await stage(current, uatFailure);
+  current = (await f.s.review(user, f.workspace, f.project, current.id, { request_id: rid(), expected_version: current.version, decision: "return", report_hash: digest(current.payload.report), reason: "UAT found a business defect; repeat development and reviews" })).ticket!;
+  assert.equal(current.role_id, "development"); assert.equal(current.payload.environment_artifact, null); assert.equal(current.payload.release, null);
+  current = await accept(await stage(current, implementation), implementation);
+  for (const role of ["security_review", "ux_accessibility", "performance_data", "documentation", "peer_review", "quality_assurance"] as const) { assert.equal(current.role_id, role); current = await accept(await stage(current, implementation), implementation); }
+  current = (await f.s.authorizeEnvironment(user, f.workspace, f.project, current.id, "uat", { request_id: rid(), expected_version: current.version, environment: "uat", artifact: "immutable-test-artifact", reason: "Fresh authorization after UAT rework", accept_authorization: true })).ticket!;
   current = await accept(await stage(current, uat), uat); assert.equal(current.phase, "release_authorization");
   await assert.rejects(f.s.authorizeEnvironment(user, f.workspace, f.project, current.id, "release", { request_id: rid(), expected_version: current.version, environment: "production", artifact: "different-artifact", configuration: "v1", migration: "None", recovery: "Rollback", reason: "Invalid artifact swap", accept_authorization: true }), /passed UAT/);
   current = (await f.s.authorizeEnvironment(user, f.workspace, f.project, current.id, "release", { request_id: rid(), expected_version: current.version, environment: "production", artifact: "immutable-test-artifact", configuration: "v1", migration: "No schema changes", recovery: "Restore prior image and verify health", reason: "Approved exact tested artifact for production", accept_authorization: true })).ticket!;

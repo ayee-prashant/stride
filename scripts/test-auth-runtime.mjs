@@ -219,8 +219,8 @@ try {
   assert.equal((await request("/api/workspace?workspace_id=" + workspaceId, "GET", undefined, { cookie: cookieBeforeSignOut })).status, 401);
   assert.equal((await request("/api/workspace?workspace_id=" + workspaceId, "GET", undefined, { cookie: signedInCookie })).status, 401);
   console.log("Authenticated Next.js/PostgreSQL runtime flow passed.");
-} catch {
-  console.error(JSON.stringify({ event: "auth_runtime_check_failed", stage }));
+} catch (error) {
+  console.error(JSON.stringify({ event: "auth_runtime_check_failed", stage, kind: error?.name, expected: typeof error?.expected === "number" ? error.expected : undefined, actual: typeof error?.actual === "number" ? error.actual : undefined, frames: error instanceof Error ? error.stack?.split("\n").slice(1, 4) : [] }));
   process.exitCode = 1;
 } finally {
   child.kill("SIGTERM");

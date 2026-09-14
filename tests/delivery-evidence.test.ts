@@ -18,7 +18,8 @@ function provider(b = binding, override?: (path: string) => unknown) {
     if (data === undefined) {
       if (url.pathname.endsWith("/access_tokens")) data = { token: "isolated-worker-token" };
       else if (url.pathname === "/repos/fixture/project") data = { id: 12345, full_name: "fixture/project" };
-      else if (url.pathname.endsWith("/pulls/7")) data = { number: 7, head: { sha: candidate.commit, repo: { id: 12345 } }, base: { ref: "main", repo: { id: 12345 } } };
+      else if (url.pathname.endsWith("/pulls/7")) data = { changed_files: 1, number: 7, head: { sha: candidate.commit, repo: { id: 12345 } }, base: { ref: "main", repo: { id: 12345 } } };
+      else if (url.pathname.endsWith("/pulls/7/files")) data = [{ filename: "docs/ARCHITECTURE.md", status: "modified" }];
       else if (url.pathname.endsWith("/check-runs")) data = { total_count: 1, check_runs: [{ name: "CI", head_sha: candidate.commit, status: "completed", conclusion: "success" }] };
       else if (url.pathname.endsWith("/status")) data = { sha: candidate.commit, total_count: 0, statuses: [] };
       else if (url.pathname.endsWith("/deployments")) data = [{ id: 2, sha: candidate.commit, environment: "uat", payload: "invalid payload" }, { id: 3, sha: candidate.commit, environment: "uat", payload: JSON.stringify({ artifact: "sha256:immutable-image" }) }];

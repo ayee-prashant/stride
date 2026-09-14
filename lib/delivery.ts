@@ -26,7 +26,7 @@ export type AgentConnection = { id: string; workspace_id: string; project_id: st
 export type AgentActor = { kind: "agent"; connection_id: string; profile_id: string; operator_id: string; workspace_id: string; project_id: string; session_id: string };
 export type HumanActor = { kind: "human"; id: string };
 export type DeliveryActor = AgentActor | HumanActor;
-export type VerifiedEvidence = { provenance: "github_verified"; repository_id: number; commit: string; pull_request: number; checks: { name: string; conclusion: string }[]; deployment: { id: string; environment: string; artifact: string; state: "success" } | null; observed_at: string };
+export type VerifiedEvidence = { changed_paths: string[]; provenance: "github_verified"; repository_id: number; commit: string; pull_request: number; checks: { name: string; conclusion: string }[]; deployment: { id: string; environment: string; artifact: string; state: "success" } | null; observed_at: string };
 
 export function version(value: unknown) { if (!Number.isSafeInteger(value) || Number(value) < 1 || Number(value) > 10000) return invalid("Use the current positive version."); return Number(value); }
 export function hashValue(value: unknown) { const result = text(value, "Fingerprint", 64); if (!/^[0-9a-f]{64}$/.test(result)) return invalid("Use an exact SHA-256 fingerprint."); return result; }

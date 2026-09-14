@@ -56,16 +56,26 @@ export class GitHubEvidenceProvider extends GitHubContextProvider {
     const signal = AbortSignal.timeout(30000); const prefix = `/repos/${encodeURIComponent(binding.owner)}/${encodeURIComponent(binding.repository)}`;
     const grant = record(await this.request(`/app/installations/${binding.installation_id}/access_tokens`, this.jwt(), signal, { repository_ids: [binding.repository_id], permissions: { contents: "read", metadata: "read", pull_requests: "read", checks: "read", statuses: "read", deployments: "read" } }));
     if (typeof grant.token !== "string" || !grant.token || grant.token.length > 4096) throw new GitHubContextError("access_unavailable"); const token = grant.token;
-    const [repo, pr, checkData, statusData] = await Promise.all([
+    const [repo, pr, checkData, statusData, fileData] = await Promise.all([
       this.request(prefix, token, signal).then(record), this.request(`${prefix}/pulls/${input.candidate.pull_request}`, token, signal).then(record),
       this.request(`${prefix}/commits/${input.candidate.commit}/check-runs?per_page=100`, token, signal, undefined, 524288).then(record),
       this.request(`${prefix}/commits/${input.candidate.commit}/status?per_page=100`, token, signal, undefined, 524288).then(record),
+      this.request(`${prefix}/pulls/${input.candidate.pull_request}/files?per_page=100`, token, signal, undefined, 524288).then(list),
     ]);
     const head = record(pr.head); const base = record(pr.base);
     if (repo.id !== binding.repository_id || repo.full_name !== `${binding.owner}/${binding.repository}` || record(head.repo).id !== binding.repository_id || record(base.repo).id !== binding.repository_id || base.ref !== binding.branch || head.sha !== input.candidate.commit || pr.number !== input.candidate.pull_request || statusData.sha !== input.candidate.commit) throw new GitHubContextError("source_changed");
     const checks = list(checkData.check_runs).map(record); const statuses = list(statusData.statuses).map(record);
     if (Number(checkData.total_count) !== checks.length || Number(statusData.total_count) > 100 || !checks.length && !statuses.length) throw new GitHubContextError("incomplete");
     if (checks.some(c => c.head_sha !== input.candidate.commit || c.status !== "completed" || c.conclusion !== "success") || statuses.some(s => s.state !== "success")) throw new GitHubContextError("incomplete");
+    const files = fileData.map(record);
+    if (!files.length || files.length > 100 || Number(pr.changed_files) !== files.length) throw new GitHubContextError("incomplete");
+    const paths: string[] = [];
+    for (const file of files) {
+      if (typeof file.filename !== "string" || file.filename.length > 500 || file.status === "renamed" && typeof file.previous_filename !== "string") throw new GitHubContextError("incomplete");
+      paths.push(file.filename); if (typeof file.previous_filename === "string") paths.push(file.previous_filename);
+    }
+    const finalPr = record(await this.request(`${prefix}/pulls/${input.candidate.pull_request}`, token, signal));
+    if (record(finalPr.head).sha !== input.candidate.commit) throw new GitHubContextError("source_changed");
     let deployment: VerifiedEvidence["deployment"] = null;
     if (input.environment) {
       const deployments = list(await this.request(`${prefix}/deployments?sha=${input.candidate.commit}&environment=${encodeURIComponent(input.environment)}&per_page=10`, token, signal, undefined, 262144)).map(record);
@@ -79,6 +89,6 @@ export class GitHubEvidenceProvider extends GitHubContextProvider {
       if (state?.state !== "success" || !input.artifact) throw new GitHubContextError("incomplete");
       deployment = { id: String(d.id), environment: input.environment, artifact: input.artifact, state: "success" };
     }
-    return { provenance: "github_verified", repository_id: binding.repository_id, commit: input.candidate.commit, pull_request: input.candidate.pull_request, checks: [...checks.map(c => ({ name: String(c.name).slice(0, 200), conclusion: "success" })), ...statuses.map(s => ({ name: String(s.context).slice(0, 200), conclusion: "success" }))], deployment, observed_at: this.now().toISOString() };
+    return { changed_paths: [...new Set(paths)], provenance: "github_verified", repository_id: binding.repository_id, commit: input.candidate.commit, pull_request: input.candidate.pull_request, checks: [...checks.map(c => ({ name: String(c.name).slice(0, 200), conclusion: "success" })), ...statuses.map(s => ({ name: String(s.context).slice(0, 200), conclusion: "success" }))], deployment, observed_at: this.now().toISOString() };
   }
 }

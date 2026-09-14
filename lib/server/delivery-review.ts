@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { choice, text } from "../domain.ts";
-import { decision, hashValue, roleGate, SPECIALIST_REVIEWS } from "../delivery.ts";
+import { covers, decision, hashValue, roleGate, SPECIALIST_REVIEWS } from "../delivery.ts";
 import type { AgentReport, DeliveryTicket, HumanActor, PlanItem } from "../delivery.ts";
 import type { Database } from "./repository.ts";
 import { Repository } from "./repository.ts";
@@ -17,6 +17,7 @@ export class DeliveryReview extends DeliveryExecution {
     if (!candidate || !this.options.verifyEvidence) throw changed("Connect the repository evidence verifier before accepting this candidate.");
     const evidence = await this.options.verifyEvidence({ workspace_id: t.workspace_id, project_id: t.project_id, candidate, ...(environment ? { environment } : {}), ...(artifact ? { artifact } : {}) });
     if (evidence.provenance !== "github_verified" || evidence.commit !== candidate.commit || evidence.repository_id !== candidate.repository_id || evidence.pull_request !== candidate.pull_request || !evidence.checks.length || evidence.checks.some(c => c.conclusion !== "success") || evidence.observed_at < expires(this.repo.now(), -60) || evidence.observed_at > expires(this.repo.now(), 5)) throw changed("Fresh provider evidence for this exact candidate and successful checks is required.");
+    if (!evidence.changed_paths?.length || evidence.changed_paths.some(path => !covers(path, t.payload.write_paths))) throw changed("The pull request changes files outside this ticket’s approved scope. Split the change or obtain a revised architecture plan.");
     if (environment && (evidence.deployment?.environment !== environment || evidence.deployment.state !== "success" || artifact && evidence.deployment.artifact !== artifact)) throw changed("Verify the exact deployment, environment and artifact before continuing.");
     return evidence;
   }
@@ -32,6 +33,11 @@ export class DeliveryReview extends DeliveryExecution {
   async adoptPlan(userId: string, t: DeliveryTicket, plan: PlanItem[]) {
     const baseline = await this.baselineCurrent(userId, t.workspace_id, t.project_id); const config = await this.configuration(t.workspace_id, t.project_id);
     if (!plan.length || plan.some(i => i.requirement_ids.some(id => !baseline.documents.some(d => d.id === id)))) throw changed("Every plan item must reference the approved baseline.");
+    const active = await this.repo.statement("SELECT title,payload FROM delivery_tickets WHERE workspace_id=? AND project_id=? AND kind='delivery' AND phase NOT IN ('accepted','cancelled') LIMIT 1001", t.workspace_id, t.project_id).all<{ title: string; payload: string }>();
+    if (active.results.length + plan.length > 1000) throw changed("Split this project or finish its active work before adopting another plan.");
+    const fingerprint = (title: string, item: Pick<PlanItem, "requirement_ids" | "write_paths">) => digest({ title: title.trim().toLocaleLowerCase("en-US"), requirements: [...item.requirement_ids].sort(), writes: item.write_paths.map(p => p.replace(/\/$/, "")).sort() });
+    const known = new Set(active.results.map(row => fingerprint(row.title, JSON.parse(row.payload))));
+    for (const item of plan) { const key = fingerprint(item.title, item); if (known.has(key)) throw changed("The plan duplicates an active ticket with the same requirement and file scope. Reuse or revise that work before approval."); known.add(key); }
     const revision = config.plan_revision + 1; const ids = new Map<string, string>(); const tickets: DeliveryTicket[] = [];
     for (const item of plan) {
       const ticket = await this.insertTicket(userId, t.workspace_id, t.project_id, "delivery", item.title, item.description, { review_roles: item.review_roles ?? [], acceptance: item.acceptance, todo: item.todo, requirement_ids: item.requirement_ids, read_paths: item.read_paths, write_paths: item.write_paths, depends_on: [], candidate: null, report: null, reviews: [], rework_cycles: 0, environment: null, environment_artifact: null, reviewed_context_hash: null, release: null, last_checkpoint: null }, revision);

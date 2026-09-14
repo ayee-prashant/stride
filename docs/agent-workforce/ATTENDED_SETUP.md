@@ -123,7 +123,9 @@ connection and verified TLS settings as the context worker. Only workers receive
 the GitHub App signing key. The web process queues bounded evidence requests.
 
 Before human acceptance, the worker verifies the repository ID, target branch,
-PR head, exact commit and successful GitHub checks/statuses. UAT and production
+PR head, exact commit, complete changed-file list and successful GitHub checks/statuses.
+Every changed and renamed path must fit the approved ticket scope. Pull requests
+with more than 100 changed files must be split before this release can accept them. UAT and production
 verification additionally require a successful GitHub Deployment for the exact
 commit and environment with an immutable `payload.artifact` identifier. A host
 success message alone is not sufficient. Configure the deployment pipeline to
