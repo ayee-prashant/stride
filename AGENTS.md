@@ -5,12 +5,20 @@
 Read README.md, docs/PRODUCT.md, docs/ARCHITECTURE.md, docs/DEVELOPMENT_PLAN.md,
 docs/SECURITY.md, and docs/TESTING.md before changing product code. Read
 docs/DECISIONS.md before introducing a new dependency or architectural pattern.
-The active scope is the user-approved team productivity release in
+The task-management baseline is the user-approved team productivity release in
 docs/PRODUCTIVITY_RELEASE.md. Preserve the completed first-release flows.
+
+The proposed human-supervised agent-work expansion is indexed in
+docs/agent-workforce/README.md. For implementation of that scope, read its linked
+operating, architecture, connection and security contracts, then follow
+docs/agent-workforce/DELIVERY_PLAN.md. Those documents describe pending work;
+they do not change deployment authority or authorize runtime agent execution.
 
 ## Operating rules
 
-- Implement the next uncompleted vertical slice in DEVELOPMENT_PLAN.md.
+- Implement the next uncompleted vertical slice in the plan for the active scope:
+  docs/DEVELOPMENT_PLAN.md for task management, or
+  docs/agent-workforce/DELIVERY_PLAN.md for the agent-work expansion.
 - Keep HTTP handling, business rules, persistence, and UI separate. Prefer simple
   composition over inheritance, microservices, generic frameworks, or speculative abstractions.
 - Never trust client user IDs, workspace IDs, roles, assignees, or record versions.
