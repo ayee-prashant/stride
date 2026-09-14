@@ -1,4 +1,9 @@
-# GitHub project context: first source slice
+# GitHub project context: source configuration
+
+For the delivery release, also follow [ATTENDED_SETUP.md](ATTENDED_SETUP.md).
+It adds PR/check/deployment evidence and an attended execution worker to the
+source observation contract below. The historical first-slice exclusions are not
+a description of the later delivery engine.
 
 The context worker reads a single approved repository and branch per project.
 Humans still publish accepted requirements, decisions and constraints. A GitHub

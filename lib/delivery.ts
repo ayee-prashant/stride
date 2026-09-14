@@ -4,6 +4,8 @@ import { sourcePath } from "./github-context.ts";
 import type { ContextRevision } from "./context.ts";
 import type { AgentRole } from "./agents.ts";
 
+export const deliveryLink = (workspaceId: string, projectId: string, ticketId: string) => `/?${new URLSearchParams({ workspace: workspaceId, project: projectId, delivery: ticketId })}`;
+
 export const DELIVERY_ROLES = ["business_analysis", "solution_architecture", "development", "peer_review", "quality_assurance", "user_acceptance_testing", "release_operations"] as const;
 export const REVIEW_GATES = ["requirements", "architecture", "engineering", "qa", "uat", "release"] as const;
 export type ReviewGate = typeof REVIEW_GATES[number];

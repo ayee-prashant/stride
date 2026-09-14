@@ -6,6 +6,8 @@ import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { Repository } from "../lib/server/repository.ts";
 import { PostgresDatabase } from "../lib/server/postgres-adapter.ts";
 import { completeDelivery, setupDelivery, rid } from "./delivery-contract.ts";
+import { DeliveryEvidenceStore } from "../lib/server/delivery-evidence.ts";
+import { parseBinding } from "../lib/github-context.ts";
 
 const value = process.env.TEST_DATABASE_URL;
 if (!value) throw new Error("An isolated TEST_DATABASE_URL is required");
@@ -19,6 +21,14 @@ test("PostgreSQL full human delivery and concurrency contract", async t => {
     return { repo, owner, other, workspace, project };
   }
   await t.test("requirements through rework and verified production acceptance", async () => { await completeDelivery(fixture); });
+  await t.test("evidence queue persists one request and gives only one worker its current generation", async () => {
+    const f = await setupDelivery(fixture);
+    const binding = parseBinding({ key: "pg_evidence", workspace_id: f.workspace, project_id: f.project, repository_id: 12345, installation_id: 4567, owner: "fixture", repository: "project", branch: "main", paths: ["README.md"] });
+    const queue = new DeliveryEvidenceStore(repo, [binding]); const input = { workspace_id: f.workspace, project_id: f.project, candidate: { repository_id: 12345, commit: "a".repeat(40), pull_request: 7 } };
+    await Promise.all([1, 2].map(() => assert.rejects(queue.verified(input), /queued/)));
+    const results = await Promise.all([queue.claim(), queue.claim()]); assert.equal(results.filter(Boolean).length, 1);
+    assert.equal(Number((await repo.statement("SELECT COUNT(*) AS n FROM delivery_evidence WHERE workspace_id=?", f.workspace).first<{ n: string }>())!.n), 1);
+  });
   await t.test("concurrent start retries share one grant and only one distinct claim wins", async () => {
     const f = await setupDelivery(fixture);
     const start = () => f.s.authorizeStart(f.owner.userId, f.workspace, f.project, f.t.id, f.startInput);

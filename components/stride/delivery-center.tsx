@@ -15,10 +15,10 @@ type TicketSummary = Pick<DeliveryTicket, "id" | "task_id" | "title" | "kind" | 
 type Overview = { configuration: DeliveryProject | null; tickets: TicketSummary[]; connections: AgentConnection[]; has_more: boolean; next_offset: number };
 type NoticePage = { notices: Notice[]; next_cursor: number; has_more: boolean };
 type Notice = { id: string; sequence: number; ticket_id: string | null; title: string; created_at: string; read_at: string | null };
-export function DeliveryCenter({ workspaceId, projectId, members, userId, admin }: { workspaceId: string; projectId: string; members: Member[]; userId: string; admin: boolean }) {
+export function DeliveryCenter({ workspaceId, projectId, members, userId, admin, initialTicketId = "", onDismissInitial }: { initialTicketId?: string; onDismissInitial?: () => void; workspaceId: string; projectId: string; members: Member[]; userId: string; admin: boolean }) {
   const [page, setPage] = useState<Overview | null>(null); const [bindings, setBindings] = useState<AgentBindingSummary[]>([]); const [notices, setNotices] = useState<Notice[]>([]);
   const [noticeBefore, setNoticeBefore] = useState(0); const [moreNotices, setMoreNotices] = useState(false);
-  const [tab, setTab] = useState<"work" | "connections" | "responsibilities" | "notices">("work"); const [offset, setOffset] = useState(0); const [busy, setBusy] = useState(false); const [error, setError] = useState(""); const [selected, setSelected] = useState<string | null>(null); const [discovery, setDiscovery] = useState(false);
+  const [tab, setTab] = useState<"work" | "connections" | "responsibilities" | "notices">("work"); const [offset, setOffset] = useState(0); const [busy, setBusy] = useState(false); const [error, setError] = useState(""); const [selected, setSelected] = useState<string | null>(initialTicketId || null); const [discovery, setDiscovery] = useState(false);
   const abort = useRef<AbortController | null>(null); const path = workspacePath(`projects/${encodeURIComponent(projectId)}/delivery`, workspaceId);
   const refresh = useCallback(async () => {
     abort.current?.abort(); const c = new AbortController(); abort.current = c;
@@ -45,6 +45,6 @@ export function DeliveryCenter({ workspaceId, projectId, members, userId, admin 
       {page.configuration && tab === "connections" && <DeliveryConnections workspaceId={workspaceId} projectId={projectId} userId={userId} bindings={bindings} connections={page.connections} onSaved={() => void refresh()} />}
       {page.configuration && tab === "notices" && <div className="delivery-notices"><h3>Your delivery notifications</h3><p className="muted">The companion shows these same private notices in your terminal. An idle IDE agent starts when you ask it to.</p>{notices.length ? notices.map(n => <article key={n.id}><strong>{n.title}</strong><time dateTime={n.created_at}>{new Date(n.created_at).toLocaleString()}</time>{n.ticket_id && <Button variant="outline" size="sm" onClick={() => setSelected(n.ticket_id)}>Review task</Button>}</article>) : <p>No delivery notifications yet.</p>}<div className="inline-actions"><Button variant="outline" disabled={!noticeBefore || busy} onClick={() => setNoticeBefore(0)}>Newest notifications</Button><Button variant="outline" disabled={!moreNotices || busy} onClick={() => setNoticeBefore(notices.at(-1)?.sequence ?? 0)}>Older notifications</Button></div></div>}
     </>}
-    {selected && page?.configuration && <DeliveryDialog key={selected} workspaceId={workspaceId} projectId={projectId} ticketId={selected} userId={userId} members={members} bindings={bindings} connections={page.connections} onClose={() => setSelected(null)} onSaved={() => void refresh()} />}
+    {selected && page?.configuration && <DeliveryDialog key={selected} workspaceId={workspaceId} projectId={projectId} ticketId={selected} userId={userId} members={members} bindings={bindings} connections={page.connections} onClose={() => { setSelected(null); onDismissInitial?.(); window.history.replaceState(window.history.state, "", "/"); }} onSaved={() => void refresh()} />}
   </section>;
 }

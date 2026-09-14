@@ -88,10 +88,10 @@ export async function verifyBrowser(origin, cookie, reconcileRepository, deliver
     await call("Page.navigate", { url: origin });
     await waitFor("document.querySelector('h1')?.textContent === 'My Tasks' && document.querySelector('[aria-label=\"New task title\"]')?.disabled === false");
     stage = "delivery-human-review";
-    await clickButton("Agent delivery", '[data-slot="sidebar-menu-button"]');
+    await call("Page.navigate", { url: `${origin}/?${new URLSearchParams({ workspace: deliveryReview.workspaceId, project: deliveryReview.projectId, delivery: deliveryReview.ticketId })}` });
     await waitFor("document.querySelector('h1')?.textContent === 'Agent delivery'");
     const deliveryRow = `Array.from(document.querySelectorAll('.delivery-ticket')).find(el => el.querySelector('h3')?.textContent === ${JSON.stringify(deliveryReview.title)})`;
-    await waitFor(`Boolean(${deliveryRow})`); await evaluate(`${deliveryRow}.click()`);
+    await waitFor(`Boolean(${deliveryRow})`);
     await waitFor("document.querySelectorAll('.delivery-dialog .context-three-pane > section').length === 3");
     assert.equal(await evaluate("document.querySelector('.delivery-dialog').textContent.includes('Agent-reported evidence')"), true);
     assert.equal(await evaluate("window.__deliveryXss === undefined"), true);

@@ -113,14 +113,16 @@ async function bridge() {
   process.once("SIGINT", () => void close()); process.once("SIGTERM", () => void close()); process.stdin.once("end", () => void close());
 }
 async function watch() {
-  if (!options.ticket || !/^[a-zA-Z0-9_-]{1,160}$/.test(options.ticket)) throw new Error("Choose an assigned ticket ID with --ticket.");
+  if (options.ticket && !/^[a-zA-Z0-9_-]{1,160}$/.test(options.ticket)) throw new Error("Choose an assigned ticket ID with --ticket.");
   const release = await processLock("companion"); const provider = await new ConnectionProvider("companion").load(); let stopped = false; let cursor = (await readPrivate(join(directory, "notices.json")))?.cursor ?? 0;
   process.once("SIGINT", () => { stopped = true; }); process.once("SIGTERM", () => { stopped = true; });
   async function call(query = "", body) { const token = await provider.freshToken(); const response = await boundedFetch(`${provider.resourceUrl()}${query}`, { method: body ? "POST" : "GET", headers: { Authorization: `Bearer ${token}`, ...(body ? { "Content-Type": "application/json" } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) }); const data = await response.json(); if (!response.ok) throw new Error(data.error ?? "Companion request failed."); return data; }
   try {
-    process.stdout.write(`Watching assigned ticket ${options.ticket}. Review and authorize its start in Stride, then ask your IDE agent to claim it.\n`);
+    process.stdout.write(options.ticket ? `Watching assigned ticket ${options.ticket}. Review and authorize its start in Stride, then ask your IDE agent to claim it.\n` : "Watching private delivery notifications. Select a ticket with --ticket to prepare a human-approved start.\n");
     while (!stopped) {
       try {
+        if (!options.ticket) await call("", { preparation: null });
+        else {
         const work = await call(`?ticket_id=${encodeURIComponent(options.ticket)}`); const packet = work.packet;
         let checkout = null; let repositoryId = null; let clean = true;
         if (packet.payload.repository) {
@@ -130,10 +132,11 @@ async function watch() {
           checkout = head.stdout.trim(); repositoryId = packet.payload.repository.repository_id; clean = !status.stdout.trim();
         }
         await call("", { preparation: { packet_id: packet.id, packet_hash: packet.hash, checkout, repository_id: repositoryId, clean } });
+        }
       } catch (error) { process.stderr.write(`${error instanceof Error ? error.message : "Companion unavailable."} No new start is authorized.\n`); try { await call("", { preparation: null }); } catch { /* Revoked or offline connections cannot renew. */ } }
       try {
         const page = await call(`?after=${cursor}`);
-        for (const item of page.notices) process.stdout.write(`${process.stdout.isTTY ? "\u0007" : ""}[${item.created_at}] ${item.title}${item.ticket_id ? ` · ticket ${item.ticket_id}` : ""}\n`);
+        for (const item of page.notices) process.stdout.write(`${process.stdout.isTTY ? "\u0007" : ""}[${item.created_at}] ${item.title}${item.ticket_id ? ` · ticket ${item.ticket_id}` : ""}${item.review_path ? `\nReview: ${new URL(item.review_path, site).href}` : ""}\n`);
         cursor = page.next_cursor; await savePrivate(join(directory, "notices.json"), { cursor });
       } catch { process.stderr.write("Delivery notifications are temporarily unavailable. The saved cursor will resume on reconnection.\n"); }
       if (!stopped) await new Promise(resolve => setTimeout(resolve, 15000));

@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { AppError, object } from "../domain.ts";
 import { parseContextCursor } from "../context.ts";
+import { deliveryLink } from "../delivery.ts";
 import type { AgentActor } from "../delivery.ts";
 import type { Database } from "./repository.ts";
 import { Repository } from "./repository.ts";
@@ -32,8 +33,8 @@ export class DeliveryService extends DeliveryReview {
   }
   async notices(userId: string, workspaceId: string, projectId: string, after = 0, latest = false) {
     await this.project(userId, workspaceId, projectId);
-    const rows = await this.repo.statement(`SELECT id,sequence,ticket_id,title,created_at,read_at FROM delivery_notices WHERE workspace_id=? AND project_id=? AND recipient_id=? ${latest && !after ? "" : `AND sequence${latest ? "<" : ">"}?`} ORDER BY sequence ${latest ? "DESC" : "ASC"} LIMIT 51`, workspaceId, projectId, userId, ...(latest && !after ? [] : [after])).all<{ sequence: number }>();
-    const notices = rows.results.slice(0, 50); return { notices, next_cursor: notices.at(-1)?.sequence ?? after, has_more: rows.results.length > 50 };
+    const rows = await this.repo.statement(`SELECT id,sequence,ticket_id,title,created_at,read_at FROM delivery_notices WHERE workspace_id=? AND project_id=? AND recipient_id=? ${latest && !after ? "" : `AND sequence${latest ? "<" : ">"}?`} ORDER BY sequence ${latest ? "DESC" : "ASC"} LIMIT 51`, workspaceId, projectId, userId, ...(latest && !after ? [] : [after])).all<{ sequence: number; ticket_id: string | null }>();
+    const notices = rows.results.slice(0, 50).map(n => ({ ...n, review_path: n.ticket_id ? deliveryLink(workspaceId, projectId, n.ticket_id) : null })); return { notices, next_cursor: notices.at(-1)?.sequence ?? after, has_more: rows.results.length > 50 };
   }
   async readNotices(userId: string, workspaceId: string, projectId: string, input: unknown) {
     const v = object(input, ["through"]); const cursor = parseContextCursor(String(v.through)); await this.project(userId, workspaceId, projectId);

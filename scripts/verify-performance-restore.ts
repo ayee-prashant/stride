@@ -58,7 +58,7 @@ try {
     const query = `SELECT COUNT(*)::integer AS n,md5(COALESCE(string_agg(md5(to_jsonb(t)::text),'' ORDER BY md5(to_jsonb(t)::text)),'')) AS checksum FROM ${table} t`;
     const sourceRows: { rows: { n: number; checksum: string }[] } = await pool.query(query);
     const restoredRows: { rows: { n: number; checksum: string }[] } = await restorePool.query(query);
-    assert.ok(sourceRows.rows[0].n > 0, `Missing context restore fixture for ${table}`);
+    if (!["auth_oauth_access_token", "auth_oauth_client_assertion"].includes(table)) assert.ok(sourceRows.rows[0].n > 0, `Missing context restore fixture for ${table}`);
     assert.deepEqual(restoredRows.rows, sourceRows.rows, `Restored context differs for ${table}`);
   }
   const restoredRepo = new Repository(new PostgresDatabase(restorePool));

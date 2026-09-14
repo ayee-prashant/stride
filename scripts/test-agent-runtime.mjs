@@ -80,7 +80,7 @@ export async function verifyAgentRuntime({ origin, request, json, userId, worksp
     assert.equal((await raw("/api/agent-companion", { headers: bearer(companionTokens) })).status, 401);
     assert.equal((await raw("/mcp", { method: "POST", headers: bearer(rotated) })).status, 401);
     console.log(JSON.stringify({ event: "agent_runtime_passed", checks: ["real_oauth_pkce", "code_single_use", "resource_isolation", "modern_mcp", "human_start", "report_requires_human_review", "refresh_rotation", "connection_revocation"] }));
-    return { title, ticketId: ticket.id };
+    return { title, ticketId: ticket.id, workspaceId, projectId };
   } catch (error) { console.error(JSON.stringify({ event: "agent_runtime_failed", stage })); throw error; }
   finally { await client?.close(); }
 }

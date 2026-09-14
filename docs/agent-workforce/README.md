@@ -64,3 +64,9 @@ The source synchronization increment is described in [GITHUB_CONTEXT_SETUP.md](G
 The human profile and role-approval increment is described in
 [AGENT_REGISTRY_SETUP.md](AGENT_REGISTRY_SETUP.md). These role decisions do not
 enroll a connection or authorize execution.
+
+## Attended delivery setup
+
+See [ATTENDED_SETUP.md](ATTENDED_SETUP.md) for human responsibilities, connection
+enrollment, MCP configuration, notifications, review gates and machine recovery.
+Implementation and deployment status remain tracked separately.
