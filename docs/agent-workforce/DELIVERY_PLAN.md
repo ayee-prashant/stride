@@ -12,6 +12,8 @@ Ship complete human-to-agent-to-human flows in small increments. Keep agent feat
 
 Use the existing repository development instructions and security/validation gates. The roles described in this product are runtime concepts; creating these docs does not start a development-agent swarm.
 
+Human-selected profiles are mandatory in this release. Agents may recommend roles/profiles and prepare drafts; assignment, operator start, evidence acceptance and release remain distinct decisions. [Human-approved delivery](HUMAN_APPROVED_DELIVERY.md), the [role catalog](ROLE_CATALOG.md), [prompt handoffs](PROMPT_HANDOFFS.md) and [audit/metrics](AUDIT_AND_METRICS.md) refine these contracts. The files are design deliverables, not completed orchestration features.
+
 Shared project context and GitHub reconciliation are foundational. Follow PROJECT_CONTEXT.md and CONTEXT_PROTOCOL.md before adding execution/role automation. The protocol research baseline is MCP 2026-07-28; tested older clients use explicit compatibility adapters. A task queue without versioned intent, source freshness and cold-start recovery does not meet the first-release gate.
 
 ## Phase 0: prove the boundaries
@@ -34,12 +36,12 @@ Depends on Phase 0. This is the first useful release.
 
 | Ticket | Work | Observable exit criterion |
 | --- | --- | --- |
-| AW-101 | Agent registry, operator acceptance and project role grants | Create/revoke a stable profile; reconnect with a new session; reject forged identity/role fields |
+| AW-101 | Agent registry, operator acceptance, adopted role templates and project grants | Create/revoke a stable profile; initialize one active role with explicit exclusions/access; reject forged identity/role fields and prompt-based permission escalation |
 | AW-102 | Work items, packet revisions, proposals and actor-aware timeline | Agent proposes a ticket; human accepts it; historical human authorship stays accurate |
 | AW-106 | Project brief, versioned requirements/decisions and GitHub ingestion | Human adopts a baseline; direct GitHub changes remain observed facts; incomplete indexing and conflicting intent are visible |
 | AW-107 | Context assembly, search, validation and change notices | Complete least-privilege packet includes requirement/code versions and related work; stale packets and poisoned/restricted retrieval fail appropriate gates |
 | AW-108 | Requirement-aware proposal intake and checkpoints | Scope/duplicates are checked before ticket acceptance; two proposals cannot silently create the same work; another machine can resume from a safe published checkpoint |
-| AW-103 | Human decisions, scoped start grants and atomic claims | Assignment notifies; no work runs before authorization; one claim wins; changed scope invalidates the grant |
+| AW-103 | Manual profile selection, human decisions, scoped start grants and atomic claims | Only an authorized human selects/reassigns; operator start is separate; no work runs before authorization; one claim wins; changed scope invalidates the grant |
 | AW-104 | Narrow MCP reads/writes and simple CLI companion | Human receives a terminal/in-app notice and starts an attended client with the accepted packet; companion renews its lease independently of model tool calls |
 | AW-105 | Progress, artifacts, review and human completion | Agent submits evidence; human requests changes or accepts; direct/bulk Done cannot bypass gates |
 
@@ -68,14 +70,17 @@ Depends on stable identity, approvals and attempts from Phases 1–2; it can reu
 
 | Ticket | Work | Observable exit criterion |
 | --- | --- | --- |
-| AW-301 | Accepted plan and dependency DAG with role routing | SA proposes work; human accepts; only dependency-ready work is offered; cycles and excessive fan-out are rejected transactionally |
+| AW-307 | BA baseline and human-adopted solution | Product human accepts intent; technical human adopts solution; requirement exports cannot become a second writable authority |
+| AW-301 | Accepted plan, dependency DAG and manual role assignment | SA proposes bounded tickets and profile recommendations; human accepts/selects; only dependency-ready work is offered; cycles and excessive fan-out are rejected transactionally |
 | AW-302 | Developer, reviewer and QA handoffs | Three profiles complete a feature with each operator notified and each required human decision recorded |
 | AW-303 | Parallel developer branches and integration ownership | DEV-1 and DEV-2 contribute without a shared checkout; conflicts return to a named integration owner |
 | AW-304 | GitHub/CI evidence and exact-candidate gates | A new commit invalidates prior review/QA; verified CI and agent-reported tests are distinguished |
 | AW-305 | Solo and small-team policy | One agent in multiple roles works without deadlock and is labeled self-review; required second-human policies still block when unmet |
-| AW-306 | Role-specific context and conflict review | Architect/dev/review/QA share accepted criteria with relevant role slices; context-review agents only propose changes; overlapping work and unknown impact reach human review |
+| AW-306 | Role-specific context, deterministic prompts and conflict review | Pin adopted base/role templates and relevant accepted inputs; missing placeholders block; upstream instructions cannot expand authority; next-work drafts never auto-assign/start |
+| AW-308 | QA/UAT findings, human decisions and bounded rework | Failed QA cannot advance to UAT; verified UAT candidate and business-human acceptance are required; defects return to dev and repeat affected gates; two cycles trigger replanning |
+| AW-309 | Shared release candidate, separate release decision and manual deployment evidence | Bind exact artifact/environment/config; UAT PASS alone cannot release; unknown/failed deployment cannot close a ticket; verified production plus human closure satisfies the selected policy |
 
-Demonstrate both a small bug fix and a feature with optional architecture, two developer contributions, peer review, QA and human acceptance. Keep release as a separate recorded decision. Do not attach five mandatory roles to every task.
+Implement AW-307/301/306 before multi-role handoffs; AW-304 supplies candidate evidence for AW-308/309. Demonstrate both a small fix using an explicitly selected simplified policy and a software feature with accepted BA/architecture baseline, developer contributions, engineering review, QA, UAT, separate release and human closure. Include QA and UAT failure paths. Reuse accepted baselines and add specialists by risk; do not attach every role to every task.
 
 ## Phase 4: operational readiness and optional managed runs
 
@@ -89,6 +94,7 @@ First validate unattended recovery, sustained event load, backup policy and acce
 | AW-404 | Optional isolated managed runners | No operator/browser/production secrets exposed; resource and egress restrictions, termination and cleanup verified |
 | AW-405 | Bounded automation and governance | Only explicitly approved plan packets run; limits and unknown costs are visible; no self-authorizing recursive work |
 | AW-406 | Optional model-assisted context suggestions | Compare source-linked summaries/gap/duplicate suggestions with deterministic baseline; rejected suggestions cannot affect authority; API outage leaves core workflows available |
+| AW-407 | Audit-based delivery metrics and improvement proposals | Separate server/CI/human/agent evidence and wait intervals; preserve sample/coverage limits; proposals cannot change roles, gates, permissions or routing |
 
 Managed runs are not a prerequisite for a useful agent team working in existing IDEs.
 
@@ -100,7 +106,7 @@ Managed runs are not a prerequisite for a useful agent team working in existing 
 | Approval | Agent calling human endpoints, stale packet/role/policy, replayed approval, alternate/bulk completion bypass and missing reviewer authority |
 | Concurrency | 100 simultaneous claims yield one active attempt; competing capacity reservations respect limits; retries return the same result |
 | Execution | Lost launch response, native denial, pause/question, killed process, late heartbeat/artifact and unavailable resume |
-| Workflow | Cycles, concurrent plan expansion, recursive proposals, offline role, rework limit and changed dependency candidate |
+| Workflow | Cycles, concurrent plan expansion, recursive proposals, manual assignment, offline role, rework limit, QA/UAT failures, accepted failure report versus passing gate, changed candidate and production-closure guard |
 | Evidence | Forged CI success, webhook replay, new commit after QA, self-review labels, stale release artifact and unsafe report upload |
 | Context | Mixed versions, unpublished/poisoned facts, stale local memory, mandatory input overflow, relevant/unrelated changes and a source outage |
 | Proposal intake | Existing completed feature, external PR overlap, same-gap race, distinct bugs under one requirement and conflicting human publications |
@@ -112,6 +118,6 @@ Use a deterministic fake agent for most contracts and real PostgreSQL for concur
 
 ## Deferred scope and success measures
 
-Defer an agent marketplace, universal IDE remote control, arbitrary automation builder, model-based performance rankings, full transcript collection, autonomous budget expansion, self-spawning agent trees and a new orchestration infrastructure stack.
+Defer automatic profile selection/reassignment, an agent marketplace, universal IDE remote control, arbitrary automation builder, model-based performance rankings, full transcript collection, autonomous budget expansion, self-spawning agent trees and a new orchestration infrastructure stack.
 
 Measure human effort and delivery quality: time from assignment to a reviewed start, time waiting for a named human, accepted outcomes, rework and escaped defects, duplicate proposals/launches, stale-context incidents, unnecessary context invalidations and cold-start recovery. Measure cached context assembly separately from external GitHub reconciliation. Compare with the team's baseline before setting improvement claims. More agent activity alone is not product success.

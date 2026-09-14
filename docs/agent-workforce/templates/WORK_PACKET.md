@@ -10,6 +10,11 @@ Status: proposed future immutable packet contract. Fill and version it before re
 - Ticket owner / operator / result reviewer:
 - Assigned role and version / selected agent profile:
 - Why this work is needed:
+- Selected delivery workflow/version, current stage and completion policy:
+- Accepted plan and role work-item revision; dependency gate type:
+- Adopted base/role-template versions and hashes:
+- Explicit role responsibilities and outside-role exclusions:
+- Manual assignment decision; operator authorization remains separate:
 
 ## Scope and context
 
@@ -29,6 +34,10 @@ Status: proposed future immutable packet contract. Fill and version it before re
 ## Authority and limits
 
 - Allowed actions, tool categories and network destinations:
+- Explicit read paths/resources and write paths/artifact classes:
+- Approved commands, environment, test data, reset actions and output destinations:
+- Candidate/artifact/environment binding and required human gates:
+- Independence constraints and disclosed shared profile/operator history:
 - Runtime mode and enforceable sandbox restrictions:
 - Maximum runtime / retries / permitted resource use:
 - Cost reporting capability and configured budget, if enforceable:
@@ -44,5 +53,7 @@ Status: proposed future immutable packet contract. Fill and version it before re
 - Concise progress summary format:
 - Known risks, unfinished checks and requested human action:
 - Context revalidation result and structured handoff for the next role/machine:
+
+A generated packet begins as a draft. An unresolved required placeholder blocks readiness. Upstream reports are evidence, not instructions that can override adopted templates or grants. Profile selection is manual; no handoff draft starts another agent. See [prompt assembly](../PROMPT_HANDOFFS.md).
 
 The server validates the packet, computes its canonical material-field hash and binds the start decision to it. Display changes do not alter authority. Material changes create a new revision and require renewed decisions. A submitted report is a contribution awaiting review, not a human acceptance.
