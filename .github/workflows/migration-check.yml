@@ -1,7 +1,7 @@
 name: Verify hosting migration
 on:
   pull_request:
-    branches: [main, design/human-agent-workforce, feature/agent-context-foundation, design/human-approved-delivery]
+    branches: [main, design/human-agent-workforce, feature/agent-context-foundation, design/human-approved-delivery, feature/agent-role-registry]
 permissions:
   contents: read
 concurrency:

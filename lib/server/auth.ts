@@ -4,6 +4,9 @@ import { APIError } from "better-auth/api";
 import { drizzleAdapter } from "@better-auth/drizzle-adapter";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { authSchema } from "../../db/auth-schema";
+import { oauthSchema } from "../../db/oauth-schema";
+import { jwt } from "better-auth/plugins";
+import { agentOAuthOptions } from "./agent-oauth-options";
 import type { Identity } from "../domain";
 import { authenticationSettings } from "./deployment-config";
 import { getPool, getRepository } from "./database";
@@ -17,7 +20,9 @@ function createAuth() {
     baseURL: settings.origin,
     secret: settings.secret,
     trustedOrigins: [settings.origin],
-    database: drizzleAdapter(drizzle(getPool()), { provider: "pg", schema: authSchema }),
+    database: drizzleAdapter(drizzle(getPool()), { provider: "pg", schema: { ...authSchema, ...oauthSchema } }),
+    disabledPaths: ["/token"],
+    plugins: [jwt({ jwt: { issuer: settings.origin } }), agentOAuthOptions(settings.origin, admitted)],
     emailAndPassword: {
       enabled: true,
       disableSignUp: true,
@@ -70,7 +75,7 @@ function createAuth() {
 let instance: ReturnType<typeof createAuth> | undefined;
 export function getAuth() { return instance ??= createAuth(); }
 
-async function admitted(userId: string, email: string): Promise<boolean> {
+export async function admitted(userId: string, email: string): Promise<boolean> {
   if (authenticationSettings(process.env).approvedEmails.has(email.toLowerCase())) return true;
   const result = await getPool().query("SELECT user_id FROM account_admissions WHERE user_id=$1 AND email=$2 LIMIT 1", [userId, email.toLowerCase()]);
   return result.rows.length === 1;
