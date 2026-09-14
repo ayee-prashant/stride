@@ -1,7 +1,7 @@
 // PostgreSQL target schema. Generate migrations separately from the Sites/D1 schema.
 // ISO timestamps and date-only values stay text to preserve the existing API contract.
 import { sql } from "drizzle-orm";
-import { pgTable, text, integer, primaryKey, uniqueIndex, index, foreignKey, check } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, primaryKey, unique, index, foreignKey, check } from "drizzle-orm/pg-core";
 
 export const users = pgTable("users", {
   id: text("id").primaryKey(), email: text("email").notNull().unique(), name: text("name").notNull(), createdAt: text("created_at").notNull(),
@@ -18,7 +18,7 @@ export const projects = pgTable("projects", {
   name: text("name").notNull(), description: text("description").notNull().default(""),
   archivedAt: text("archived_at"), version: integer("version").notNull().default(1),
   createdAt: text("created_at").notNull(), updatedAt: text("updated_at").notNull(),
-}, t => [uniqueIndex("uq_project_workspace").on(t.workspaceId, t.id), index("idx_projects_workspace_archive").on(t.workspaceId, t.archivedAt), check("project_version", sql`${t.version} > 0`)]);
+}, t => [unique("uq_project_workspace").on(t.workspaceId, t.id), index("idx_projects_workspace_archive").on(t.workspaceId, t.archivedAt), check("project_version", sql`${t.version} > 0`)]);
 export const tasks = pgTable("tasks", {
   id: text("id").primaryKey(), workspaceId: text("workspace_id").notNull(), projectId: text("project_id").notNull(),
   title: text("title").notNull(), description: text("description").notNull().default(""),
@@ -31,7 +31,7 @@ export const tasks = pgTable("tasks", {
 }, t => [
   foreignKey({ columns: [t.workspaceId, t.projectId], foreignColumns: [projects.workspaceId, projects.id] }),
   foreignKey({ columns: [t.workspaceId, t.assigneeId], foreignColumns: [memberships.workspaceId, memberships.userId] }),
-  uniqueIndex("uq_task_workspace").on(t.workspaceId, t.id),
+  unique("uq_task_workspace").on(t.workspaceId, t.id),
   index("idx_tasks_workspace_project_archive").on(t.workspaceId, t.projectId, t.archivedAt),
   index("idx_tasks_workspace_assignee_archive").on(t.workspaceId, t.assigneeId, t.archivedAt),
   check("task_status", sql`${t.status} IN ('todo','in_progress','done')`),

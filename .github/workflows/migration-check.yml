@@ -11,6 +11,8 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    outputs:
+      artifact-id: ${{ steps.generated.outputs.artifact-id }}
     services:
       postgres:
         image: postgres:18
@@ -20,12 +22,14 @@ jobs:
           POSTGRES_DB: stride_test
         ports: ['5432:5432']
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U stride_test -d stride_test"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -34,6 +38,7 @@ jobs:
       - run: npm install --no-audit --no-fund
       - run: npm run db:generate
       - uses: actions/upload-artifact@v4
+        id: generated
         with:
           name: migration-source-${{ github.event.pull_request.head.sha }}
           path: |
@@ -46,5 +51,36 @@ jobs:
           NODE_ENV: test
           TEST_DATABASE_URL: postgresql://stride_test:isolated_ci_fixture@127.0.0.1:5432/stride_test
       - run: npm run typecheck
+        if: ${{ !cancelled() && steps.generated.outcome == 'success' }}
       - run: npm run lint
+        if: ${{ !cancelled() && steps.generated.outcome == 'success' }}
       - run: npm run build
+        if: ${{ !cancelled() && steps.generated.outcome == 'success' }}
+  save-generated-source:
+    needs: verify
+    if: >-
+      always() && needs.verify.outputs.artifact-id != '' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'deploy/vercel-railway'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      # This job runs no dependency scripts. It saves only generated source
+      # on the authorized draft branch, never on main.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/download-artifact@v4
+        with:
+          artifact-ids: ${{ needs.verify.outputs.artifact-id }}
+          merge-multiple: true
+      - name: Save generated source for review
+        run: |
+          git add -- package-lock.json drizzle-postgres
+          if git diff --cached --quiet; then exit 0; fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Save generated dependency lock and PostgreSQL migrations'
+          git push origin HEAD:refs/heads/deploy/vercel-railway
