@@ -2,6 +2,8 @@
 
 Reviewed: 2026-09-14. Method: inspect existing source boundaries, check primary protocol/client documentation, walk the human and agent flows, then review adversarial and failure cases. This is a design review by the author, not an independent security audit or an executed integration test.
 
+Revision 2 incorporates the user's cross-machine context requirement and correction to the MCP 2026-07-28 transport baseline. Shared context/source reconciliation now precedes execution features in delivery. The original design did not sufficiently specify project-wide authority and context publication; PROJECT_CONTEXT.md and CONTEXT_PROTOCOL.md supply those missing contracts.
+
 ## Requirement coverage
 
 | User intent | Chosen design |
@@ -17,6 +19,12 @@ Reviewed: 2026-09-14. Method: inspect existing source boundaries, check primary 
 | Professional development hierarchy | Small-fix and feature templates, optional architecture, parallel development, candidate review/QA and separate release |
 | Human-readable progress and responsibility | Outcome board, contribution panel, decision queue, evidence labels and a named next action |
 | Ease of doing tasks | Keep title/project creation, avoid per-tool notices, allow explicit approval bundles and human-only review fallback |
+| Entire project context across machines | Versioned requirement/decision authority, verified repository observations, relevant immutable work manifests and structured checkpoints |
+| Agents already have GitHub access | Independent GitHub ingestion and reconciliation, external-change attribution and explicit observed/protected repository guarantees |
+| Work only on what is needed | Requirement/evidence links, current scope and related-work lookup, duplicate intake and human acceptance of new requirements |
+| Private context belongs to each agent | Local context stays local; share deliberate findings and handoffs; no assumption of shared chat or model comprehension |
+| Optional OpenRouter/API access | Core context functions are deterministic; existing agents can assist; optional model suggestions cannot publish authority |
+| Current MCP transport revision | Modern per-request metadata/subscriptions/MRTR/cancellation with explicit legacy compatibility and durable application recovery |
 
 ## Corrections made during review
 
@@ -33,6 +41,19 @@ Reviewed: 2026-09-14. Method: inspect existing source boundaries, check primary 
 11. **A universal hierarchy adds unnecessary work.** Made architecture/specialist stages conditional and started with one end-to-end human/agent contribution before the multi-role workflow.
 12. **Local credentials cannot enter the model transcript.** Narrowed claim responses to nonsecret attempt metadata and routed any runtime credentials through trusted transport/adapter code.
 
+## Context and protocol review
+
+1. **Code and accepted intent have different authorities.** GitHub changes are verified facts, while a human publishes accepted requirement/decision revisions. A merged implementation cannot silently rewrite product intent. Generated requirement exports are not a second writable source of truth.
+2. **Global context is not a giant shared chat.** Relevant task manifests reference exact source versions, required context and related work. Local conversations remain private and disposable; a fresh machine resumes from structured evidence.
+3. **Context refresh cannot silently change approved work.** Material binding checks run at claims, submissions, handoffs and acceptance. Publishing an accepted material change invalidates affected bindings transactionally; unknown impact requires revalidation, and unrelated changes do not restart every agent.
+4. **Direct GitHub access creates gaps in observation and attribution.** Webhooks need reconciliation and refresh generations. A shared GitHub credential cannot identify distinct agents. Repository protection, context checking and a future merge broker have different guarantees; a green check does not make GitHub and Stride atomic.
+5. **Semantic search cannot decide truth or completeness.** Mandatory criteria/policy come from explicit links, inaccessible sources are filtered before retrieval, summaries inherit source restrictions, and incomplete indexes stay labeled incomplete. No mandatory input is silently truncated.
+6. **A claim-before-context or context-before-launch loop would be unsafe.** Deterministic adapter packet preparation can precede claim without launching a model. Agent acknowledgement and adapter delivery are separate receipts; neither proves comprehension. Assisted code execution still follows authorization and claim.
+7. **Missing local work cannot be invented on another machine.** Handoffs distinguish published commits/patches from unavailable unshared edits. Resume preserves dirty checkouts and uses a new connection/attempt authorization.
+8. **New work needs justification and race handling.** Proposals cite requirements or declare new scope, carry evidence and check existing work/PRs. Exact duplicates can be linked deterministically; ambiguous matches and conflicting requirement updates remain human decisions.
+9. **The older MCP reference affected behavior, not just citations.** Adopted modern request metadata, subscriptions and multi round-trip semantics; removed assumptions of protocol sessions or MCP stream replay. Cancelling a subscription is distinct from stopping a durable attempt. Current protocol support is still untested for each vendor/SDK combination.
+10. **A mandatory coordinator LLM would not solve consistency.** Keep publication, permission, packet assembly and invalidation deterministic. Optional API generation must cite sources, retain provenance, respect provider/data limits and fail without blocking core work.
+
 ## Architecture decisions
 
 | ID | Decision | Reason and consequence |
@@ -44,6 +65,10 @@ Reviewed: 2026-09-14. Method: inspect existing source boundaries, check primary 
 | AW-ADR-05 | Modular monolith, PostgreSQL outbox, continuous coordinator | Reuses deployed foundations without using the reminder cron as a realtime scheduler |
 | AW-ADR-06 | Isolated attempts and exact-candidate evidence | Makes concurrent contribution and rework understandable; requires integration ownership and invalidation rules |
 | AW-ADR-07 | Extend maintained authentication | Avoids a custom OAuth implementation; pinned integration compatibility remains a Phase 0 gate |
+| AW-ADR-08 | Authority by information type and immutable context manifests | Separates accepted intent, observed code and local hypotheses; supports precise invalidation and cold starts |
+| AW-ADR-09 | GitHub ingestion independent of agent reporting | Handles direct changes; requires explicit freshness, coverage and credential/agent attribution limits |
+| AW-ADR-10 | Current MCP plus application-owned recovery | Supports modern subscriptions while keeping project state, cursors and run identity independent of transport |
+| AW-ADR-11 | No mandatory context LLM | PostgreSQL records, indexed links and deterministic assembly suffice for correctness; model assistance remains optional and evaluated |
 
 ## Implementation uncertainties with an owner and next action
 
@@ -56,11 +81,15 @@ Reviewed: 2026-09-14. Method: inspect existing source boundaries, check primary 
 | Pool and stream capacity on the chosen deployment | AW-402, platform implementer | Conservative pilot limits and bounded event replay |
 | Production backup/retention policy | AW-401, platform operator | Confirm before broader operational rollout |
 | Provider usage reporting and enforceable cost controls | AW-404/AW-405, runner implementer | Show unavailable estimates honestly; enforce time limits |
+| Modern MCP SDK/client behavior and auth compatibility | AW-001/AW-002, protocol implementer | Test each revision explicitly; disable unsupported combinations without weakening guards |
+| Source authority and material-change classification | AW-005/AW-107, context implementer | Required links plus conservative revalidation for unknown impact |
+| GitHub protection availability and direct-write detection | AW-006/AW-106, integration implementer | Observed mode until actual settings/checks are verified |
+| Cold-start recovery, mandatory context size and proposal races | AW-007/AW-108, application implementer | Block incomplete packets; preserve explicit missing-work state and uncertain duplicates |
 
 These are implementation gates with chosen fallbacks, not unresolved product questions requiring another planning meeting. Default decisions are specified so work can proceed in the delivery order.
 
 ## Review outcome and validation limits
 
-The architecture is sufficiently specified to begin Phase 0 and the first vertical slice. It establishes identity, authority, state transitions, integration boundaries, delivery order and measurable acceptance. It does not establish that integrations are already working, that a security certification exists or that performance targets have been measured.
+The revised architecture is sufficiently specified to begin Phase 0 and the first vertical slice. It establishes identity, project-context authority, source observation, state transitions, integration boundaries, delivery order and observable acceptance. It does not establish that integrations are already working, that a security certification exists or that performance targets have been measured.
 
-This change contains Markdown only. Local checks passed for document links, code-fence balance and trailing whitespace across nine design/template documents and the two repository entry documents. The entry-document diff was reviewed for scope and preservation of authority rules. No application build, provider run, load test or deployment is claimed for this design change. Product implementation must pass the repository's actual test/build/release gates for its own immutable source version.
+This change contains Markdown only. Local checks passed for document links, code-fence balance and trailing whitespace across 13 design/template documents and the two repository entry documents. The delivery plan has 33 distinct proposed ticket IDs. The entry-document diff was reviewed for scope and preservation of authority rules, and current MCP references were checked. No application build, provider run, load test or deployment is claimed for this design change. Product implementation must pass the repository's actual test/build/release gates for its own immutable source version.

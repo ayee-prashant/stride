@@ -10,6 +10,8 @@ The core interaction is: **assign a role, notify the human, approve the work, le
 
 Every agent has a stable profile and a responsible human operator. An agent can propose tickets, plans and handoffs. It cannot grant itself permissions, approve its own result or independently declare a human outcome complete.
 
+Shared project context is a prerequisite for this workflow. Stride maintains accepted requirements, adopted decisions, verified repository facts and active work, then supplies each contribution with a versioned, relevant context packet. Local agent memory remains local; it does not become project truth automatically. Direct GitHub changes are reconciled even when they bypass Stride tools. See [Project context](PROJECT_CONTEXT.md).
+
 ## Who does what
 
 | Human | Agent | Stride |
@@ -24,11 +26,11 @@ Human ownership is required even when one person supervises several agents. Prov
 
 ## A useful first product
 
-Start with one complete, attended workflow: a human connects an agent, assigns a work item, reviews and authorizes the packet, starts the agent in an existing tool, sees its progress and accepts or returns its result. Add a CLI notification companion and a VS Code extension, then additional execution adapters and multi-role handoffs.
+First establish the project brief, versioned requirements and GitHub reconciliation. Then complete an attended workflow: a human connects an agent, assigns a work item, reviews and authorizes its context packet, starts the agent in an existing tool, sees its progress and accepts or returns its result. Prove recovery on another machine and rejection of stale context before adding more execution adapters and multi-role handoffs.
 
 The first multi-agent demonstration should use three profiles: Developer, Reviewer and QA. The same human can supervise all three. Architecture becomes a required stage when the change warrants it. More roles and managed execution follow the same contracts.
 
-The daily human interface needs four additions: **My decisions**, **Team and agents**, an **Agent work** section inside a ticket, and a **Review** panel. Keep quick task creation and the existing board. Do not expose leases, OAuth scopes or protocol events as routine user decisions.
+The daily human interface needs **My decisions**, **Team and agents**, a **Project brief**, an **Agent work** section inside a ticket, and a **Review** panel. The brief shows accepted scope, decisions, source freshness, conflicts and why proposed work is needed. Keep quick task creation and the existing board. Do not expose leases, OAuth scopes or protocol events as routine user decisions.
 
 ## Existing foundation and proposed changes
 
@@ -36,16 +38,19 @@ Stride already has human authentication, workspaces, projects, tasks, comments, 
 
 This proposal adds an actor-aware agent-work module. It preserves the existing human task identity model and adds work items, proposals, profiles, approvals, attempts and evidence alongside it. It does not represent agents as fake human users.
 
-MCP supplies the tool/context connection. A separate trusted companion or IDE adapter handles notifications and, where documented and tested, launching an approved session. MCP transport can carry server notifications, but that does not establish a universal contract for waking an idle coding agent. The manual-start path remains available. This is an architecture inference from the [MCP transport specification](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports) and the client interfaces listed in [Connections and MCP](CONNECTIONS_AND_MCP.md).
+MCP supplies the tool/context connection. The design now targets the [2026-07-28 transport specification](https://modelcontextprotocol.io/specification/2026-07-28/basic/transports), with explicit compatibility for tested older clients. Use standard subscriptions where supported; a trusted companion or IDE adapter supplies human notices, monitoring and supported launches. Stride stores durable context and recovery state independently. The protocol revision and application recovery contract are detailed in [Context protocol](CONTEXT_PROTOCOL.md).
+
+No new LLM API is required for context storage, packet assembly, source reconciliation or approval enforcement. Existing connected agents can propose improvements. Optional OpenRouter or other model assistance can later suggest source-linked summaries and gaps without publishing accepted requirements or expanding authority.
 
 ## Read and implement in this order
 
 1. [Operating model](OPERATING_MODEL.md): identities, roles, work hierarchy, human experience and state transitions.
-2. [Architecture](ARCHITECTURE.md): module boundaries, data model, task compatibility and dispatch.
-3. [Connections and MCP](CONNECTIONS_AND_MCP.md): compatibility evidence, connection modes and proposed contracts.
-4. [Security and reliability](SECURITY_AND_RELIABILITY.md): approval enforcement, execution boundaries and recovery.
-5. [Delivery plan](DELIVERY_PLAN.md): ordered slices, dependencies and observable acceptance gates.
-6. [Design review](DESIGN_REVIEW.md): requirement coverage, corrections and implementation uncertainties.
-7. [Role brief template](templates/ROLE_BRIEF.md) and [work packet template](templates/WORK_PACKET.md): proposed content contracts for future runtime use.
+2. [Project context](PROJECT_CONTEXT.md): authoritative sources, relevant context, GitHub reconciliation, requirement intake and cross-machine handoffs.
+3. [Architecture](ARCHITECTURE.md): module boundaries, data model, task compatibility and dispatch.
+4. [Connections and MCP](CONNECTIONS_AND_MCP.md) and [Context protocol](CONTEXT_PROTOCOL.md): client compatibility, current protocol behavior and application contracts.
+5. [Security and reliability](SECURITY_AND_RELIABILITY.md): approval enforcement, execution boundaries and recovery.
+6. [Delivery plan](DELIVERY_PLAN.md): ordered slices, dependencies and observable acceptance gates.
+7. [Design review](DESIGN_REVIEW.md): requirement coverage, corrections and implementation uncertainties.
+8. Templates: [role brief](templates/ROLE_BRIEF.md), [work packet](templates/WORK_PACKET.md), [handoff](templates/HANDOFF.md), and [context change](templates/CONTEXT_CHANGE.md).
 
 These documents define a design baseline, not permission to execute tickets, change production policy or skip repository instructions. Existing `AGENTS.md` remains the development entry point. Begin future implementation with the compatibility/security slice in the delivery plan and update actual completion evidence after each slice.

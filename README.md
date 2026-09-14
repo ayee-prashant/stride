@@ -50,7 +50,8 @@ configuration. Never run the CI fixture against production.
 - docs/SECURITY.md and docs/TESTING.md — safeguards and validation.
 - docs/RELEASE_REVIEW.md — actual CI, runtime, and deployment evidence.
 - [Human-supervised agent work](docs/agent-workforce/README.md) — proposed next
-  product architecture, human/agent responsibilities, MCP contracts and ordered
+  product architecture, shared project context, human/agent responsibilities,
+  current MCP contracts and ordered
   delivery plan. These agent capabilities are not implemented yet.
 
 ## Source layout

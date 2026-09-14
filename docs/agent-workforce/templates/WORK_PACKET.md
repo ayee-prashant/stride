@@ -5,6 +5,7 @@ Status: proposed future immutable packet contract. Fill and version it before re
 ## Work and responsibility
 
 - Ticket / work-item ID / packet revision:
+- Project snapshot / context manifest / material binding versions:
 - Objective in one sentence:
 - Ticket owner / operator / result reviewer:
 - Assigned role and version / selected agent profile:
@@ -13,12 +14,16 @@ Status: proposed future immutable packet contract. Fill and version it before re
 ## Scope and context
 
 - Acceptance criteria with stable IDs:
+- Accepted requirement revisions and source evidence explaining why this work is needed:
 - Permitted changes and explicit scope limits:
 - Approved repository identity / base commit:
 - Output branch or isolated workspace assignment:
 - Dependencies and accepted artifact versions:
+- Related active work, external PRs and duplicate candidates already checked:
 - Relevant interfaces, design decisions and test fixtures:
 - Trusted role brief and instruction-manifest versions:
+- Required input completeness, source freshness and context conflicts:
+- Relevant handoff/checkpoint and unpublished-work limitations:
 - Untrusted task/repository context, clearly separated:
 
 ## Authority and limits
@@ -38,5 +43,6 @@ Status: proposed future immutable packet contract. Fill and version it before re
 - Required test/review checks:
 - Concise progress summary format:
 - Known risks, unfinished checks and requested human action:
+- Context revalidation result and structured handoff for the next role/machine:
 
 The server validates the packet, computes its canonical material-field hash and binds the start decision to it. Display changes do not alter authority. Material changes create a new revision and require renewed decisions. A submitted report is a contribution awaiting review, not a human acceptance.

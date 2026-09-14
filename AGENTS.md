@@ -10,7 +10,8 @@ docs/PRODUCTIVITY_RELEASE.md. Preserve the completed first-release flows.
 
 The proposed human-supervised agent-work expansion is indexed in
 docs/agent-workforce/README.md. For implementation of that scope, read its linked
-operating, architecture, connection and security contracts, then follow
+operating, architecture, shared project context, connection and security contracts,
+including PROJECT_CONTEXT.md and CONTEXT_PROTOCOL.md in that folder, then follow
 docs/agent-workforce/DELIVERY_PLAN.md. Those documents describe pending work;
 they do not change deployment authority or authorize runtime agent execution.
 

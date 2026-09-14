@@ -12,7 +12,9 @@ flowchart TD
     M --> S["Agent-work application services"]
     W --> S
     E --> S
-    S --> D["PostgreSQL: work, decisions, outbox"]
+    S --> K["Project context and packet services"]
+    K --> D["PostgreSQL: context, work, outbox"]
+    S --> D
     S --> O["Private artifact storage"]
     D --> J["Continuous coordinator"]
     J --> E
@@ -26,6 +28,8 @@ The existing five-minute reminder job is not the realtime dispatcher. Do not run
 
 Dependencies point from UI/HTTP/MCP to application services, to domain policies and repository ports. Vendor SDKs sit in adapters. The core does not depend on Claude, Codex, Gemini or an IDE extension.
 
+[Project context](PROJECT_CONTEXT.md) is an execution dependency: it owns requirement versions, adopted decision pointers, source reconciliation, immutable snapshots, task manifests and impact rules. GitHub remains authoritative for observed code; humans publish accepted intent. Packet assembly is a deterministic application service. Optional model-derived summaries never become the authority for claims or acceptance.
+
 Suggested new boundaries within the existing layout:
 
 | Module | Responsibility |
@@ -34,6 +38,7 @@ Suggested new boundaries within the existing layout:
 | `lib/agent-work/application/` | Enroll, propose, assign, authorize, claim, submit, accept and revoke use cases |
 | `lib/agent-work/persistence/` | Tenant-scoped SQL, transactions, versions, leases and outbox |
 | `lib/agent-work/adapters/` | MCP mapping, notification transport, GitHub evidence and runtime contracts |
+| `lib/agent-work/context/` | Source authority, requirement revisions, packet assembly, freshness/impact policies and indexed traceability |
 | `app/` and `components/stride/` additions | Human decisions and task contribution views |
 | `packages/stride-cli/`, later `packages/stride-vscode/` | Small independently packaged clients sharing versioned contracts |
 | `scripts/agent-coordinator.ts` | Bounded continuous job loop with graceful shutdown |
@@ -69,6 +74,10 @@ The human task-completion service must check current agent-work gates for opted-
 | Artifacts, findings and human decisions | Immutable versions and hashes; source/candidate revision; evidence origin; supersession and decision provenance |
 | Work events, outbox and delivery receipts | State/event committed together; monotonic aggregate version; deduplicated delivery |
 | Idempotency receipts | Unique scoped operation key and request hash; replay returns original result; changed input is rejected |
+| Requirements, adopted decisions and context proposals | One authority per record type; immutable accepted revisions; versioned human publication and conflict resolution |
+| Source observations and reconciliation cursors | Exact repository/branch/revision, bounded coverage and ordered refresh generations; partial indexing is explicit |
+| Context snapshots, manifests and run bindings | Immutable source selection; current access checks; material alignment and policy epochs required for execution |
+| Checkpoints and context read/adoption receipts | Attributed handoff evidence and declared packet adoption; no claim of model comprehension or complete local visibility |
 
 These are logical groups, not a requirement for one service per table. Use PostgreSQL composite tenant foreign keys, foreign-key-backed actor references, partial unique indexes for active attempts/offers and compare-and-swap record versions. Every query binds the authenticated tenant and project. Never rely on an unguessable UUID for access control.
 
@@ -80,8 +89,8 @@ Dependency types distinguish an available submitted artifact, a verified integra
 2. The coordinator finds accepted work with satisfied dependencies, no active attempt and available policy limits. Serialize plan expansion to prevent concurrent cycle/fan-out violations.
 3. Choose a profile deterministically: approved role/capability, access, availability and capacity, followed by priority/age and a fair tie-break. Prefer continuity only within these rules. No LLM selects permissions.
 4. Create one expiring assignment offer. Notify that profile's operator. Reserve no execution lease while a human considers the request.
-5. A human decision binds the packet revision, profile, connection selection policy, repository base SHA, role/policy versions, permitted actions and limits. Selection of a different profile or material change requires another authorization.
-6. Claim atomically consumes an eligible authorization, reserves profile/workspace capacity, creates one attempt and lease, and establishes run-scoped authority. Deliver any separate run credential to the trusted adapter outside model-visible tool results. Simultaneous claimers must produce one winner. A retry with the same idempotency key returns that attempt, not a new run.
+5. Assemble a complete context manifest from verified mandatory sources. A human decision binds the packet/manifest, profile, connection selection policy, repository base SHA, requirement/role/policy versions, permitted actions and limits. Selection of a different profile or material change requires another authorization.
+6. Claim atomically checks current material context and policy versions, consumes an eligible authorization, reserves profile/workspace capacity, creates one attempt and lease, and establishes run-scoped authority. Required context must be acknowledged by the attended agent or prepared for launch by the trusted adapter as specified in CONTEXT_PROTOCOL.md. Deliver any separate run credential outside model-visible tool results. Simultaneous claimers must produce one winner. A retry with the same idempotency key returns that attempt, not a new run.
 7. Only then may the companion launch work. Its durable launch receipt keys on attempt ID; a lost response must not start a second process. A generic MCP host can claim from an already human-started session; that process may report progress only after the claim.
 8. Heartbeats extend a live lease. Submission stores immutable artifacts and moves work to review, releases execution capacity and notifies the reviewer. Submission, verified CI and human acceptance each unlock only their explicitly defined dependency types.
 
@@ -95,7 +104,7 @@ A clarification pauses execution while preserving the current reservation for at
 
 Use a PostgreSQL transactional outbox first. Multiple coordinators claim bounded batches with row locks and job leases. Wake hints such as database notifications are optional; periodic reconciliation is authoritative. Do not hold a database transaction during an external call or stream connection.
 
-Delivery is at least once. Consumers deduplicate by event ID and aggregate version; external operations use a receipt/idempotency contract. An SSE stream carries a recipient-filtered cursor and reconnects with backoff. If replay retention expires, return an explicit resync requirement and fetch a current authorized snapshot. Older events cannot roll a current UI backward.
+Application event delivery is at least once. Consumers deduplicate by event ID and aggregate version; external operations use a receipt/idempotency contract. Modern MCP subscriptions are change hints; durable catch-up uses a Stride application cursor. An optional application SSE stream may carry the same recipient-scoped cursor, but this is not MCP transport replay. If replay retention expires, return an explicit resync requirement and fetch a current authorized snapshot. Older events cannot roll a current UI backward. See CONTEXT_PROTOCOL.md for the 2026-07-28 transport distinction.
 
 Expired attempts lose authority immediately at the server. Every consequential write checks the current fencing epoch and lease using database time. Late artifacts are quarantined for human comparison, never promoted as the current result. Audit the late submission without leaking revoked project content back to the caller.
 
@@ -108,6 +117,8 @@ Give each implementation attempt a distinct branch and worktree or isolated chec
 An integration owner produces a candidate commit from parallel contributions. Capture CI checks and peer/QA reports against that exact commit. New commits invalidate downstream candidate decisions. Gate results include check identity, source, timestamp, artifact hash and candidate SHA. Agent text saying “tests passed” is a report, not verified CI evidence.
 
 Prefer GitHub commit/PR references and bounded structured reports. If storing new report bodies, use private storage with a separate validated content contract and quota; preserve existing attachment limits. Do not add unrestricted archives, executables, arbitrary URL fetches or raw transcripts through an “artifact” escape hatch.
+
+Direct GitHub writes require verified source ingestion and explicit external-change attribution. Webhooks trigger bounded reconciliation, not blind trust in event arrival order. A GitHub account or commit author does not uniquely identify an agent when credentials are shared. Track protected/observed repository mode honestly and do not claim atomic context enforcement across GitHub and Stride. The full rules are in PROJECT_CONTEXT.md.
 
 ## Capacity and scale
 

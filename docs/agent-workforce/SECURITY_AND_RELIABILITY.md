@@ -7,8 +7,8 @@ Status: proposed controls and verification requirements. An IDE agent with its o
 | Decision | Authorized human | Bound to | Does not authorize |
 | --- | --- | --- | --- |
 | Enroll and grant access | Operator and applicable project administrator | Profile, connection, roles, projects and data permissions | Starting arbitrary work |
-| Accept plan | Ticket owner or designated project authority | Outcome, packet revisions, dependencies and scope | Execution by another person's agent |
-| Start work | Agent operator, or explicitly delegated human operator | Profile, connection by default, work revision, repository/base SHA, policy, actions, limits and expiration | Extra work, native permission escalation, acceptance, merge or release |
+| Publish context / accept plan | Context steward and applicable ticket/project authority | Requirement/decision revisions, outcome, context/packet manifests, dependencies and scope | Execution by another person's agent |
+| Start work | Agent operator, or explicitly delegated human operator | Profile, connection by default, work/context revisions, repository/base SHA, policy, actions, limits and expiration | Extra work, native permission escalation, acceptance, merge or release |
 | Answer/change scope | Appropriate operator and outcome authority | The exact question or revised packet | Silent reuse of earlier authorization |
 | Accept result | Designated human reviewer with project authority | Current work revision, artifacts, required gate results and candidate SHA | Publishing or deploying |
 | Release | Designated human release authority | Exact candidate or release artifact, target environment and release evidence | Future commits or unrelated environments |
@@ -50,6 +50,12 @@ For managed execution, require an ephemeral nonprivileged runner, filesystem and
 Artifact uploads need size/type quotas, safe content disposition, private access and explicit provenance. Reject active HTML/executable payloads in rendered reports; display text safely. Fetch repository/CI evidence only through validated provider identities and allowlisted endpoints; reject arbitrary URL redirects, local/private-address fetches and unsafe client-metadata URLs. Verify provider webhook signatures and deduplicate deliveries.
 
 ## Quality and release gates
+
+Context is subject to the same authorization boundary as execution. Filter retrieved material before ranking and again before delivery, apply source restrictions to summaries, and invalidate cached access on revocation. Local downloaded context cannot be remotely erased from an operator's machine; do not promise otherwise. Source pointers or manifest hashes are not access tokens.
+
+Context publication and affected binding invalidation share a Stride transaction. A lost change notice cannot permit a stale authoritative write. GitHub changes use verified observations with explicit freshness and scope; webhook ingestion and GitHub merge are outside that transaction. Required repository protections must be verified before describing a repository as protected. A shared GitHub credential does not establish distinct agent authorship.
+
+Retrieved notes, model summaries and copied instructions cannot publish requirements, alter scope or grant privileges. Preserve provenance, authority labels, mandatory exact criteria and uncertainty. Never promote an external code change into an accepted product requirement automatically. See [Project context](PROJECT_CONTEXT.md) for direct-GitHub and cross-machine boundaries.
 
 Use evidence tied to the precise candidate SHA and acceptance-criteria revision. A peer agent contributes review findings; it cannot issue a human approval or override required checks. CI results must be independently retrieved/verified to receive a CI-verified label. Preserve failed and superseded reports in the timeline.
 

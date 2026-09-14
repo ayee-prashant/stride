@@ -15,6 +15,8 @@ Status: proposed. Terms and transitions here are the product contract for this d
 
 Keep three human responsibilities distinct: the **ticket owner** owns the outcome; the **agent operator** authorizes use of their agent; the **reviewer** accepts the contribution. A release approver authorizes a release separately. One person may fill several positions where project policy permits it.
 
+The **project context steward**, initially the project owner, publishes accepted requirements and resolves context conflicts. A solutions architect or context-review agent may assist through proposals. Automatically observed repository facts do not require manual rewriting, while changes to accepted intent require a human decision. See [Project context](PROJECT_CONTEXT.md).
+
 Agent profiles show alias, operator, role bindings, projects, runtime/model metadata, connection status, capacity, active work and recent accepted contributions. Server-issued IDs survive restarts. A new session is not a new agent. A new device gets its own connection and credential. Model identity supplied by a client is marked as reported, not independently verified.
 
 A role belongs to a workspace and is enabled for specific projects. A profile may have multiple roles but an attempt has exactly one active role. Roles describe expected work; action permissions are explicit grants. Adding the name “administrator” to a role grants nothing.
@@ -42,7 +44,7 @@ Three providers can back five profiles, for example SA-1, DEV-1, DEV-2, REVIEW-1
 
 A human ticket describes an outcome. An accepted plan contains bounded work items and dependencies. Each work item has a role, acceptance criteria, an accountable human, a current assignment and attempts. Attempts produce artifacts; decisions refer to exact artifact versions.
 
-An agent-created ticket starts as a **proposal**, visible in the same human queue with its author and suggested role. A human accepts or edits it into a normal ticket. An agent can propose child work and role assignments, but cannot expand the accepted plan or authorize the next agent to execute it. Within an accepted plan, Stride can materialize its approved work items automatically.
+An agent-created ticket starts as a **proposal**, visible in the same human queue with its author and suggested role. It links the current context, relevant requirement or new-scope request, evidence of the gap and related work/PRs. Stride checks duplicate candidates and scope before a human accepts or edits it into a normal ticket. An agent can propose child work and role assignments, but cannot expand the accepted plan or authorize the next agent to execute it. Within an accepted plan, Stride can materialize its approved work items automatically.
 
 Role routing chooses an eligible profile and notifies its operator. Eligibility requires project membership and grants, the role, repository/runtime capability, remaining capacity and applicable limits. An offline or busy profile is shown as unavailable. No eligible profile leaves the work visibly queued; Stride does not silently switch to an unapproved tool.
 
@@ -99,6 +101,10 @@ Accepted work is immutable evidence. Reopening the outcome creates a new revisio
 
 **Team and agents** shows connected, busy, paused, offline or revoked profiles. A connected client is not necessarily an available executing agent. Show the real reason work is waiting and which human can resolve it.
 
+**Project brief** shows accepted goals, exclusions, adopted decisions, verified code baselines and active work. It highlights source freshness, disputed requirements, externally observed GitHub changes and proposed missing work. A task explains “Why this work?” using its requirement/evidence links. Per-attempt context badges distinguish current, needs refresh, conflicting and unavailable input; connected does not imply current context.
+
 **IDE/CLI** delivers a concise private notice and a link to the authenticated decision. The VS Code extension can host a queue; unsupported IDEs use the companion terminal and browser. Notification previews omit sensitive ticket content by default. Quiet hours delay ordinary notices, not expiration or revocation enforcement. Email is optional; the initial flow works with the in-app inbox and companion.
 
 Progress uses acceptance checks, artifacts and completed gates. Distinguish agent-reported, server-observed, CI-verified and human-accepted evidence. Do not fabricate completion percentages, billing figures or ETAs. Do not collect hidden reasoning or complete private agent conversations for the human dashboard.
+
+Switching machines uses a published structured checkpoint and a fresh validation/authorization step. Unshared local edits remain explicitly unavailable. A newer requirement or conflicting local instruction is a decision to resolve, never permission to silently change the task.
