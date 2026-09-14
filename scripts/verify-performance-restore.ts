@@ -56,7 +56,8 @@ try {
     // Fixture equality includes every field, immutable payload and mutable pointer.
     // The checksum is an integrity assertion for this drill, not an authentication mechanism.
     const query = `SELECT COUNT(*)::integer AS n,md5(COALESCE(string_agg(md5(to_jsonb(t)::text),'' ORDER BY md5(to_jsonb(t)::text)),'')) AS checksum FROM ${table} t`;
-    const sourceRows = await pool.query(query); const restoredRows = await restorePool.query(query);
+    const sourceRows: { rows: { n: number; checksum: string }[] } = await pool.query(query);
+    const restoredRows: { rows: { n: number; checksum: string }[] } = await restorePool.query(query);
     assert.ok(sourceRows.rows[0].n > 0, `Missing context restore fixture for ${table}`);
     assert.deepEqual(restoredRows.rows, sourceRows.rows, `Restored context differs for ${table}`);
   }
