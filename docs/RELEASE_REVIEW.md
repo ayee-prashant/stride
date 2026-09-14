@@ -128,3 +128,24 @@ AGENTS.md and the Sites setup skill. Once authorized registry access exists,
 resume the original preferred-pnpm installer attempt, retaining its lockfile
 policy. Complete the remaining gates, correct findings, rerun checks, and only
 then create and publish the immutable release version.
+
+## Native baseline verified and release continuation: 2026-09-14
+
+Commit cfdc751c5f503d9752ca0a3e135dc578f4c18aea passed GitHub Actions
+run 34828808360, job 103927010961: clean npm ci, committed migration parity,
+48 native tests, real PostgreSQL contract test, typecheck, lint, and Next.js
+production build. This supersedes earlier statements that these baseline gates
+were unrun. Reviewed generated SQL includes the composite unique constraints
+before dependent foreign keys and separate auth tables.
+
+Railway deployment 2b55f23a-79ff-4e7d-bcc9-969a5757518d reports SUCCESS for that
+baseline. It is not yet a working release because authentication and database
+runtime configuration remain incomplete. The Vercel native upload was canceled
+without a verified result; management still returns 403. A private database
+certificate was read from the provider container: the original leaf only covers
+localhost. A hostname-correct leaf and CA trust must pass a real connection test.
+
+ADR-009 records the subsequent hosting/authentication decision. Its new password,
+provisioning, certificate, and runtime test changes require fresh CI and a second
+review before the deployment branch advances. Backup restoration, browser checks,
+load measurements, and production session/task verification are not yet claimed.

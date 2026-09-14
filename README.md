@@ -1,3 +1,8 @@
+> Current deployment: native Next.js and PostgreSQL on Railway, with a Vercel
+> entry address. Private password sign-in supersedes the earlier OAuth plan.
+> See docs/DEPLOYMENT.md and docs/RELEASE_REVIEW.md for current release evidence.
+> Historical Sites setup notes below are retained for source provenance.
+
 # Stride — focused team task management
 
 ## Requested hosting migration

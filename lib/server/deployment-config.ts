@@ -12,20 +12,18 @@ export function applicationOrigin(environment: Environment): string {
   } catch { throw unavailable(); }
 }
 
-export function allowedGitHubIds(environment: Environment): ReadonlySet<string> {
-  const ids = (environment.STRIDE_ALLOWED_GITHUB_IDS ?? "").split(",").map(id => id.trim());
-  if (!ids.length || ids.length > 50 || ids.some(id => !/^[1-9]\d{0,19}$/.test(id))) throw unavailable();
-  return new Set(ids);
+export function allowedEmails(environment: Environment): ReadonlySet<string> {
+  const emails = (environment.STRIDE_ALLOWED_EMAILS ?? "").split(",").map(email => email.trim().toLowerCase());
+  if (!emails.length || emails.length > 50 || emails.some(email => email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) throw unavailable();
+  return new Set(emails);
 }
 
 export function authenticationSettings(environment: Environment) {
   const origin = applicationOrigin(environment);
-  const allowedIds = allowedGitHubIds(environment);
+  const approvedEmails = allowedEmails(environment);
   const secret = environment.BETTER_AUTH_SECRET ?? "";
-  const clientId = environment.GITHUB_CLIENT_ID ?? "";
-  const clientSecret = environment.GITHUB_CLIENT_SECRET ?? "";
-  if (secret.length < 32 || !clientId.trim() || !clientSecret.trim()) throw unavailable();
-  return { origin, allowedIds, secret, clientId, clientSecret };
+  if (secret.length < 32) throw unavailable();
+  return { origin, approvedEmails, secret };
 }
 
 /** Parse explicitly so URL ssl parameters cannot override certificate verification. */

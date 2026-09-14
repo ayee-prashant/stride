@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { applicationOrigin, authenticationSettings, allowedGitHubIds, postgresSettings } from "../lib/server/deployment-config.ts";
+import { applicationOrigin, authenticationSettings, allowedEmails, postgresSettings } from "../lib/server/deployment-config.ts";
 
 test("production origins reject redirects, credentials and insecure protocols", () => {
   for (const APP_URL of ["", "http://localhost:3000", "http://stride.example", "https://attacker@stride.example", "https://stride.example/auth", "https://stride.example/?next=attacker", "https://stride.example/#x"]) {
@@ -9,12 +9,13 @@ test("production origins reject redirects, credentials and insecure protocols", 
   assert.equal(applicationOrigin({ NODE_ENV: "production", APP_URL: "https://stride.example" }), "https://stride.example");
   assert.equal(applicationOrigin({ NODE_ENV: "development", APP_URL: "http://localhost:3000" }), "http://localhost:3000");
 });
-test("authentication fails closed without secrets and an explicit numeric account allowlist", () => {
-  for (const STRIDE_ALLOWED_GITHUB_IDS of ["", "*", "prashant@example.test", "user-login", "12,", "0", "1.2"]) {
-    assert.throws(() => allowedGitHubIds({ STRIDE_ALLOWED_GITHUB_IDS }), { code: "SETUP_REQUIRED" });
+test("authentication fails closed without secrets and an explicit email allowlist", () => {
+  for (const STRIDE_ALLOWED_EMAILS of ["", "*", "user-login", "owner@example.test,", "a b@example.test", "person@invalid"]) {
+    assert.throws(() => allowedEmails({ STRIDE_ALLOWED_EMAILS }), { code: "SETUP_REQUIRED" });
   }
-  assert.deepEqual([...allowedGitHubIds({ STRIDE_ALLOWED_GITHUB_IDS: "123,456" })], ["123", "456"]);
-  assert.throws(() => authenticationSettings({ APP_URL: "https://stride.example", STRIDE_ALLOWED_GITHUB_IDS: "123" }), { code: "SETUP_REQUIRED" });
+  assert.deepEqual([...allowedEmails({ STRIDE_ALLOWED_EMAILS: "Owner@Example.test,teammate@example.test" })], ["owner@example.test", "teammate@example.test"]);
+  assert.throws(() => authenticationSettings({ APP_URL: "https://stride.example", STRIDE_ALLOWED_EMAILS: "owner@example.test" }), { code: "SETUP_REQUIRED" });
+  assert.equal(authenticationSettings({ NODE_ENV: "production", APP_URL: "https://stride.example", STRIDE_ALLOWED_EMAILS: "owner@example.test", BETTER_AUTH_SECRET: "isolated-fixture-secret-32-characters-long" }).approvedEmails.has("owner@example.test"), true);
 });
 test("database URLs cannot weaken TLS, and only nonproduction loopback can use plaintext", () => {
   const DATABASE_URL = "postgresql://fictional:fixture@database.example.test/stride";

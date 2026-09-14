@@ -2,10 +2,12 @@
 
 ## System
 
-React + TypeScript with native Next.js App Router, targeting Vercel's Node.js
-runtime. Railway PostgreSQL supplies durable relational storage; Drizzle schema
-generation owns schema changes. Better Auth verifies GitHub sign-in and persisted
-sessions. An explicit numeric GitHub account allowlist keeps enrollment closed. One
+React + TypeScript with native Next.js App Router, running beside PostgreSQL on
+Railway. Vercel supplies an entry address that redirects to the canonical HTTPS
+application origin. This avoids cross-origin cookies and removes runtime secrets
+from Vercel. Drizzle owns schema changes. Better Auth verifies passwords and
+persisted sessions; enrollment is closed and approved emails are configured at
+the host. A separate job provisions the owner and runs migrations. One
 modular monolith is appropriate for the first release; services can be extracted
 later only when measured traffic or ownership boundaries justify the cost.
 
@@ -22,7 +24,7 @@ checks the target SQL and generated migrations.
 ## Ownership and consistency
 
 Users are keyed by Better Auth's persisted user ID. Every request revalidates its
-database session and linked GitHub account against the server allowlist. Workspace membership
+database session and persisted credential account against the server allowlist. Workspace membership
 authorizes access; authentication alone does not. Projects and tasks include
 workspace_id, and all task queries are scoped. One workspace may contain many
 projects; each task belongs to one project and optionally one workspace member.
@@ -40,7 +42,7 @@ database constraints protect relational integrity.
 - Index workspace/project/archive and workspace/assignee/archive paths.
 - Fetch shared workspace/member/project metadata once per workspace change.
 - No per-task user lookup; join display metadata in the list query.
-- Stateless Node.js functions, private no-store responses, no cross-user application cache.
+- Stateless Node.js application instances, private no-store responses, no cross-user application cache.
 - Three connections per warm process, with connection, idle, and statement timeouts.
 - Cap request bodies and field lengths. No uploaded binary blobs in the database.
 - Refresh after mutations and on focus; no aggressive background polling.

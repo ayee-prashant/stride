@@ -58,3 +58,24 @@ Session authorization rechecks the persisted provider account on every request;
 no editable profile claim, email, or identity header grants access. Auth records
 use separate tables from domain users. A dedicated OAuth application and host
 secrets still need provisioning; the code fails closed until configuration exists.
+
+## ADR-009: deploy through available Railway access with closed password sign-in
+
+Accepted for this release after access checks on 2026-09-14. Vercel project
+management repeatedly returns 403 and no teams; the separate GitHub OAuth client
+has not been provisioned. Railway successfully built the tested Next.js revision
+from the private repository. Run the app and PostgreSQL there, with a Vercel
+entry URL redirecting to the canonical Railway HTTPS address.
+
+This supersedes ADR-007's placement of app compute and ADR-008's OAuth provider,
+while retaining the modular monolith, server sessions, private enrollment,
+tenant authorization, verified TLS, and same-origin API. Better Auth provides
+email/password authentication and scrypt hashing. A controlled provisioning job
+creates the first credential account and restricted runtime database role.
+Credentials never enter Git. Public signup is disabled. A browser email change
+cannot change the server-managed allowlist. Password changes revoke other sessions.
+The operator can provision additional approved accounts through the same job.
+
+Build changes in build/railway-runtime and verify them before advancing the
+deployed deploy/vercel-railway branch. The database job has no public endpoint;
+the app has no migration credential. No extra application microservice is added.

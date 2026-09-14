@@ -56,3 +56,19 @@ concurrent compare-and-swap, rollback on a failed audit FK, archive/restore, and
 rate-limit SQL. It does not use production credentials or reset a database.
 The GitHub workflow provisions that temporary service. An authored test is not
 a passing test; see RELEASE_REVIEW.md for what actually ran.
+
+## Native runtime release gates
+
+The verified native baseline uses npm ci and committed PostgreSQL migrations.
+Run npm test, npm run test:postgres, npm run typecheck, npm run lint, and npm run
+build. The CI-only test:auth-runtime gate starts the built Next.js server against
+an isolated PostgreSQL database with a restricted role and generated fixture
+account. It covers closed signup, forged identity, real login, task transitions,
+reload persistence, stale versions, origin/tenant rejection, password change,
+and invalidation of old sessions. The fixture script rejects non-loopback or
+non-stride_test databases and must never target production.
+
+The test server allows HTTP only under the existing nonproduction loopback rule.
+Production connections still require HTTPS and verified PostgreSQL TLS.
+Production verification must separately confirm the provider's actual certificate,
+canonical origin, health response, authenticated behavior, and persistence.

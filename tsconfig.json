@@ -42,7 +42,7 @@
     "db/postgres-schema.ts",
     "db/auth-schema.ts",
     "tests/**/*.ts",
-    "scripts/migrate-postgres.ts",
+    "scripts/*.ts",
     "next.config.ts",
     "drizzle.postgres.config.ts",
     ".next/types/**/*.ts",

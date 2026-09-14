@@ -15,7 +15,9 @@
     "test:postgres": "node --experimental-strip-types --test tests/postgres.integration.test.ts",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate --config=drizzle.postgres.config.ts",
-    "db:migrate": "node --experimental-strip-types scripts/migrate-postgres.ts"
+    "db:migrate": "node --experimental-strip-types scripts/migrate-postgres.ts",
+    "db:provision": "node --experimental-strip-types scripts/provision-postgres.ts",
+    "test:auth-runtime": "node scripts/test-auth-runtime.mjs"
   },
   "dependencies": {
     "@better-auth/drizzle-adapter": "1.7.4",

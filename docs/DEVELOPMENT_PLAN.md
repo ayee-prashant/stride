@@ -33,26 +33,15 @@ fix findings, and rerun affected gates before release.
 
 ## Current progress
 
-- Slices 1–3: source complete and covered by the available Node/SQLite tests.
-- Slices 4–5: frontend source authored and connected to the API, not compiled or
-  exercised in a browser yet.
-- Slice 6: 35 native tests passed and a second source review completed. Full
-  typecheck, lint, schema migration parity, framework build, and hosted checks
-  are blocked on the unresolved dependency installation.
-- Slice 7: source checkpoint only. No deployment until all required gates pass.
-
-## Requested hosting migration
-
-Vercel plus Railway is now the target for the user's deployment request.
-See DEPLOYMENT.md for the migration sequence. PostgreSQL adapter/schema source
-and portable repository queries are prepared; 44 native tests pass. Provider
-authorization, session authentication, pool/runtime wiring, generated migrations,
-real PostgreSQL tests, compilation, and deployment remain outstanding. Keep the
-migration in a draft branch until its complete release gates pass.
-
-Retry checkpoint: Railway project/Postgres storage and a Vercel static setup
-preview are created. Native Next.js, PostgreSQL pool, Better Auth GitHub sessions,
-closed enrollment, and the sign-in/sign-out UI are now wired in source. There are
-47 passing dependency-free tests. A GitHub CI workflow is prepared to resolve
-the new lockfile, generate migrations, and run real PostgreSQL/type/lint/build
-gates. This is not evidence that those gates passed.
+- Slices 1–6: native Next.js baseline cfdc751 passes the 48-test suite, real
+  PostgreSQL contract test, migration parity, typecheck, lint, and production
+  build in GitHub Actions run 34828808360.
+- Railway built and started that exact baseline from the private repository.
+- Current release work: private password sign-in, account password changes,
+  restricted runtime role, separately controlled provisioning, verified private
+  database TLS, and an authenticated runtime test.
+- The deployment branch stays on the tested baseline while the new work passes
+  CI in build/railway-runtime.
+- Release remains incomplete until provisioning, readiness, live session/task
+  behavior, and the final public URL are verified. Update RELEASE_REVIEW.md with
+  actual evidence after the next compilation and deployment.

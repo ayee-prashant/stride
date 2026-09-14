@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ComponentProps, FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { Archive, ArrowRight, Check, CheckCheck, Circle, CircleDashed, Folder, FolderKanban, LayoutList, ListTodo, Loader2, LogOut, Pencil, Play, Plus, RotateCcw, Search, Users } from "lucide-react";
+import { Archive, ArrowRight, Check, CheckCheck, Circle, CircleDashed, Folder, FolderKanban, LayoutList, ListTodo, Loader2, KeyRound, LogOut, Pencil, Play, Plus, RotateCcw, Search, Users } from "lucide-react";
 import { toast } from "sonner";
 import { SidebarProvider, Sidebar, SidebarHeader, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuItem, SidebarMenuButton as BaseSidebarMenuButton, SidebarInset, SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,7 @@ import { localToday, PRIORITIES, STATUSES, STATUS_LABEL, taskGroup } from "@/lib
 import type { Identity, Member, Project, ProjectInput, Task, TaskPatch, Workspace } from "@/lib/domain";
 import { Avatar, Choice, EmptyWork } from "./controls";
 import { ProjectDialog } from "./project-dialog";
+import { AccountDialog } from "./account-dialog";
 import { TaskEditor } from "./task-editor";
 import { useTaskCreationTool } from "@/hooks/use-task-creation-tool";
 
@@ -37,6 +38,7 @@ function SidebarMenuButton(props: ComponentProps<typeof BaseSidebarMenuButton>) 
 export function WorkspaceApp({ identity }: { identity: Identity }) {
   const router = useRouter();
   const [signingOut, setSigningOut] = useState(false);
+  const [accountDialog, setAccountDialog] = useState(false);
   async function signOut() {
     setSigningOut(true);
     try {
@@ -143,7 +145,7 @@ export function WorkspaceApp({ identity }: { identity: Identity }) {
   return <SidebarProvider><Sidebar className="stride-sidebar"><SidebarHeader><div className="brand"><span className="brand-mark"><CheckCheck size={23} /></span><span>stride<span className="brand-period">.</span></span></div>{workspaces.length > 1 ? <Choice label="Workspace" value={workspaceId} onChange={changeWorkspace} options={workspaces.map(w => ({ value: w.id, label: w.name }))} /> : <p className="workspace-label">{workspace?.name ?? "Your workspace"}</p>}</SidebarHeader>
     <SidebarContent><SidebarGroup><SidebarGroupLabel>WORKSPACE</SidebarGroupLabel><SidebarMenu>{([{ view: "my", label: "My Work", icon: ListTodo }, { view: "board", label: "Project board", icon: FolderKanban }, { view: "projects", label: "Projects", icon: Folder }, { view: "members", label: "People", icon: Users }] as const).map(item => <SidebarMenuItem key={item.view}><SidebarMenuButton isActive={view === item.view} onClick={() => navigate(item.view)} className="nav-item"><item.icon /><span>{item.label}</span></SidebarMenuButton></SidebarMenuItem>)}</SidebarMenu></SidebarGroup>
       <SidebarGroup><SidebarGroupLabel>PROJECTS</SidebarGroupLabel><SidebarMenu>{activeProjects.slice(0, 12).map(p => <SidebarMenuItem key={p.id}><SidebarMenuButton isActive={view === "board" && projectId === p.id} onClick={() => { setProjectId(p.id); navigate("board"); }}><span className="project-symbol"><Folder size={14} /></span><span>{p.name}</span></SidebarMenuButton></SidebarMenuItem>)}</SidebarMenu>{metadata?.role === "admin" && <Button variant="ghost" className="sidebar-add" onClick={() => setProjectDialog("new")}><Plus size={16} />New project</Button>}</SidebarGroup>
-    </SidebarContent><SidebarFooter><div className="account"><Avatar name={identity.displayName} /><div><strong>{identity.displayName}</strong><span>{metadata?.role === "admin" ? "Workspace admin" : "Team member"}</span></div><button type="button" aria-label="Sign out" disabled={signingOut || busy} onClick={signOut}><LogOut size={17} /></button></div></SidebarFooter></Sidebar>
+    </SidebarContent><SidebarFooter><div className="account"><Avatar name={identity.displayName} /><div><strong>{identity.displayName}</strong><span>{metadata?.role === "admin" ? "Workspace admin" : "Team member"}</span></div><button type="button" aria-label="Change password" disabled={busy} onClick={() => setAccountDialog(true)}><KeyRound size={17} /></button><button type="button" aria-label="Sign out" disabled={signingOut || busy} onClick={signOut}><LogOut size={17} /></button></div></SidebarFooter></Sidebar>
     <SidebarInset className="stride-main"><header className="topbar"><div><SidebarTrigger /><span className="breadcrumb">Workspace <span>/</span> {headings[view]}</span></div><span className="private-label">Private workspace</span></header>
       <main id="main-content" className="workspace-content"><div className="page-heading"><div><p className="eyebrow">{view === "my" ? "YOUR DAILY WORKSPACE" : view === "board" ? "WORK IN MOTION" : "WORKSPACE"}</p><h1>{headings[view]}</h1><p className="page-description">{view === "my" ? "A clear place to start. One task at a time." : view === "board" ? "See what’s next, what’s moving, and what’s done." : view === "projects" ? "Keep related work together." : "The people who share this workspace."}</p></div>{["my", "board"].includes(view) ? <Button onClick={() => composer.current?.focus()} disabled={!activeProjects.length || archived}><Plus size={17} />Add task</Button> : view === "projects" && metadata?.role === "admin" ? <Button onClick={() => setProjectDialog("new")}><Plus size={17} />New project</Button> : null}</div>
       {bootError ? <div className="error-box" role="alert"><p>{bootError}</p><div className="inline-actions"><Button variant="outline" onClick={() => { setBootError(""); setBootRetry(n => n + 1); setMetadataRevision(n => n + 1); }}>Try again</Button><a href="/sign-in">Sign in again</a></div></div> : !metadata ? <div aria-label="Loading your workspace" className="loading-state"><Skeleton className="h-14 w-full" /><Skeleton className="h-36 w-full" /></div> : <>
@@ -162,6 +164,7 @@ export function WorkspaceApp({ identity }: { identity: Identity }) {
     </main></SidebarInset>
     {selected && <TaskEditor key={selected.id} task={selected} members={metadata?.members ?? []} onClose={() => setSelected(null)} onUpdate={updateTask} />}
     {projectDialog && <ProjectDialog key={projectDialog === "new" ? "new" : projectDialog.id} project={projectDialog === "new" ? undefined : projectDialog} onClose={() => setProjectDialog(null)} onSave={saveProject} />}
+    {accountDialog && <AccountDialog onClose={() => setAccountDialog(false)} />}
     <Toaster richColors closeButton position="bottom-right" />
   </SidebarProvider>;
 }
