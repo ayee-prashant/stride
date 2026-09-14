@@ -14,7 +14,7 @@ unmeasured claim. Primary user: team contributor. Secondary user: team lead.
 - Title-only quick task creation inside a project. Optional description,
   one assignee, priority (low/medium/high), and date-only due date.
 - To do / In progress / Done, with reopen and undo after completion.
-- My Work grouped into Overdue, Today, Upcoming, and No due date.
+- My Tasks grouped into Overdue, Today, Upcoming, and No due date.
 - Project board, status actions, drag-and-drop with keyboard alternatives.
 - Assignee/status/priority/due-date filtering, task title search, and priority/due-date sorting.
 - A built-in My open tasks view, default on sign-in and available with one click.
@@ -41,7 +41,7 @@ automations, external integrations, and AI generation. Do not add these to v1.
 
 ## Release boundary
 
-The initial deployment remains private to its owner. Team membership features
+The initial deployment remains restricted to operator-approved accounts. Team membership features
 are implemented, but other users must be explicitly approved in the server's
 approved account allowlist and sign in once before an admin can add them. The
 application never silently opens enrollment or sends invitations/email.

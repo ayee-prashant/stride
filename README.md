@@ -52,13 +52,14 @@ configuration. Never run the CI fixture against production.
 - scripts/ — provisioning and isolated/live verification.
 - infra/ — private database TLS startup and Vercel entry source.
 
-The app's c39487f release passed 48 native tests, real PostgreSQL tests, full
-session/task/password runtime checks, typecheck, lint, and production compilation.
-Railway confirms the exact source is healthy, and the controlled production
-session/task verification passed. The baseline release is in PR #2. First-sprint collaboration completion is in
-PR #3; main is unchanged. See RELEASE_REVIEW.md for current validation/deployment. Public-edge/browser acceptance,
-load measurements, backup restore, and dependency audit are separately recorded
-limits, not assumed passes.
+The first-sprint release d2e6c48 passed 58 native tests, real PostgreSQL and
+session tests, browser task/comment/inbox checks, typecheck, lint, and production
+compilation. Railway deployed that exact source; all eight controlled live checks
+passed, including comments, overdue notifications, filters and persistence.
+[PR #3](https://github.com/ayee-prashant/stride/pull/3) contains the complete scope
+and release evidence. Main remains unchanged. The Vercel entry status, public-edge
+routing, load measurements, backup restore and dependency audit remain separately
+recorded limits. See docs/RELEASE_REVIEW.md for evidence and operating details.
 
 The original Sites starter is retained in Git history and
 docs/HISTORICAL_SITES.md. Its provider identity headers and Worker commands do

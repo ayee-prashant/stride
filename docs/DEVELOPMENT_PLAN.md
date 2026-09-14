@@ -7,16 +7,16 @@ Each slice includes validation and tests, rather than postponing security to the
 | 1 | Agent setup, product contract, ADRs | Explicit scope, boundaries, commands, release gates |
 | 2 | Schema, identity, memberships | Isolated authenticated workspace, idempotent onboarding |
 | 3 | Project/task vertical flow | Create -> assign -> start -> complete -> reopen persists |
-| 4 | Daily work UX | My Work, detail editing, board and quick actions |
-| 5 | Organization and recovery | Filters, search, pagination, archive/restore, edit conflicts |
-| 6 | Hardening | Unit/integration tests, permissions, bounds, lint, typecheck, build |
-| 7 | Release | Second review, documented limits, immutable source, private deployment |
+| 4 | Daily work UX | My Tasks, detail editing, board and quick actions |
+| 5 | Collaboration | Comments, mentions, assignment/overdue inbox, activity |
+| 6 | Find and organize | Complete filters, due/priority sort, My open tasks |
+| 7 | Hardening and release | Tests, typecheck, lint, build, second review, tested deployment |
 
 ## Change control
 
-P0: identity/authorization, durable CRUD, My Work, board, recovery, accessibility,
-and validation. P1: drag-and-drop, title search, activity display. These are
-bounded enhancements after P0 is functioning. Never cut permission checks or
+P0: identity/authorization, durable task CRUD, ownership, My Tasks, board,
+comments, mentions, in-app notifications, complete search/filters, recovery,
+accessibility, and validation. Drag/drop supplements keyboard status controls. Never cut permission checks or
 input validation to meet a deadline. Future sprints remain in PRODUCT.md.
 
 ## Agent work protocol
@@ -31,7 +31,7 @@ input validation to meet a deadline. Future sprints remain in PRODUCT.md.
 The author must conduct a second architecture/security review after compilation,
 fix findings, and rerun affected gates before release.
 
-## Current progress
+## Previous release evidence
 
 - Slices 1–6: application c39487f passed the 48-test suite, real PostgreSQL
   contract tests, migration parity, typecheck, lint, production build, and full
@@ -61,6 +61,8 @@ access limitations, not unfinished application implementation.
 5. Run SQLite and PostgreSQL contracts, real session flows, typecheck, lint, and build.
 6. Review security and migration compatibility; provision and deploy the tested source.
 
-This is the next uncompleted slice. No epics, reporting, custom workflows,
+All six completion steps are complete. Full CI and isolated browser acceptance
+passed on d2e6c481a82d43e7da80e9fbd3e3220fd3c501a0, which is deployed on Railway.
+The additive migration and all eight private live checks passed. See RELEASE_REVIEW.md. No epics, reporting, custom workflows,
 external integrations, or AI features are added. Main-branch merging remains a
 separate approval boundary; the authorized release branch can deploy this work.

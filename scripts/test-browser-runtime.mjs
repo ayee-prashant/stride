@@ -50,7 +50,7 @@ export async function verifyBrowser(origin, cookie) {
   const editorClosed = "!document.querySelector('.task-sheet')";
   try {
     let target;
-    for (let attempt = 0; attempt < 40; attempt++) {
+    for (let attempt = 0; attempt < 150; attempt++) {
       try {
         const response = await fetch("http://127.0.0.1:9337/json/list", { signal: AbortSignal.timeout(1000) });
         target = (await response.json()).find(item => item.type === "page"); if (target) break;

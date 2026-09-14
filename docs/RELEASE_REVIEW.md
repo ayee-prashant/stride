@@ -1,6 +1,62 @@
 # Release review — 2026-09-14
 
-## Current verified application
+## First-sprint collaboration completion
+
+The user reaffirmed comments, mentions, notifications and complete organization
+as first-sprint scope. Source d2e6c481a82d43e7da80e9fbd3e3220fd3c501a0 passed
+[CI run 34851848200](https://github.com/ayee-prashant/stride/actions/runs/34851848200),
+job 104001499786: locked install, generated migration parity, 58 native tests,
+real PostgreSQL contracts, type checking, lint (one unused test assignment warning),
+production compilation, isolated provisioning, authenticated API flow and Chrome
+browser acceptance. No dependency or production authentication bypass was added.
+
+The browser exercised title-only quick creation, creator responsibility, task
+details, comment/mention selection and persistence, escaped HTML-like comment
+text, unsent-draft confirmation, Start/Complete board actions, Trash/restore,
+My open tasks, inbox-to-task navigation, keyboard focus and 390px overflow.
+It reported no JavaScript runtime/console errors. The first browser run timed out
+at Chrome startup before reaching the app; the next full gate passed. The test
+harness now gives cold browser startup a bounded 15 seconds. This does not claim
+manual visual review, assistive-technology testing, or public-edge acceptance.
+
+Second review after compilation covered composite tenant foreign keys,
+recipient-private inbox queries, mention membership checks at the write,
+assignment mutation tokens, transaction rollback, same-origin notification sync,
+server-date/offset handling, bounded pagination/catch-up, and preserved drafts.
+Fixed an ambiguous-error message, concurrent task/comment control states and
+workspace switching with a quick-create draft. No credentials or user content
+were added to logs. Removed the temporary migration-generation workflow after
+its strictly scoped commit; the ordinary CI workflow remains read-only.
+
+Generated additive migration 0001_fat_vapor.sql was committed by pinned Drizzle
+at 5bb1adfca40129c3f41ad6244b2610d77415c569. All previous migrations are byte-for-byte
+unchanged. Provisioning source 33ee73fd5f30de506f1fad4437632258a51910e6 passed
+[CI run 34850811971](https://github.com/ayee-prashant/stride/actions/runs/34850811971).
+Railway provisioning deployment 535de4ca-4d68-43f6-99f4-9e62d7d77051 emitted
+`database_provisioned`, `ownerCreated=false`, `runtimeRole=stride_app` at
+13:54:18 UTC. Existing accounts, passwords and task rows were preserved.
+
+Automatic review initially classified the provisioning ref update as a possible
+rollback. Read-only GitHub comparison proved it was four commits ahead, zero
+behind the actual deployed branch, with no provisioning-script or old-migration
+changes. The evidence-backed fast-forward was then approved. No force push or
+default-branch update was used.
+
+Railway web deployment d9e39a1e-9f0a-47a3-aea8-aa0243e86312 is SUCCESS at
+13:56:39 UTC and identifies the tested d2e6c481a82d43e7da80e9fbd3e3220fd3c501a0
+source. The private live job 9ca90315-4409-47fb-a1fb-d48a802f6b69 emitted
+`production_verified` at 13:58:14 UTC with all eight checks: readiness, closed
+enrollment, sign-in, workspace, task persistence, comments/inbox, origin/tenant
+denial and sign-out. It used the approved demo account, confirmed the new comment,
+overdue notification/read and filter paths, and archived its own QA task.
+The job's source is 33ee73f; its verification script is identical in d2e6c48.
+Its configured start command was restored to npm run db:provision, restart NEVER.
+
+The Vercel team-scope/public-edge limitations below remain unchanged. This
+release adds no external delivery or enrollment expansion. The source is reviewable in
+[PR #3](https://github.com/ayee-prashant/stride/pull/3). Main is unchanged.
+
+## Previous verified application
 
 Application source c39487f01083aa945683075f89a4c7b5af7f0cfe passed GitHub Actions
 [run 34831794534](https://github.com/ayee-prashant/stride/actions/runs/34831794534),

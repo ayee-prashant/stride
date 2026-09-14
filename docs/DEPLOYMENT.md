@@ -22,15 +22,16 @@ is needed. Keep the application in the same region where available.
 
 ## Release sequence
 
-1. Pass CI and review an immutable commit in build/railway-runtime before
+1. Pass CI and review an immutable commit on the reviewed feature/release branch before
    advancing deploy/vercel-railway, the branch watched by the running web service.
 2. Verify the database leaf certificate against its dedicated CA and the private
    postgres.railway.internal hostname. infra/postgres/tls-start.sh issues the leaf
    within the database container using the existing CA and key; private keys
    never leave that container. Capture only the public root certificate for the
    client trust store. Keep rejectUnauthorized=true.
-3. Generate distinct cryptographically random session, runtime-database, and
-   initial-owner credentials. Put them in provider environment stores only.
+3. On initial setup, generate distinct cryptographically random session,
+   runtime-database, and initial-owner credentials in provider stores only.
+   On subsequent releases, preserve these values and all existing accounts.
 4. Run npm run db:provision as a separate controlled service/job with no public
    domain. Give it MIGRATION_DATABASE_URL assembled from Postgres references with the
    existing postgres database name, the public CA,
@@ -92,7 +93,7 @@ install, or build command. The current production submission has an unverified
 terminal status because the Vercel connector denies the team's scope.
 The Railway app is the canonical runtime; the Vercel entry stores no credentials.
 
-The current web service remains on the tested c39487f application. Its operations
-and documentation are consolidated in PR #2. A main-branch merge requires
+The c39487f application is the previous baseline. First-sprint completion is
+reviewable in PR #3; exact current source and deployments are in RELEASE_REVIEW.md. A main-branch merge requires
 explicit authorization after an automatic approval-review rejection; do not
 substitute a direct main ref update for that merge.

@@ -95,7 +95,7 @@ test("overdue reminders deduplicate, honor the viewer date, and disappear when r
   assert.equal((await repo.notifications("owner", f.workspace, page, true)).unreadCount, 0);
   task = await repo.updateTask("owner", f.workspace, task.id, { version: task.version, due_date: "2026-09-12" });
   assert.equal((await repo.notifications("owner", f.workspace, page, true)).unreadCount, 1);
-  task = await repo.updateTask("owner", f.workspace, task.id, { version: task.version, status: "done" });
+  await repo.updateTask("owner", f.workspace, task.id, { version: task.version, status: "done" });
   assert.equal((await repo.notifications("owner", f.workspace, page, true)).notifications.length, 0);
 });
 
