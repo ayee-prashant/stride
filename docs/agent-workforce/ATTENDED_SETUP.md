@@ -119,7 +119,9 @@ and does not supply the deployed application's credentials.
 For delivery evidence, add repository read permissions for Pull requests, Checks,
 Commit statuses and Deployments to Contents and Metadata. The persistent
 `npm run worker:agents` service uses the same approved bindings, restricted database
-connection and verified TLS settings as the context worker. Only workers receive
+connection and verified TLS settings as the web app. It performs both source
+synchronization and candidate verification, so a separate context worker is optional.
+Only workers receive
 the GitHub App signing key. The web process queues bounded evidence requests.
 
 Before human acceptance, the worker verifies the repository ID, target branch,

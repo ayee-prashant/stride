@@ -38,8 +38,11 @@ export async function verifyAgentRuntime({ origin, request, json, userId, worksp
       const state = randomBytes(24).toString("base64url");
       const endpoint = new URL(discovery.authorization_endpoint);
       endpoint.search = new URLSearchParams({ client_id: purpose === "agent" ? connection.client_id : connection.companion_client_id, response_type: "code", redirect_uri: "http://127.0.0.1:43871/callback", scope: `stride:${purpose} offline_access`, resource: `${origin}${purpose === "agent" ? "/mcp" : "/api/agent-companion"}`, state, code_challenge: createHash("sha256").update(verifier).digest("base64url"), code_challenge_method: "S256", prompt: "consent" }).toString();
-      const response = await request(endpoint.pathname + endpoint.search); assert.ok([302, 303].includes(response.status), `authorization status ${response.status}`);
-      const consent = new URL(response.headers.get("location"), origin); assert.equal(consent.origin, origin); assert.equal(consent.pathname, "/connect/consent");
+      // This is a fetch request, so the provider returns a JSON navigation
+      // result. Browser navigation uses the same checked destination via 302.
+      const response = await request(endpoint.pathname + endpoint.search, "GET", undefined, { accept: "application/json" });
+      const navigation = await json(response); assert.equal(navigation.redirect, true);
+      const consent = new URL(navigation.url, origin); assert.equal(consent.origin, origin); assert.equal(consent.pathname, "/connect/consent");
       const approved = await json(await request("/api/connect/consent", "POST", { accept: true, oauth_query: consent.search.slice(1) }));
       const callback = new URL(approved.url); assert.equal(callback.origin, "http://127.0.0.1:43871"); assert.equal(callback.searchParams.get("state"), state); assert.equal(callback.searchParams.get("iss"), origin); assert.ok(callback.searchParams.get("code"));
       return { code: callback.searchParams.get("code"), verifier, purpose };

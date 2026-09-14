@@ -98,6 +98,11 @@ jobs:
           STRIDE_BOOTSTRAP_EMAIL: owner@stride.invalid
           STRIDE_BOOTSTRAP_NAME: Isolated CI owner
           STRIDE_BOOTSTRAP_PASSWORD: isolated-ci-owner-password-not-for-production
+      - name: Verify attended coordinator startup without a repository secret
+        run: npm run worker:agents -- --once
+        env:
+          NODE_ENV: test
+          DATABASE_URL: postgresql://stride_app:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef@127.0.0.1:5432/stride_test
       - name: Verify real session and task flow
         run: npm run test:auth-runtime
         env:
