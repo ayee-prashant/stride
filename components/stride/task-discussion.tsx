@@ -11,6 +11,7 @@ import type { CommentDraft, CommentPage, Member, Task } from "@/lib/domain";
 
 type Props = {
   task: Task;
+  disabled: boolean;
   members: Member[];
   draft: CommentDraft;
   onDraftChange: (draft: CommentDraft) => void;
@@ -18,7 +19,7 @@ type Props = {
   onPosted: () => void;
 };
 
-export function TaskDiscussion({ task, members, draft, onDraftChange, onBusyChange, onPosted }: Props) {
+export function TaskDiscussion({ task, disabled, members, draft, onDraftChange, onBusyChange, onPosted }: Props) {
   const [offset, setOffset] = useState(0);
   const [revision, setRevision] = useState(0);
   const [result, setResult] = useState<{ key: string; page?: CommentPage; error?: string }>({ key: "" });
@@ -58,7 +59,7 @@ export function TaskDiscussion({ task, members, draft, onDraftChange, onBusyChan
   }
 
   async function post() {
-    if (lock.current || !draft.body.trim()) return;
+    if (lock.current || disabled || !draft.body.trim()) return;
     lock.current = true; setPosting(true); onBusyChange(true); setPostError("");
     try {
       await api(workspacePath(`tasks/${encodeURIComponent(task.id)}/comments`, task.workspace_id), { method: "POST", body: draft });
@@ -73,15 +74,15 @@ export function TaskDiscussion({ task, members, draft, onDraftChange, onBusyChan
     <h3 id="discussion-title">Comments</h3>
     {task.archived_at ? <p className="muted text-sm">Restore this task to continue the discussion.</p> : <form onSubmit={event => { event.preventDefault(); void post(); }}>
       <Label htmlFor="task-comment" className="sr-only">Add a comment</Label>
-      <Textarea ref={textarea} id="task-comment" placeholder="Add an update or ask a question…" rows={3} maxLength={4000} required disabled={posting} value={draft.body} aria-describedby="mention-help" onChange={event => onDraftChange({ ...draft, body: event.target.value })} />
+      <Textarea ref={textarea} id="task-comment" placeholder="Add an update or ask a question…" rows={3} maxLength={4000} required disabled={posting || disabled} value={draft.body} aria-describedby="mention-help" onChange={event => onDraftChange({ ...draft, body: event.target.value })} />
       <p id="mention-help" className="muted text-sm">Type @ and choose a teammate to notify them. Use Tab to reach the suggestions.</p>
-      {draft.mentioned_user_ids.length > 0 && <ul className="mention-chips" aria-label="Teammates to notify">{draft.mentioned_user_ids.map(id => <li key={id}><span>@{members.find(member => member.user_id === id)?.name ?? "Former member"}</span><Button type="button" size="icon" variant="ghost" disabled={posting} aria-label={`Remove mention of ${members.find(member => member.user_id === id)?.name ?? "former member"}`} onClick={() => onDraftChange({ ...draft, mentioned_user_ids: draft.mentioned_user_ids.filter(value => value !== id) })}><X size={13} /></Button></li>)}</ul>}
+      {draft.mentioned_user_ids.length > 0 && <ul className="mention-chips" aria-label="Teammates to notify">{draft.mentioned_user_ids.map(id => <li key={id}><span>@{members.find(member => member.user_id === id)?.name ?? "Former member"}</span><Button type="button" size="icon" variant="ghost" disabled={posting || disabled} aria-label={`Remove mention of ${members.find(member => member.user_id === id)?.name ?? "former member"}`} onClick={() => onDraftChange({ ...draft, mentioned_user_ids: draft.mentioned_user_ids.filter(value => value !== id) })}><X size={13} /></Button></li>)}</ul>}
       {(mentionPicker || typedMention) && draft.mentioned_user_ids.length < 10 && <div className="mention-picker">
-        {mentionPicker && <Input aria-label="Find a teammate to mention" placeholder="Find teammate" maxLength={100} value={mentionSearch} onChange={event => setMentionSearch(event.target.value)} disabled={posting} />}
-        {suggestions.length ? <ul aria-label="Mention suggestions">{suggestions.map(member => <li key={member.user_id}><Button type="button" variant="ghost" disabled={posting} onClick={() => mention(member)}>{member.name}<span className="muted">{member.email}</span></Button></li>)}</ul> : <p className="muted text-sm">No matching teammates.</p>}
+        {mentionPicker && <Input aria-label="Find a teammate to mention" placeholder="Find teammate" maxLength={100} value={mentionSearch} onChange={event => setMentionSearch(event.target.value)} disabled={posting || disabled} />}
+        {suggestions.length ? <ul aria-label="Mention suggestions">{suggestions.map(member => <li key={member.user_id}><Button type="button" variant="ghost" disabled={posting || disabled} onClick={() => mention(member)}>{member.name}<span className="muted">{member.email}</span></Button></li>)}</ul> : <p className="muted text-sm">No matching teammates.</p>}
       </div>}
-      <div className="comment-actions"><Button type="button" size="sm" variant="ghost" aria-expanded={mentionPicker} disabled={posting || draft.mentioned_user_ids.length >= 10} onClick={() => setMentionPicker(value => !value)}><AtSign size={15} />Mention</Button><Button type="submit" size="sm" disabled={posting || !draft.body.trim()}><Send size={14} />{posting ? "Posting…" : "Post comment"}</Button></div>
-      {postError && <div role="alert" className="error-box"><p>{postError}</p><Button type="button" variant="outline" disabled={posting} onClick={() => { setOffset(0); setRevision(value => value + 1); }}>Refresh comments before retrying</Button></div>}
+      <div className="comment-actions"><Button type="button" size="sm" variant="ghost" aria-expanded={mentionPicker} disabled={posting || disabled || draft.mentioned_user_ids.length >= 10} onClick={() => setMentionPicker(value => !value)}><AtSign size={15} />Mention</Button><Button type="submit" size="sm" disabled={posting || disabled || !draft.body.trim()}><Send size={14} />{posting ? "Posting…" : "Post comment"}</Button></div>
+      {postError && <div role="alert" className="error-box"><p>{postError}</p><Button type="button" variant="outline" disabled={posting || disabled} onClick={() => { setOffset(0); setRevision(value => value + 1); }}>Refresh comments before retrying</Button></div>}
     </form>}
     {error ? <div role="alert" className="error-box">{error}<Button variant="outline" onClick={() => setRevision(value => value + 1)}>Retry loading comments</Button></div> : !page ? <p className="muted" role="status">Loading comments…</p> : <>
       {page.comments.length ? <ol className="comment-list">{page.comments.map(comment => <li key={comment.id}><div className="comment-heading"><strong>{comment.author_name}</strong><time dateTime={comment.created_at}>{new Date(comment.created_at).toLocaleString()}</time></div><p className="comment-body">{comment.body}</p></li>)}</ol> : <p className="muted text-sm">{offset ? "No more comments on this page." : "No comments yet. Keep the next step here."}</p>}

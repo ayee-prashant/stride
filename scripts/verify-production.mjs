@@ -96,7 +96,7 @@ try {
   const metadata = await json(await request("/api/workspace?workspace_id=" + encodeURIComponent(workspaceId)));
   const page = await request("/");
   assert.equal(page.status, 200);
-  assert.ok((await page.text()).includes("My Work"));
+  assert.ok((await page.text()).includes("My Tasks"));
   assert.equal((await request("/favicon.svg")).status, 200);
   checks.push(stage);
 
@@ -119,6 +119,19 @@ try {
   assert.ok(task.archived_at);
   task = await json(await request(taskPath(), "PATCH", { version: task.version, archived: false }));
   assert.equal(task.archived_at, null);
+  checks.push("task-persistence");
+  stage = "comments-and-inbox";
+  assert.equal(created.responsible_id, bootstrap.user.userId);
+  const commentsPath = "/api/tasks/" + encodeURIComponent(verificationTaskId) + "/comments?workspace_id=" + encodeURIComponent(workspaceId);
+  const comment = await json(await request(commentsPath, "POST", { body: "Release verification comment (automatically archived with this task).", mentioned_user_ids: [bootstrap.user.userId] }), 201);
+  assert.equal((await json(await request(commentsPath))).comments[0].id, comment.id);
+  task = await json(await request(taskPath(), "PATCH", { version: task.version, due_date: "2000-01-01" }));
+  const inbox = await json(await request("/api/notifications/sync?workspace_id=" + encodeURIComponent(workspaceId), "POST", { tz_offset: 0 }));
+  const overdue = inbox.notifications.find(item => item.task_id === verificationTaskId && item.kind === "overdue");
+  assert.ok(overdue);
+  await json(await request("/api/notifications/" + encodeURIComponent(overdue.id) + "?workspace_id=" + encodeURIComponent(workspaceId), "PATCH", {}));
+  const filtered = await json(await request("/api/tasks?workspace_id=" + encodeURIComponent(workspaceId) + "&due=overdue&sort=priority&assignee_id=" + encodeURIComponent(bootstrap.user.userId)));
+  assert.ok(filtered.tasks.some(item => item.id === verificationTaskId));
   task = await json(await request(taskPath(), "PATCH", { version: task.version, archived: true }));
   assert.ok(task.archived_at);
   archived = true;

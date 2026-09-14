@@ -62,3 +62,30 @@ test("missing Origin and forged cross-tenant API updates are rejected", async t 
   const response = await handleApi(request(`tasks/${task.id}?workspace_id=${f.workspace}`, { version: 1, status: "done" }, {}, "PATCH"), { identity: async () => f.other, repository: () => f.repo });
   assert.equal(response.status, 404); assert.equal((await f.repo.task("owner", f.workspace, task.id)).status, "todo");
 });
+
+test("comment and inbox HTTP routes retain origin, tenant, recipient and input guards", async t => {
+  const f = await fixture(); t.after(() => f.db.raw.close());
+  const owner = { identity: async () => f.owner, repository: () => f.repo };
+  const other = { identity: async () => f.other, repository: () => f.repo };
+  const task = await f.repo.createTask("owner", f.workspace, { title: "Discuss", project_id: f.project });
+  const path = `tasks/${task.id}/comments?workspace_id=${f.workspace}`;
+  assert.equal((await handleApi(request(path, { body: "Denied" }), other)).status, 404);
+  assert.equal((await handleApi(request(path, { body: "Denied" }, { Origin: "https://untrusted.example" }), owner)).status, 403);
+  await f.repo.addMember("owner", f.workspace, { email: f.other.email });
+  const created = await handleApi(request(path, { body: "Please review", mentioned_user_ids: ["other"] }), owner);
+  assert.equal(created.status, 201);
+  const comments = await handleApi(request(path + "&limit=1"), other);
+  assert.equal(comments.status, 200); assert.equal((await comments.json()).comments[0].body, "Please review");
+  assert.equal((await handleApi(request(path + "&limit=1&limit=2"), other)).status, 400);
+  const inboxPath = `notifications/sync?workspace_id=${f.workspace}`;
+  assert.equal((await handleApi(request(inboxPath, { recipient_id: "owner" }), other)).status, 400);
+  assert.equal((await handleApi(request(inboxPath, {}, { Origin: "https://untrusted.example" }), other)).status, 403);
+  const inbox = await (await handleApi(request(inboxPath, {}), other)).json();
+  assert.equal(inbox.unreadCount, 1); assert.equal(inbox.notifications[0].kind, "mention");
+  const notificationPath = `notifications/${encodeURIComponent(inbox.notifications[0].id)}?workspace_id=${f.workspace}`;
+  assert.equal((await handleApi(request(notificationPath, {}, {}, "PATCH"), owner)).status, 404);
+  assert.equal((await handleApi(request(notificationPath, {}, {}, "PATCH"), other)).status, 200);
+  assert.equal((await (await handleApi(request(inboxPath, {}), other)).json()).unreadCount, 0);
+  assert.equal((await handleApi(request(`notifications/%GG?workspace_id=${f.workspace}`, {}, {}, "PATCH"), other)).status, 400);
+  assert.equal((await handleApi(request(`notifications/read?workspace_id=${f.workspace}`, {}), other)).status, 200);
+});

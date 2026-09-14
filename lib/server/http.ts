@@ -86,6 +86,6 @@ export async function handleApi(request: Request, dependencies: Dependencies): P
     const status = known ? error.status : 503;
     if (!known) console.error(JSON.stringify({ event: "request_failed", requestId, kind: error instanceof Error ? error.name : "unknown" }));
     if (status === 429) headers.set("Retry-After", "60");
-    return new Response(JSON.stringify({ error: { code: known ? error.code : "UNAVAILABLE", message: known ? error.message : "Your workspace is temporarily unavailable. Your draft has not been saved; try again shortly.", requestId } }), { status, headers });
+    return new Response(JSON.stringify({ error: { code: known ? error.code : "UNAVAILABLE", message: known ? error.message : "Your workspace is temporarily unavailable. Refresh and check whether your change was saved before retrying.", requestId } }), { status, headers });
   }
 }

@@ -57,4 +57,29 @@ test("PostgreSQL migrations and repository contract", async t => {
   for (let i = 0; i < 120; i++) await repo.rateLimit(owner.userId, 60_000);
   await assert.rejects(repo.rateLimit(owner.userId, 60_000), { status: 429 });
   await repo.rateLimit(owner.userId, 120_000);
+
+  await t.test("collaboration writes, recipient privacy and concurrent overdue catch-up", async () => {
+    const clock = new Repository(db, () => new Date("2026-09-14T12:00:00Z"));
+    let collaboration = await clock.createTask(owner.userId, workspace, { title: "Collaboration fixture", project_id: project, due_date: "2026-09-13" });
+    assert.equal(collaboration.responsible_id, owner.userId);
+    collaboration = await clock.updateTask(owner.userId, workspace, collaboration.id, { version: collaboration.version, assignee_id: other.userId });
+    const assignment = (await clock.notifications(other.userId, workspace, {})).notifications.find(item => item.task_id === collaboration.id);
+    assert.equal(assignment?.kind, "assignment");
+    await assert.rejects(clock.readNotification(owner.userId, workspace, assignment!.id, {}), { status: 404 });
+    const comment = await clock.createComment(owner.userId, workspace, collaboration.id, { body: "Review @teammate <script>plain text</script>", mentioned_user_ids: [other.userId] });
+    assert.deepEqual(comment.mentioned_user_ids, [other.userId]);
+    assert.equal((await clock.comments(other.userId, workspace, collaboration.id, { limit: 1, offset: 0 })).comments[0].id, comment.id);
+    assert.equal((await clock.task(owner.userId, workspace, collaboration.id)).version, collaboration.version);
+    await Promise.all([clock.notifications(other.userId, workspace, {}, true), clock.notifications(other.userId, workspace, {}, true)]);
+    const inbox = await clock.notifications(other.userId, workspace, {});
+    assert.equal(inbox.notifications.filter(item => item.task_id === collaboration.id).length, 3);
+    assert.equal(inbox.notifications.filter(item => item.task_id === collaboration.id && item.kind === "overdue").length, 1);
+    await clock.readNotification(other.userId, workspace, null, {});
+    assert.equal((await clock.notifications(other.userId, workspace, {})).unreadCount, 0);
+    assert.equal((await clock.listTasks(other.userId, workspace, parseTaskQuery(new URLSearchParams({ assignee_id: other.userId, due: "overdue", sort: "priority" })))).tasks[0].id, collaboration.id);
+    collaboration = await clock.updateTask(other.userId, workspace, collaboration.id, { version: collaboration.version, status: "done" });
+    assert.equal((await clock.notifications(other.userId, workspace, {})).notifications.some(item => item.task_id === collaboration.id && item.kind === "overdue"), false);
+    await clock.updateTask(other.userId, workspace, collaboration.id, { version: collaboration.version, archived: true });
+    assert.equal((await clock.notifications(other.userId, workspace, {})).notifications.some(item => item.task_id === collaboration.id), false);
+  });
 });

@@ -29,6 +29,7 @@ export function TaskEditor({ task, members, onClose, onUpdate }: { task: Task; m
   }, [source.id, source.workspace_id, source.version, historyRevision]);
   const close = () => { if (busy || commentBusy) return; if (dirty) setDiscard(true); else onClose(); };
   async function save(patch: Omit<TaskPatch, "version">, closeAfter = false) {
+    if (busy || commentBusy) return;
     setBusy(true); setError("");
     try { const updated = await onUpdate(source, patch); setSource(updated); setDraft(editable(updated)); if (closeAfter) onClose(); }
     catch (e) { setError(e instanceof Error ? e.message : "The change could not be saved."); }
@@ -58,7 +59,7 @@ export function TaskEditor({ task, members, onClose, onUpdate }: { task: Task; m
         <div className="editor-actions">{source.archived_at ? <Button type="button" disabled={busy || commentBusy} onClick={() => void save({ archived: false }, true)}><RotateCcw size={16} />Restore task</Button> : <><Button type="submit" disabled={busy || commentBusy || !formDirty}>{busy ? "Saving…" : "Save changes"}</Button><Button type="button" variant="ghost" disabled={busy || commentBusy || dirty} onClick={() => void save({ archived: true }, true)}><Trash2 size={16} />Move to trash</Button></>}</div>
         {dirty && <p className="muted text-sm">You have unsaved changes.</p>}
       </form>
-      <TaskDiscussion task={source} members={members} draft={commentDraft} onDraftChange={setCommentDraft} onBusyChange={setCommentBusy} onPosted={() => setHistoryRevision(value => value + 1)} />
+      <TaskDiscussion task={source} disabled={busy} members={members} draft={commentDraft} onDraftChange={setCommentDraft} onBusyChange={setCommentBusy} onPosted={() => setHistoryRevision(value => value + 1)} />
       <section className="activity-section"><h3>Activity</h3>{historyError ? <p className="muted">Activity could not be loaded.</p> : <ol>{history.map(item => <li key={item.id}><p><strong>{item.actor_name}</strong> {item.action.startsWith("status:") ? `moved this task to ${STATUS_LABEL[item.action.slice(7) as Task["status"]] ?? "another status"}` : item.action === "commented" ? "added a comment" : `${item.action} this task`}</p><time dateTime={item.created_at}>{new Date(item.created_at).toLocaleString()}</time></li>)}</ol>}<p className="muted text-sm">Created {new Date(source.created_at).toLocaleDateString()} · Version {source.version}</p></section>
     </SheetContent></Sheet>
     <AlertDialog open={discard} onOpenChange={setDiscard}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Discard unsaved changes?</AlertDialogTitle><AlertDialogDescription>Your saved task will remain unchanged.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Keep editing</AlertDialogCancel><AlertDialogAction onClick={onClose}>Discard changes</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
