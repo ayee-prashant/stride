@@ -114,11 +114,14 @@ export async function verifyBrowser(origin, cookie, reconcileRepository) {
     await call("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
     await capture("context-agent-role-mobile");
     assert.equal(await evaluate("document.documentElement.scrollWidth <= 392"), true);
-    await call("Emulation.setDeviceMetricsOverride", { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
+    await evaluate("document.querySelector('.agent-review-check').scrollIntoView({ block: 'center' })");
+    await waitFor("(() => { const box = document.querySelector('.agent-role-dialog button[type=submit]')?.getBoundingClientRect(); return box && box.top >= 0 && box.bottom <= innerHeight && box.left >= 0 && box.right <= innerWidth; })()");
+    await capture("context-agent-role-mobile-review");
     await evaluate("document.querySelector('.agent-review-check input').click()");
     await clickButton("Accept operator responsibility", ".agent-role-dialog button");
     await waitFor(`!document.querySelector('.agent-role-dialog') && ${agentCard}.textContent.includes('Operator approved')`);
     assert.equal(await evaluate(`${agentCard}.textContent.includes('Not connected')`), true);
+    await call("Emulation.setDeviceMetricsOverride", { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
     await capture("context-agent-registry-desktop");
     await evaluate(`Array.from(${agentCard}.querySelectorAll('button')).find(el => el.textContent.trim() === 'History').click()`);
     await waitFor("Boolean(document.querySelector('.agent-history-dialog .brief-history li'))");

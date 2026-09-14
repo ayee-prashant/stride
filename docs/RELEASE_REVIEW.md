@@ -1,5 +1,54 @@
 # Release review — 2026-09-14
 
+## Human agent roles — feature review
+
+The human configuration portion of AW-101 is reviewable in
+[draft PR #9](https://github.com/ayee-prashant/stride/pull/9), stacked on the
+human-approved delivery design. Admins propose stable profiles and project roles;
+only the named human operator accepts responsibility. The UI exposes all eleven
+reviewed role prompts, responsibilities, exclusions and proposed file scopes.
+Configuration changes clear acceptance, and each human decision retains its
+original timestamp, reason, prompt and scope. Role acceptance does not grant
+repository access, connect an agent or authorize any task execution.
+
+Source `25581eee5353bab1bf1e8d1cf369e9a03879fb95`, tree
+`24f87a60a560b083a529595711cd9470f51efbc8`, passed every gate in
+[run 34899561606](https://github.com/ayee-prashant/stride/actions/runs/34899561606),
+job 104161966651. This includes 111 native tests; real PostgreSQL contracts and
+competing approvals, configuration changes, retries, quotas and admin demotion;
+generated migration parity; typecheck; lint; production build; genuine-session
+API and browser acceptance; runtime privilege checks; and a 25-table restore
+drill that compares the original registry/context contents. Desktop and 390px
+mobile role screenshots were retrieved and visually inspected. The first run
+had caught TypeScript narrowing and effect-loading errors, which were corrected
+before this complete passing run.
+
+Generated migration `0005_workable_changeling.sql` is additive. Its archive
+digest was verified before restoring the generated files. The lockfile and all
+earlier migration bytes are unchanged. Apply it through provisioning before
+switching the application, and rerun the restricted-role grants. Runtime UPDATE
+and DELETE are denied on agent profiles and role events. No dependency was
+added; at 21:35 UTC the production/full audits reported zero moderate, high or
+critical findings and one low transitive esbuild advisory.
+
+Post-build review checked persisted membership and operator authority, ordered
+membership/workspace/project locks, atomic audit receipts, stale-version/template
+rejection, revocation-safe retries, bounded queries, tenant foreign keys and
+draft preservation. It adds explicit refresh/pagination feedback and mobile
+approval-control visibility/interaction coverage. The latest source checks are
+attached to PR #9 and must pass before any release.
+
+This is a feature increment, not the full multi-agent delivery system or a
+production release. Connection enrollment and revocation epochs, agent identity,
+MCP/IDE adapters, approved start grants, work packets and BA/SA/Dev/QA/UAT/release
+gates remain pending. In particular, historical approval after a human rejoins
+must not become execution authority; the future enrollment contract must add
+renewed validation. Alias/operator transfer is also outside this increment.
+No merge, deployment, live GitHub App setup or external message delivery was
+performed. Current production evidence below remains unchanged. See
+[agent registry setup](agent-workforce/AGENT_REGISTRY_SETUP.md) and
+[implementation status](agent-workforce/IMPLEMENTATION_STATUS.md).
+
 ## Reminder concurrency follow-up
 
 The documentation-only commit 0e262e6 triggered CI run 34866667041, which

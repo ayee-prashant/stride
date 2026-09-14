@@ -1,7 +1,7 @@
 # Ordered delivery plan
 
-Status: design approved; the human context foundation and configured GitHub
-source increment are implemented, with verification evidence recorded. [Implementation status](IMPLEMENTATION_STATUS.md) tracks evidence
+Status: design approved; the human context foundation, configured GitHub source
+increment and human profile/role configuration are implemented. [Implementation status](IMPLEMENTATION_STATUS.md) tracks evidence
 and incomplete contracts. The complete delivery slices below remain pending
 until all their acceptance gates pass. Existing task-management deployment
 evidence remains in [the current release review](../RELEASE_REVIEW.md).

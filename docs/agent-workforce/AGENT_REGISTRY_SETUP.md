@@ -1,6 +1,6 @@
 # Human-owned agent role registry
 
-Status: implementation increment under verification on feature/agent-role-registry. This is the human configuration portion of AW-101, not a connected-agent execution release.
+Status: human configuration implemented on feature/agent-role-registry; the first complete CI passed and post-build review refinements are tracked in [PR #9](https://github.com/ayee-prashant/stride/pull/9). This is the human configuration portion of AW-101, not a connected-agent execution release.
 
 ## Human flow
 
@@ -34,4 +34,14 @@ Apply reviewed generated migrations through the provisioning job before deployin
 
 ## Verification
 
-Local native suite: 111 tests passing at initial implementation, including operator-only decisions, tenant/admin checks, scope validation, stale templates/versions, historical evidence, retries after revocation and atomic audit rollback. PostgreSQL concurrency, restricted-runtime session, restore-content, type/lint/build and browser flows are authored; their actual results must be recorded after CI completes. No deployment is claimed here.
+Source `25581eee5353bab1bf1e8d1cf369e9a03879fb95` (tree `24f87a60a560b083a529595711cd9470f51efbc8`) passed the complete gate in [CI run 34899561606](https://github.com/ayee-prashant/stride/actions/runs/34899561606), job 104161966651:
+
+- 111 native tests, including operator-only decisions, tenant/admin checks, scope validation, stale templates/versions, historical evidence, retries after revocation and atomic audit rollback.
+- Real PostgreSQL contracts, concurrent initialization/configuration, idempotent retries, cross-project profile quota races and admin demotion during a pending write.
+- Generated migration parity, type checking, lint and the production build. Migration 0005 is additive; earlier migrations and the lockfile are unchanged.
+- A genuine signed-in runtime flow with restricted database privileges, no execution endpoint, immutable profile/event grants and a 25-table restore drill including exact registry contents.
+- Browser registration, preserved drafts, named-operator acceptance, nonconnected status and history. Desktop and 390px mobile images were retrieved and visually reviewed.
+
+At 21:35 UTC on 2026-09-14 the dependency audit reported no moderate/high/critical findings and one low transitive esbuild advisory. This increment adds no dependency. These checks use isolated synthetic fixtures, not production data or an enterprise load claim.
+
+The post-build review adds explicit refresh/pagination feedback and checks that the approval control is reachable and used in the mobile viewport. Each subsequent source commit must pass the full gate; PR #9 records the latest checks. No merge or deployment is claimed here.

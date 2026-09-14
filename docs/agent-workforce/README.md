@@ -61,3 +61,6 @@ No new LLM API is required for context storage, packet assembly, source reconcil
 These documents define a design baseline, not permission to execute tickets, change production policy or skip repository instructions. Existing `AGENTS.md` remains the development entry point. Begin future implementation with the compatibility/security slice in the delivery plan and update actual completion evidence after each slice.
 
 The source synchronization increment is described in [GITHUB_CONTEXT_SETUP.md](GITHUB_CONTEXT_SETUP.md).
+The human profile and role-approval increment is described in
+[AGENT_REGISTRY_SETUP.md](AGENT_REGISTRY_SETUP.md). These role decisions do not
+enroll a connection or authorize execution.
