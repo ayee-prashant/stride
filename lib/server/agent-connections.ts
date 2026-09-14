@@ -5,6 +5,8 @@ import { decision, hashValue } from "../delivery.ts";
 import type { AgentActor, AgentConnection } from "../delivery.ts";
 import { Repository } from "./repository.ts";
 import { AgentRegistryRepository } from "./agent-registry.ts";
+import { DeliveryRepository } from "./delivery-repository.ts";
+import { AppError } from "../domain.ts";
 import { DeliveryStore, changed, digest, encoded, expires, forbidden } from "./delivery-store.ts";
 import type { Database } from "./repository.ts";
 
@@ -86,6 +88,16 @@ export class AgentConnections extends DeliveryStore {
       }
       const until = expires(s.repo.now(), 90);
       await s.repo.statement("UPDATE agent_connections SET lease_until=?,prepared=? WHERE workspace_id=? AND project_id=? AND id=?", until, preparation ? encoded(preparation, 4096) : null, actor.workspace_id, actor.project_id, c.id).run();
+      const active = await s.repo.statement("SELECT id,ticket_id FROM delivery_attempts WHERE workspace_id=? AND project_id=? AND connection_id=? AND state='running' AND lease_until>?", actor.workspace_id, actor.project_id, c.id, s.repo.now().toISOString()).all<{ id: string; ticket_id: string }>();
+      for (const attempt of active.results) {
+        const ticket = await s.ticket(actor.workspace_id, actor.project_id, attempt.ticket_id);
+        try { await new DeliveryRepository(s.repo, s.options).currentPacket(actor.operator_id, ticket); }
+        catch (error) {
+          if (!(error instanceof AppError)) throw error;
+          await s.fence(ticket, "lease_lost"); ticket.phase = "assigned"; await s.saveTicket(ticket);
+          await s.event({ kind: "system", id: "delivery-coordinator" }, actor.workspace_id, actor.project_id, ticket.id, "context_fenced", "The approved packet is no longer current. Review a new packet and authorize a fresh start.", randomUUID(), digest({ attempt_id: attempt.id, action: "context_fenced" }), { attempt_id: attempt.id, physical_stop: "unconfirmed" }, [actor.operator_id]);
+        }
+      }
       await s.repo.statement("UPDATE delivery_attempts SET lease_until=? WHERE workspace_id=? AND project_id=? AND connection_id=? AND state='running' AND lease_until>?", until, actor.workspace_id, actor.project_id, c.id, s.repo.now().toISOString()).run();
       return { lease_until: until, physical_execution: "attended", checkout_provenance: "companion_reported" };
     });

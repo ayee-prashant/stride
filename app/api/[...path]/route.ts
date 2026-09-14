@@ -8,6 +8,7 @@ import { createObjectStorage, storageConfigured } from "@/lib/server/s3-storage"
 import { emailConfigured } from "@/lib/server/email";
 import { handleApi } from "@/lib/server/http";
 import { githubContextBindings } from "@/lib/server/github-context-provider";
+import { deliveryOptions } from "@/lib/server/delivery-runtime";
 import { provisionConnection } from "@/lib/server/agent-authorization";
 
 export const dynamic = "force-dynamic";
@@ -17,7 +18,7 @@ function handle(request: Request) {
     identity: () => getSessionIdentity(request.headers),
     repository: getRepository,
     provisionConnection: (workspaceId, projectId, input) => provisionConnection(request, workspaceId, projectId, input),
-    deliveryOptions: () => ({ bindings: githubContextBindings(process.env) }),
+    deliveryOptions,
     githubBindings: () => {
       try { return githubContextBindings(process.env); }
       catch { return []; } // Invalid configuration withholds source content; human context stays available.

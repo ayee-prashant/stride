@@ -5,7 +5,7 @@ import type { AgentActor } from "../delivery.ts";
 import type { Database } from "./repository.ts";
 import { Repository } from "./repository.ts";
 import { DeliveryRepository } from "./delivery-repository.ts";
-import { changed, digest, encoded, expires, forbidden } from "./delivery-store.ts";
+import { changed, digest, encoded, forbidden } from "./delivery-store.ts";
 
 /** Agent-only operations. There is deliberately no acceptance, assignment or start tool. */
 export class DeliveryExecution extends DeliveryRepository {
@@ -15,7 +15,7 @@ export class DeliveryExecution extends DeliveryRepository {
     return this.repo.db.transaction(async db => {
       const s = this.scoped(db); await s.lock(actor.operator_id, actor.workspace_id, actor.project_id); const c = await s.validateConnection(actor);
       const replay = await s.replay(actor, actor.workspace_id, actor.project_id, request, digest(v));
-      if (replay) { const a = await s.attempt(actor.workspace_id, actor.project_id, attemptId); return { ...replay, attempt: { id: a.id, state: a.state, version: a.version, lease_until: a.lease_until }, execution_authorized: a.state === "running" && !!a.lease_until && a.lease_until > s.repo.now().toISOString() }; }
+      if (replay) { const a = await s.attempt(actor.workspace_id, actor.project_id, attemptId); if (a.state === "running" && replay.ticket) await s.currentPacket(actor.operator_id, replay.ticket); return { ...replay, attempt: { id: a.id, state: a.state, version: a.version, lease_until: a.lease_until }, execution_authorized: a.state === "running" && !!a.lease_until && a.lease_until > s.repo.now().toISOString() }; }
       const t = await s.ticket(actor.workspace_id, actor.project_id, ticketId); const a = await s.attempt(actor.workspace_id, actor.project_id, attemptId);
       const now = s.repo.now().toISOString();
       if (!c.initialized_at || !c.lease_until || c.lease_until <= now || t.binding_id !== c.binding_id || t.attempt_id !== a.id || a.connection_id !== c.id || a.profile_id !== c.profile_id || a.ticket_id !== t.id || a.state !== "authorized" || a.grant_expires <= now || t.phase !== "start_approved") throw forbidden("This exact attempt needs a current human start approval and an online companion.");
@@ -49,7 +49,7 @@ export class DeliveryExecution extends DeliveryRepository {
         if (t.kind === "delivery") {
           if (!report.evidence.candidate || report.evidence.candidate.repository_id !== packet.payload.repository?.repository_id) throw changed("Report the exact candidate in this packet's repository.");
           if (t.role_id !== "development" && digest(report.evidence.candidate) !== digest(t.payload.candidate)) throw changed("Review the exact approved candidate. A changed commit must return to development and repeat review.");
-          if (["user_acceptance_testing", "release_operations"].includes(t.role_id) && report.evidence.environment !== t.payload.environment) throw changed("The report must identify the authorized environment.");
+          if (["user_acceptance_testing", "release_operations"].includes(t.role_id) && (report.evidence.environment !== t.payload.environment || report.evidence.artifact !== t.payload.environment_artifact)) throw changed("The report must identify the authorized environment.");
           if (report.outcome === "pass" && !report.evidence.checks.length) throw changed("A passing implementation or review needs at least one explicit check.");
         }
         if (t.kind === "requirements" && report.outcome === "pass" && !report.requirements.length) throw changed("A successful BA report needs proposed requirements for human review.");

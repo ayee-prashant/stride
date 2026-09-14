@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
-import { choice, identifier, text } from "../domain.ts";
-import { decision, hashValue, roleGate } from "../delivery.ts";
-import type { AgentReport, DeliveryTicket, HumanActor, PlanItem, VerifiedEvidence } from "../delivery.ts";
+import { choice, text } from "../domain.ts";
+import { decision, hashValue, roleGate, SPECIALIST_REVIEWS } from "../delivery.ts";
+import type { AgentReport, DeliveryTicket, HumanActor, PlanItem } from "../delivery.ts";
 import type { Database } from "./repository.ts";
 import { Repository } from "./repository.ts";
 import { ContextRepository } from "./context-repository.ts";
@@ -12,6 +12,8 @@ export class DeliveryReview extends DeliveryExecution {
   override scoped(db: Database) { return new DeliveryReview(new Repository(db, this.repo.now), this.options); }
   async verified(t: DeliveryTicket, environment?: string, artifact?: string) {
     const candidate = t.payload.report?.evidence.candidate ?? t.payload.candidate;
+    artifact ??= environment ? t.payload.environment_artifact ?? undefined : undefined;
+    if (environment && !artifact) throw changed("The authorized deployment artifact must be identified.");
     if (!candidate || !this.options.verifyEvidence) throw changed("Connect the repository evidence verifier before accepting this candidate.");
     const evidence = await this.options.verifyEvidence({ workspace_id: t.workspace_id, project_id: t.project_id, candidate, ...(environment ? { environment } : {}), ...(artifact ? { artifact } : {}) });
     if (evidence.provenance !== "github_verified" || evidence.commit !== candidate.commit || evidence.repository_id !== candidate.repository_id || evidence.pull_request !== candidate.pull_request || !evidence.checks.length || evidence.checks.some(c => c.conclusion !== "success") || evidence.observed_at < expires(this.repo.now(), -60) || evidence.observed_at > expires(this.repo.now(), 5)) throw changed("Fresh provider evidence for this exact candidate and successful checks is required.");
@@ -32,7 +34,7 @@ export class DeliveryReview extends DeliveryExecution {
     if (!plan.length || plan.some(i => i.requirement_ids.some(id => !baseline.documents.some(d => d.id === id)))) throw changed("Every plan item must reference the approved baseline.");
     const revision = config.plan_revision + 1; const ids = new Map<string, string>(); const tickets: DeliveryTicket[] = [];
     for (const item of plan) {
-      const ticket = await this.insertTicket(userId, t.workspace_id, t.project_id, "delivery", item.title, item.description, { acceptance: item.acceptance, todo: item.todo, requirement_ids: item.requirement_ids, read_paths: item.read_paths, write_paths: item.write_paths, depends_on: [], candidate: null, report: null, reviews: [], rework_cycles: 0, environment: null, release: null, last_checkpoint: null }, revision);
+      const ticket = await this.insertTicket(userId, t.workspace_id, t.project_id, "delivery", item.title, item.description, { review_roles: item.review_roles ?? [], acceptance: item.acceptance, todo: item.todo, requirement_ids: item.requirement_ids, read_paths: item.read_paths, write_paths: item.write_paths, depends_on: [], candidate: null, report: null, reviews: [], rework_cycles: 0, environment: null, environment_artifact: null, reviewed_context_hash: null, release: null, last_checkpoint: null }, revision);
       ids.set(item.key, ticket.id); tickets.push(ticket);
     }
     for (let i = 0; i < plan.length; i++) { tickets[i].payload.depends_on = plan[i].depends_on.map(d => ids.get(d)!); await this.saveTicket(tickets[i]); }
@@ -53,10 +55,10 @@ export class DeliveryReview extends DeliveryExecution {
       if (currentConfig.reviewers[roleGate(t.role_id)] !== userId) throw forbidden();
       const actor: HumanActor = { kind: "human", id: userId }; const h = digest({ ticketId, action: "review", ...v }); const replay = await s.replay(actor, workspaceId, projectId, v.request_id, h); if (replay) return replay;
       if (t.version !== v.expected_version || t.phase !== "in_review" || !t.payload.report || digest(t.payload.report) !== reportHash) throw changed();
-      await s.currentPacket(userId, t);
+      const reviewedPacket = response === "accept" ? await s.currentPacket(userId, t) : null;
       const report = t.payload.report; const reviewedRole = t.role_id; let adopted: unknown = null;
       if (response === "return") {
-        t.payload.rework_cycles += 1; t.payload.environment = null; t.payload.release = null;
+        t.payload.rework_cycles += 1; t.payload.environment = null; t.payload.environment_artifact = null; t.payload.reviewed_context_hash = null; t.payload.release = null;
         const routes = report.findings.map(f => f.route);
         if (t.payload.rework_cycles > 2 || t.kind === "delivery" && routes.some(r => r === "requirements" || r === "architecture")) t.phase = "replan_required";
         else { t.phase = "created"; t.role_id = t.kind === "requirements" ? "business_analysis" : t.kind === "architecture" ? "solution_architecture" : "development"; }
@@ -65,6 +67,7 @@ export class DeliveryReview extends DeliveryExecution {
       } else {
         if (report.outcome !== "pass") throw changed("Failed or blocked evidence cannot pass this review.");
         if (evidence && evidence.observed_at < expires(s.repo.now(), -60)) throw changed("Provider evidence expired during review. Verify again.");
+        if (t.kind === "delivery") t.payload.reviewed_context_hash = reviewedPacket!.payload.context_hash;
         t.payload.reviews.push({ gate: roleGate(t.role_id), role: t.role_id, by: userId, at: s.repo.now().toISOString(), report_hash: reportHash, candidate: report.evidence.candidate, reason: v.reason });
         if (t.payload.reviews.length > 60) throw changed("This ticket reached its review limit. Replan into a new ticket.");
         if (t.kind === "requirements") {
@@ -76,7 +79,10 @@ export class DeliveryReview extends DeliveryExecution {
         } else if (t.kind === "architecture") {
           await s.publishDocuments(userId, t, report); adopted = await s.adoptPlan(userId, t, report.plan); t.phase = "accepted";
         } else if (t.role_id === "development") {
-          t.payload.candidate = report.evidence.candidate; t.role_id = "peer_review"; t.phase = "created"; t.payload.todo = ["Independently inspect the exact proposed commit and linked acceptance criteria.", "Check correctness, security, performance and maintainability.", "Submit findings or evidence for engineering acceptance."];
+          t.payload.candidate = report.evidence.candidate; t.payload.remaining_reviews = [...t.payload.review_roles]; t.role_id = t.payload.remaining_reviews.shift() ?? "peer_review"; t.phase = "created"; t.payload.todo = ["Independently inspect the exact proposed commit and linked acceptance criteria.", "Check correctness, security, performance and maintainability.", "Submit findings or evidence for engineering acceptance."];
+        } else if (SPECIALIST_REVIEWS.includes(t.role_id as typeof SPECIALIST_REVIEWS[number])) {
+          t.role_id = t.payload.remaining_reviews?.shift() ?? "peer_review"; t.phase = "created";
+          t.payload.todo = ["Independently review the exact candidate within this specialist role.", "Report actionable findings or passing evidence for the engineering human."];
         } else if (t.role_id === "peer_review") {
           t.role_id = "quality_assurance"; t.phase = "created"; t.payload.todo = ["Test the exact candidate against every acceptance criterion.", "Include regressions, negative cases and relevant security/access checks.", "Report reproducible issues or passing QA evidence."];
         } else if (t.role_id === "quality_assurance") { t.phase = "uat_authorization"; }
@@ -102,6 +108,7 @@ export class DeliveryReview extends DeliveryExecution {
     if (config.reviewers[stage] !== userId) throw forbidden();
     // UAT requires an observed deployed candidate. Production authorization validates
     // successful CI for the candidate; production deployment is verified at closure.
+    if (stage === "release" && initial.payload.environment_artifact !== artifact) throw changed("Release the artifact that passed UAT. A different artifact must repeat UAT.");
     const evidence = await this.verified(initial, stage === "uat" ? environment : undefined, stage === "uat" ? artifact : undefined);
     return this.repo.db.transaction(async db => {
       const s = this.scoped(db); await s.lock(userId, workspaceId, projectId); const cfg = await s.configuration(workspaceId, projectId); const t = await s.ticket(workspaceId, projectId, ticketId);
@@ -109,7 +116,7 @@ export class DeliveryReview extends DeliveryExecution {
       const h = digest({ ticketId, action: stage, ...v }); const replay = await s.replay({ kind: "human", id: userId }, workspaceId, projectId, v.request_id, h); if (replay) return replay;
       if (t.version !== v.expected_version || t.phase !== `${stage}_authorization` || digest(t.payload.candidate) !== digest(initial.payload.candidate) || evidence.observed_at < expires(s.repo.now(), -60)) throw changed();
       await s.baselineCurrent(userId, workspaceId, projectId);
-      t.payload.environment = environment;
+      t.payload.environment = environment; t.payload.environment_artifact = artifact;
       if (releaseDetails) t.payload.release = { artifact, environment, ...releaseDetails, approved_by: userId, approved_at: s.repo.now().toISOString() };
       t.role_id = stage === "uat" ? "user_acceptance_testing" : "release_operations"; t.phase = "created";
       t.payload.todo = stage === "uat" ? ["Exercise the authorized UAT deployment against business acceptance criteria.", "Record the environment, exact candidate and reproducible results."] : ["Review the exact release authorization, configuration, migration and recovery plan.", "Coordinate the human-authorized production operation.", "Submit the deployed candidate, artifact and post-deployment verification for human closure."];

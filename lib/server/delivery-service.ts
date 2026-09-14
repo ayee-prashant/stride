@@ -1,11 +1,11 @@
 import { randomUUID } from "node:crypto";
-import { AppError, identifier, object } from "../domain.ts";
+import { AppError, object } from "../domain.ts";
 import { parseContextCursor } from "../context.ts";
 import type { AgentActor } from "../delivery.ts";
 import type { Database } from "./repository.ts";
 import { Repository } from "./repository.ts";
 import { DeliveryReview } from "./delivery-review.ts";
-import { digest, forbidden, unavailable } from "./delivery-store.ts";
+import { digest } from "./delivery-store.ts";
 
 export class DeliveryService extends DeliveryReview {
   override scoped(db: Database) { return new DeliveryService(new Repository(db, this.repo.now), this.options); }
@@ -13,9 +13,9 @@ export class DeliveryService extends DeliveryReview {
     await this.project(userId, workspaceId, projectId);
     const configured = await this.repo.statement("SELECT project_id FROM delivery_projects WHERE workspace_id=? AND project_id=?", workspaceId, projectId).first();
     if (!configured) return { configuration: null, tickets: [], connections: [], has_more: false, next_offset: 0 };
-    const rows = await this.repo.statement("SELECT id FROM delivery_tickets WHERE workspace_id=? AND project_id=? ORDER BY created_at DESC,id LIMIT 51 OFFSET ?", workspaceId, projectId, offset).all<{ id: string }>();
+    const rows = await this.repo.statement("SELECT id,task_id,title,kind,phase,role_id,version,updated_at FROM delivery_tickets WHERE workspace_id=? AND project_id=? ORDER BY created_at DESC,id LIMIT 51 OFFSET ?", workspaceId, projectId, offset).all<{ id: string }>();
     const connections = await this.repo.statement("SELECT id FROM agent_connections WHERE workspace_id=? AND project_id=? AND operator_id=? ORDER BY created_at DESC LIMIT 100", workspaceId, projectId, userId).all<{ id: string }>();
-    return { configuration: await this.configuration(workspaceId, projectId), tickets: await Promise.all(rows.results.slice(0, 50).map(t => this.ticket(workspaceId, projectId, t.id))), connections: await Promise.all(connections.results.map(c => this.connection(workspaceId, projectId, c.id))), has_more: rows.results.length > 50, next_offset: offset + 50 };
+    return { configuration: await this.configuration(workspaceId, projectId), tickets: rows.results.slice(0, 50), connections: await Promise.all(connections.results.map(c => this.connection(workspaceId, projectId, c.id))), has_more: rows.results.length > 50, next_offset: offset + 50 };
   }
   async detail(userId: string, workspaceId: string, projectId: string, ticketId: string) {
     await this.project(userId, workspaceId, projectId); const t = await this.ticket(workspaceId, projectId, ticketId);

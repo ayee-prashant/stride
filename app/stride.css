@@ -349,4 +349,38 @@ h1 { font-size: clamp(1.9rem, 3vw, 2.4rem); font-weight: 700; letter-spacing: -.
 .agent-review-check input { margin-top: .25rem; flex-shrink: 0; }
 .agent-role-dialog .context-pane { overflow-wrap: anywhere; }
 .agent-role-dialog .context-review button { white-space: normal; height: auto; min-height: 2.5rem; }
+.delivery-center { display:grid; gap:1.25rem; }
+.delivery-tabs { display:flex; flex-wrap:wrap; gap:.5rem; }
+.delivery-setup { display:grid; gap:1rem; padding:1.5rem; background:var(--card); border:1px solid var(--border); border-radius:.875rem; max-width:900px; }
+.delivery-setup h3,.delivery-notices h3 { font-weight:650; font-size:1rem; }
+.delivery-setup label { display:grid; gap:.5rem; line-height:1.5; }
+.delivery-setup label.flex { display:flex; }
+.delivery-reviewers { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1rem; }
+.delivery-ticket-list { display:grid; gap:.65rem; }
+.delivery-ticket { display:flex; width:100%; align-items:center; justify-content:space-between; gap:1rem; padding:1.15rem 1.4rem; text-align:left; border:1px solid var(--border); border-radius:.75rem; background:var(--card); transition:border-color .15s; }
+.delivery-ticket:hover,.delivery-ticket:focus-visible { border-color:var(--primary); outline:2px solid transparent; }
+.delivery-ticket h3 { font-weight:650; margin:.25rem 0; }
+.delivery-ticket p { font-size:.75rem; color:var(--muted-foreground); }
+.delivery-ticket-next { display:flex; align-items:center; gap:.75rem; }
+.delivery-phase { display:inline-block; font-size:.75rem; font-weight:600; padding:.35rem .65rem; border-radius:999px; background:var(--muted); color:var(--foreground); }
+.delivery-phase-in_review,.delivery-phase-uat_authorization,.delivery-phase-release_authorization { background:#fff1d5; color:#825811; }
+.delivery-phase-in_progress,.delivery-phase-start_approved { background:#e3efff; color:#254d80; }
+.delivery-phase-accepted { background:#e0f4e9; color:#246149; }
+.delivery-phase-replan_required,.delivery-phase-cancelled { background:#fbe7e7; color:#7b3030; }
+.delivery-connections { display:grid; gap:1.5rem; }
+.delivery-dialog .context-pane { min-width:0; overflow-wrap:anywhere; }
+.delivery-dialog .context-pane h4 { font-weight:650; font-size:.85rem; margin-top:.75rem; }
+.delivery-dialog .context-pane p { white-space:pre-wrap; font-size:.85rem; line-height:1.65; }
+.delivery-dialog .context-review label { display:grid; gap:.45rem; }
+.delivery-dialog .context-review .context-human-approval { display:flex; align-items:flex-start; }
+.delivery-dialog .context-review textarea { min-height:100px; }
+.delivery-dialog summary { cursor:pointer; padding:.5rem 0; font-size:.85rem; font-weight:600; }
+.delivery-bullets { padding-left:1.25rem; font-size:.85rem; line-height:1.65; }
+ul.delivery-bullets { list-style:disc; } ol.delivery-bullets { list-style:decimal; }
+.delivery-bullets li+li { margin-top:.4rem; }
+.delivery-finding { padding:.8rem; border-left:3px solid #c77e3d; background:var(--muted); }
+.delivery-notices { display:grid; gap:1rem; }
+.delivery-notices article { display:flex; flex-wrap:wrap; align-items:center; gap:1rem; border-bottom:1px solid var(--border); padding:.9rem 0; }
+.delivery-notices time { color:var(--muted-foreground); font-size:.8rem; }
+@media(max-width:640px) { .delivery-reviewers { grid-template-columns:minmax(0,1fr); } .delivery-ticket { align-items:flex-start; flex-direction:column; padding:1rem; } .delivery-ticket-next { width:100%; justify-content:space-between; } .delivery-setup { padding:1rem; } .delivery-tabs button { flex:1 1 auto; } }
 @media(max-width:640px) { .agent-card { padding: 1rem; } .agent-toolbar .inline-actions { flex-wrap: wrap; } .agent-card-actions button { flex: 1 1 auto; } }

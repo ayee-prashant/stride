@@ -1,10 +1,11 @@
 import { McpServer, createMcpHandler } from "@modelcontextprotocol/server";
 import { z } from "zod";
-import { AppError } from "../domain";
+import { AppError } from "../domain.ts";
 import type { AgentActor } from "../delivery";
-import { AgentRegistryRepository } from "./agent-registry";
-import { AgentConnections } from "./agent-connections";
-import { DeliveryService } from "./delivery-service";
+import { AgentRegistryRepository } from "./agent-registry.ts";
+import { AgentConnections } from "./agent-connections.ts";
+import { DeliveryService } from "./delivery-service.ts";
+import { readJson } from "./http.ts";
 import type { Repository } from "./repository";
 import type { DeliveryOptions } from "./delivery-store";
 
@@ -31,6 +32,11 @@ export function createAgentServer(actor: AgentActor, repo: Repository, options: 
 export async function handleAgentMcp(request: Request, actor: AgentActor, repo: Repository, options: DeliveryOptions = {}) {
   // The SDK implements 2026-07-28 body metadata and its explicit legacy adapter.
   // We expose request/response tools; no process-local subscription bus is advertised.
-  const handler = createMcpHandler(() => createAgentServer(actor, repo, options), { legacy: "stateless", responseMode: "json", maxRequestBodySize: 32768 });
-  try { return await handler.fetch(request); } finally { await handler.close(); }
+  const handler = createMcpHandler(() => createAgentServer(actor, repo, options), { legacy: "stateless", responseMode: "json" });
+  try {
+    const body = request.method === "POST" ? await readJson(request) : undefined;
+    const headers = new Headers(request.headers); headers.delete("content-length");
+    const bounded = new Request(request.url, { method: request.method, headers, signal: request.signal, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
+    return await handler.fetch(bounded);
+  } finally { await handler.close(); }
 }

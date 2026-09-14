@@ -44,7 +44,7 @@ try {
     await client.query("GRANT USAGE ON SCHEMA public TO stride_app");
     await client.query("GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO stride_app");
     // Accepted requirements and delivered context evidence are append-only to the runtime.
-    await client.query("REVOKE UPDATE, DELETE ON context_revisions, context_events, task_context_briefs, repository_observations, repository_source_events, repository_source_receipts, agent_profiles, agent_role_events FROM stride_app");
+    await client.query("REVOKE UPDATE, DELETE ON context_revisions, context_events, task_context_briefs, repository_observations, repository_source_events, repository_source_receipts, agent_profiles, agent_role_events, delivery_packets, delivery_events FROM stride_app");
     await client.query("ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO stride_app");
     stage = "owner";
     const existing = await client.query<{ id: string }>("SELECT id FROM auth_users WHERE email=$1 LIMIT 1", [ownerEmail]);

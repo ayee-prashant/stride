@@ -33,12 +33,12 @@ export function AgentRegistry({ workspaceId, projectId, members, userId }: { wor
       <p className="agent-identity">Profile ID <code>{binding.profile_id}</code></p>
       {!binding.operator_available && <p className="error-box">The operator is no longer a workspace member. This role is unavailable.</p>}
       {!binding.template_current && <p className="error-box">The role template changed. An admin must propose an updated configuration before operator review.</p>}
-      <div className="agent-card-status"><ShieldCheck size={15} /><span>Configuration v{binding.version} · Not connected</span></div>
+      <div className="agent-card-status"><ShieldCheck size={15} /><span>Configuration v{binding.version} · Manage connections in Agent delivery</span></div>
       <div className="agent-card-actions"><Button variant={binding.can_initialize ? "default" : "outline"} size="sm" onClick={() => setDialog({ mode: "review", binding })}>{binding.can_initialize ? "Review and accept role" : "View role"}</Button>{binding.can_configure && <Button variant="outline" size="sm" onClick={() => setDialog({ mode: "configure", binding })}>Revise scope</Button>}<Button variant="ghost" size="sm" onClick={() => setDialog({ mode: "history", binding })}>History</Button></div>
     </article>)}</div>}
       {(offset > 0 || data.has_more) && <div className="inline-actions agent-pagination"><Button variant="outline" disabled={loading || offset === 0} onClick={() => { setLoading(true); setOffset(n => Math.max(0, n - 50)); }}>Previous roles</Button><Button variant="outline" disabled={loading || !data.has_more} onClick={() => { setLoading(true); setOffset(data.next_offset); }}>More roles</Button></div>}
     </>}
-    <p className="brief-integration-note">Agent connections, task-start approvals and IDE notifications are not available yet. File scope is recorded for future approved work; registration grants no repository access or execution permission.</p>
+    <p className="brief-integration-note">Open Agent delivery to enroll a connection, review work packets and authorize starts. Role acceptance alone grants no execution permission. The companion supports attended IDE and CLI work.</p>
     {dialog && <AgentRoleDialog key={`${dialog.mode}:${dialog.binding?.id ?? "new"}`} mode={dialog.mode} bindingId={dialog.binding?.id} workspaceId={workspaceId} projectId={projectId} profiles={data?.profiles ?? []} members={members} userId={userId} onClose={() => setDialog(null)} onSaved={result => { setDialog(null); setNotice(`Role saved: ${stateLabel[result.binding.state].toLowerCase()}.`); setLoading(true); void refresh(); }} />}
   </section>;
 }
