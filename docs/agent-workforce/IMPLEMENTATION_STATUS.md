@@ -83,6 +83,12 @@ each new source commit must pass the full gate before release.
 Setup, coverage and limits are in [GITHUB_CONTEXT_SETUP.md](GITHUB_CONTEXT_SETUP.md).
 No GitHub App credentials have been provisioned for the deployed application.
 
+## Human-approved delivery design authored
+
+[Human-approved delivery](HUMAN_APPROVED_DELIVERY.md) specifies BA/solution approval, manual profile assignment, operator start, engineering/QA/UAT gates, rework, separate release and production closure. The [role catalog](ROLE_CATALOG.md) includes eleven specialized prompts with explicit responsibilities, exclusions and file/action boundaries. Initialization, project-baseline, ticket, deterministic handoff and audit/metric contracts are also authored.
+
+These are reviewable design/template files, not deployed agent features. Profiles, template adoption, generated packets, workflow guards, IDE notices and process analytics still require their implementation gates. Humans select profiles in the first release; automatic assignment is deferred. No LLM API is required for these core contracts.
+
 ## Remaining gates
 
 1. Installed GitHub App/live external-push validation, then PR/CI
@@ -93,8 +99,11 @@ No GitHub App credentials have been provisioned for the deployed application.
    source-aware immutable manifests, checkpoints and cold-start recovery.
 4. Agent profiles, enrolled connections and actor-aware work items; human start
    grants, atomic claims, fenced attempts and human result acceptance.
-5. CLI/IDE notices and supported execution adapters, multi-role plans and
-   handoffs, operational load/recovery gates and a verified release.
+5. CLI/IDE notices and supported execution adapters; human-adopted role templates,
+   BA/solution plan gates, manual assignment, generated handoff drafts and
+   candidate-bound QA/UAT/rework/release workflows (AW-301/306/307/308/309).
+6. Agent audit/flow metrics and reviewed process suggestions (AW-407), operational
+   load/recovery gates and a verified release.
 
 The context foundation contributes to AW-004/005/106/107. Those tickets are not
 marked complete because their full source and agent contracts remain pending.

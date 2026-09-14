@@ -4,6 +4,8 @@ Reviewed: 2026-09-14. Method: inspect existing source boundaries, check primary 
 
 Revision 2 incorporates the user's cross-machine context requirement and correction to the MCP 2026-07-28 transport baseline. Shared context/source reconciliation now precedes execution features in delivery. The original design did not sufficiently specify project-wide authority and context publication; PROJECT_CONTEXT.md and CONTEXT_PROTOCOL.md supply those missing contracts.
 
+Revision 3 incorporates the human BA-to-production loop, manual profile assignment for this release, explicit role initialization/exclusions, deterministic role prompts, QA/UAT rework and evidence-based process metrics. The previous deterministic automatic profile-selection proposal is superseded by human selection. This revision is a documentation/design change; it does not enable those runtime features.
+
 ## Requirement coverage
 
 | User intent | Chosen design |
@@ -12,11 +14,13 @@ Revision 2 incorporates the user's cross-machine context requirement and correct
 | Unique ID/profile per agent | Server-issued identity bound to enrollment credentials; model names are descriptive metadata |
 | Codex, Claude, Gemini, IDE/CLI/Antigravity | MCP connection contract, portable companion, tested vendor adapters and explicit compatibility labels |
 | Architect, developers, testers and peer reviewers | Configurable role presets with independent permissions and scoped work packets |
-| Agents create and assign tickets | Attributed proposals and bounded plan work; deterministic role routing; no self-authorized scope expansion |
+| Agents propose tickets and profile recommendations | Attributed proposals and bounded accepted plan work; humans manually select profiles; no self-authorized scope expansion |
 | Automatic trigger when assigned | Automatically deliver an offer to the operator; execute only after the separate required start decision |
 | A human behind each agent | Mandatory operator, enrollment acceptance, revocation/transfer rules and attributable decisions |
 | Human review in the IDE | Concise IDE/terminal notice, authenticated review link, supported launch or explicit manual start |
-| Professional development hierarchy | Small-fix and feature templates, optional architecture, parallel development, candidate review/QA and separate release |
+| Professional development hierarchy | Accepted BA/solution baseline; manual assignment/start; candidate-bound engineering/QA/UAT gates; separate release and production closure |
+| Explicit responsibilities and outside-role scope | Eleven specialized prompts, common base, initialization record and intersected read/write/execute grants |
+| Next-ticket prompts and future process analysis | Deterministic reviewed handoff drafts; attributed events, wait/rework/quality metrics and human-adopted improvement proposals |
 | Human-readable progress and responsibility | Outcome board, contribution panel, decision queue, evidence labels and a named next action |
 | Ease of doing tasks | Keep title/project creation, avoid per-tool notices, allow explicit approval bundles and human-only review fallback |
 | Entire project context across machines | Versioned requirement/decision authority, verified repository observations, relevant immutable work manifests and structured checkpoints |
@@ -54,6 +58,19 @@ Revision 2 incorporates the user's cross-machine context requirement and correct
 9. **The older MCP reference affected behavior, not just citations.** Adopted modern request metadata, subscriptions and multi round-trip semantics; removed assumptions of protocol sessions or MCP stream replay. Cancelling a subscription is distinct from stopping a durable attempt. Current protocol support is still untested for each vendor/SDK combination.
 10. **A mandatory coordinator LLM would not solve consistency.** Keep publication, permission, packet assembly and invalidation deterministic. Optional API generation must cite sources, retain provenance, respect provider/data limits and fail without blocking core work.
 
+## Human-approved delivery review
+
+1. **Submission is not completion.** Developer submission enters review. Report acceptance, quality-gate outcome and release authority are different records; a valid report recording failure cannot pass the gate.
+2. **QA failure cannot advance to UAT.** Human triage routes implementation defects to dev, intent gaps to BA, design gaps to SA and environment failures to ops. Repaired candidates repeat required review/QA/UAT; repeated rework reaches human replanning.
+3. **UAT belongs to the business human.** Agents provide scenario evidence. UAT acceptance prepares a separate release decision; verified deployment plus human closure satisfies software-delivery Done.
+4. **Manual selection is explicit.** An architect recommends; a human selects; the profile's operator authorizes. Busy/offline/declined work remains queued until human action. Assignment automation is deferred.
+5. **A role file is not an access grant.** Base and role templates are human-adopted versions; each packet lists read/write/execute limits and exclusions. One active role per attempt prevents silent changes of responsibility.
+6. **Generated handoffs cannot authorize themselves.** Deterministic assembly pins accepted scope and reviewed source evidence. Unresolved required inputs block readiness; untrusted upstream instructions cannot rewrite policy.
+7. **Keep human tickets legible.** One outcome ticket contains role work items, attempts and findings. Delivery stage and waiting reason are additive; preserve the existing global task enum and simple legacy flow.
+8. **Activity is not productivity.** Audit distinguishes reported, observed, verified and human-decided events. Metrics expose waits, quality, rework and evidence limitations; process changes remain human proposals.
+
+See [delivery contract](HUMAN_APPROVED_DELIVERY.md), [role catalog](ROLE_CATALOG.md), [handoffs](PROMPT_HANDOFFS.md) and [audit/metrics](AUDIT_AND_METRICS.md).
+
 ## Architecture decisions
 
 | ID | Decision | Reason and consequence |
@@ -61,7 +78,7 @@ Revision 2 incorporates the user's cross-machine context requirement and correct
 | AW-ADR-01 | Human-owned outcome plus agent work items | Keeps the board readable and preserves existing task identity/history; requires a guarded completion seam |
 | AW-ADR-02 | Attended execution first | Fits existing IDE subscriptions and human review expectations; does not promise unattended control of every client |
 | AW-ADR-03 | MCP plus a notification/lifecycle companion | Portable tool access with reliable contact and notices; one small local component is required for monitored runs |
-| AW-ADR-04 | Explicit start/result/release decisions | Prevents automatic routing from becoming accidental authority; creates a human decision queue |
+| AW-ADR-04 | Explicit start/result/release decisions | Prevents assignment or handoff preparation from becoming execution authority; creates a human decision queue |
 | AW-ADR-05 | Modular monolith, PostgreSQL outbox, continuous coordinator | Reuses deployed foundations without using the reminder cron as a realtime scheduler |
 | AW-ADR-06 | Isolated attempts and exact-candidate evidence | Makes concurrent contribution and rework understandable; requires integration ownership and invalidation rules |
 | AW-ADR-07 | Extend maintained authentication | Avoids a custom OAuth implementation; pinned integration compatibility remains a Phase 0 gate |
@@ -69,6 +86,10 @@ Revision 2 incorporates the user's cross-machine context requirement and correct
 | AW-ADR-09 | GitHub ingestion independent of agent reporting | Handles direct changes; requires explicit freshness, coverage and credential/agent attribution limits |
 | AW-ADR-10 | Current MCP plus application-owned recovery | Supports modern subscriptions while keeping project state, cursors and run identity independent of transport |
 | AW-ADR-11 | No mandatory context LLM | PostgreSQL records, indexed links and deterministic assembly suffice for correctness; model assistance remains optional and evaluated |
+| AW-ADR-12 | Manual profile assignment with scoped operator start | Human selection matches the first-release requirement; recommendations do not execute work |
+| AW-ADR-13 | Versioned software-delivery policy alongside role work items | Adds QA/UAT/release evidence and closure guards without multiplying global task statuses |
+| AW-ADR-14 | Adopted role templates and deterministic handoff drafts | Makes responsibilities, exclusions and required inputs reviewable; prompts do not grant permissions |
+| AW-ADR-15 | Attributed audit and evidence-based process proposals | Supports later analysis without treating model activity or self-reports as proven productivity |
 
 ## Implementation uncertainties with an owner and next action
 
@@ -92,4 +113,6 @@ These are implementation gates with chosen fallbacks, not unresolved product que
 
 The revised architecture is sufficiently specified to begin Phase 0 and the first vertical slice. It establishes identity, project-context authority, source observation, state transitions, integration boundaries, delivery order and observable acceptance. It does not establish that integrations are already working, that a security certification exists or that performance targets have been measured.
 
-This change contains Markdown only. Local checks passed for document links, code-fence balance and trailing whitespace across 13 design/template documents and the two repository entry documents. The delivery plan has 33 distinct proposed ticket IDs. The entry-document diff was reviewed for scope and preservation of authority rules, and current MCP references were checked. No application build, provider run, load test or deployment is claimed for this design change. Product implementation must pass the repository's actual test/build/release gates for its own immutable source version.
+The earlier revision-2 change contained Markdown only. Its local checks passed for document links, code-fence balance and trailing whitespace across 13 design/template documents and the two repository entry documents. That revision's delivery plan had 33 distinct proposed ticket IDs. The entry-document diff was reviewed for scope and preservation of authority rules, and current MCP references were checked. No application build, provider run, load test or deployment is claimed for this design change. Product implementation must pass the repository's actual test/build/release gates for its own immutable source version.
+
+Revision 3 adds the delivery/role/prompt/audit contracts and updates existing routing, plan and template references. Its validation record is documented in the associated design pull request. No new application tests, build, provider execution, deployment or independent security audit are claimed for this documentation refinement.
