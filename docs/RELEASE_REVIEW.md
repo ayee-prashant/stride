@@ -13,7 +13,13 @@ also producing deterministic primary keys. They now treat conflicts on either
 unique constraint as an idempotent no-op, preserving foreign-key/check failures
 and the existing authorization predicates. The real PostgreSQL regression now
 races eight syncs on each of 12 fresh due dates and verifies one stored event per
-date. Validation and deployment of this correction are in progress.
+date. Correction 358a427fcd748745360cc14fc47ddd5a9bee5f03 passed every CI gate
+in [run 34867963036](https://github.com/ayee-prashant/stride/actions/runs/34867963036),
+job 104056463897: PostgreSQL concurrency regression, 73 native tests, productivity
+contracts, audit, restore/performance checks, typecheck, lint, build and complete
+real-session/browser acceptance. No new migration, permission changes or
+dependencies are required. The current deployment and live-verification evidence
+for this correction are recorded in [PR #4](https://github.com/ayee-prashant/stride/pull/4).
 
 ## Productivity release
 
