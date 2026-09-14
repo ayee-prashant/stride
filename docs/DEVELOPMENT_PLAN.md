@@ -75,6 +75,6 @@ separate approval boundary; the authorized release branch can deploy this work.
 
 All five slices in PRODUCTIVITY_RELEASE.md are implemented. Source 78cfbb0
 passed the complete CI gate, real-session invitation/reset tests and expanded
-browser checks. Deployment proceeds migration → app/private storage → worker →
-controlled live verification. Email delivery remains gated by a verified sender;
+browser checks. Migration, app/private storage and worker deployment are complete on 919d0d8;
+all 12 controlled live checks passed. Email delivery remains gated by a verified sender;
 record final infrastructure evidence in RELEASE_REVIEW.md.

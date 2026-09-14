@@ -66,7 +66,9 @@ invitation flows, and browser acceptance. An isolated 20,000-task benchmark and
 PostgreSQL backup/restore drill passed. The dependency audit found no moderate,
 high or critical advisories and one low-severity transitive esbuild advisory.
 [PR #4](https://github.com/ayee-prashant/stride/pull/4) contains this release.
-Main remains unchanged. See docs/RELEASE_REVIEW.md for exact deployment evidence,
+The 919d0d8 release is deployed on Railway; all 12 controlled live checks passed,
+including real private file storage. Main remains unchanged.
+See docs/RELEASE_REVIEW.md for exact deployment evidence,
 measured limits, and email/Vercel connection status.
 
 The original Sites starter is retained in Git history and

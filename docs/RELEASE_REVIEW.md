@@ -31,10 +31,50 @@ invite quotas, pre-buffer upload throttling, and storage quotas during cleanup.
 Bulk work and recurrence stay transaction-scoped; removed storage objects have
 a durable retry record. Existing accounts/passwords and user work are preserved.
 
-Deployment and production verification are in progress. The private Railway
-stride-files bucket is staged. Resend was rechecked and is not connected;
-reset/digest code is complete but outbound delivery is unavailable. The Vercel
-team-scope and public-edge limitations below remain unchanged.
+Release source 919d0d8b0393ace5ce7a49a03fcfb08ac081cd54 (tree
+e06bfd7cd5a9161b5b7302a5d54ffd186c4289a5) adds deployment verification and operating
+documentation to the same application. It passed the complete gate again in
+[CI run 34865401452](https://github.com/ayee-prashant/stride/actions/runs/34865401452),
+job 104047848098. Local and remote Git trees were verified equal. Only the ordinary
+read-only migration-check workflow remains; both generation workflows are gone.
+
+Migration deployment 33ecdb88-ff33-441b-9ad5-a06619238198 used tested 78cfbb0 and
+emitted database_provisioned, ownerCreated=false, runtimeRole=stride_app at
+15:54:08 UTC. It applied additive migration 0002 without replacing credentials.
+The provisioning ref was a proven fast-forward: nine commits ahead, zero behind.
+
+Web deployment e2137b36-bbd5-4221-bfbd-758f76876c6c identifies exactly 919d0d8 and
+became SUCCESS at 16:01:32 UTC after its database-backed readiness check. The
+private stride-files bucket f48bc018-376f-49f3-a0e2-8e6df54e0043 is in sjc; web,
+worker and PostgreSQL are configured in sfo. S3 credentials are provider references
+on web/worker only. Railway automatically drained the older overlapping
+19f05c38 deployment at 16:01:57; e2137b36 is the intended active application.
+
+Controlled job c2de020e-701b-40ea-a646-f0c77606dd9a used the same 919d0d8 and
+emitted production_verified at 16:04:02 UTC with all 12 checks: readiness, closed
+enrollment, sign-in, workspace, task persistence, comments/inbox, productivity
+flow, templates/repetition/bulk, private files, invitation revocation, origin/
+tenant denials and sign-out. Real S3 bytes were uploaded with comment linkage,
+authenticated forced download matched the bytes, anonymous download was denied,
+and the file was deleted. The job removed its views/templates, revoked its test
+invite, archived its new tasks, and invalidated its session. Existing user work
+and passwords were untouched. The provision service's start command was restored
+to npm run db:provision with restart NEVER and no public domain.
+
+Worker service 013befc6-2284-460b-a9d0-60e1ef8814bc is deployed from 919d0d8 as
+8b84895d-f52f-4159-be3c-3ac59583a67c, with npm run worker, five-minute cron,
+restart NEVER and no public domain. It receives restricted database and private
+storage references, with no bootstrap password or migration credential.
+It emitted scheduled_work_completed at 16:04:07 and again on the five-minute
+cron tick at 16:05:07 UTC: recipients=2, sent=0, failed=0. Both real executions
+used the production database; no outbound email was attempted.
+
+Resend was rechecked and remains unconnected. Recovery/digest implementation and
+CI flows are complete, but real outbound delivery is unavailable. No production
+provider key or verified sender has been invented, and no external email was sent.
+Production backup schedule/retention could not be verified through the available
+provider inspection; the synthetic restore drill does not establish that policy.
+The Vercel team-scope and public-edge limitations below remain unchanged.
 
 ## First-sprint collaboration completion
 

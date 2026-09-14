@@ -56,6 +56,7 @@ Exact deployment evidence and remaining platform limitations are in RELEASE_REVI
 | Saved filters | Named personal views | Browser and ownership/version tests |
 | Speed and workload | C/create, /search, member open/blocked/overdue summary | Browser and PostgreSQL |
 
-Implementation and CI are complete on 78cfbb0. The current deployment and
-provider activation status are recorded in RELEASE_REVIEW.md; configured email
+Implementation and CI are complete; release 919d0d8 is deployed and all 12
+controlled live checks passed. Provider activation status is recorded in
+RELEASE_REVIEW.md; configured email
 and real external delivery must not be inferred from a passing fake-provider test.

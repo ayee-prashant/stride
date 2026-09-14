@@ -36,11 +36,12 @@ No epics, Gantt, time tracking, automation builder, or AI features are introduce
 
 ## Configuration and evidence
 
-Railway is connected and the private stride-files bucket has been staged with
-web-service references. Resend remains available but unconnected. Provider
-boundaries are implemented and tested without invented production credentials.
-Complete live S3 verification and inspect worker execution before declaring them
-operational; real email delivery requires a verified sender connection.
+Railway app 919d0d8 and the private stride-files bucket are deployed. All 12
+controlled live checks passed, including a real upload/download/deletion and
+new productivity flows. The worker is configured on five-minute cron; its actual
+execution passed at 16:04:07 and 16:05:07 UTC and is recorded in RELEASE_REVIEW.md.
+Resend is available but unconnected.
+Recovery and digest code are complete; delivery requires a verified sender.
 Do not treat a test double as evidence of production email/file delivery.
 Record actual test, audit, restore, benchmark and deployment results in
 RELEASE_REVIEW.md. Main-branch merge remains separately unauthorized.

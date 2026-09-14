@@ -15,6 +15,8 @@ The app remains private through server sessions and closed enrollment.
 | PostgreSQL service | 2dc67d03-febe-45de-82b0-00075e942aa5 |
 | Web service | 02968ece-d1c9-4782-b105-4c75f9662af0 |
 | Provisioning service | 1b76c2b4-d393-4984-a2e6-43393fe1b269 |
+| Scheduled worker | 013befc6-2284-460b-a9d0-60e1ef8814bc |
+| Private file bucket | f48bc018-376f-49f3-a0e2-8e6df54e0043 |
 | App origin | https://stride-app-production-d72b.up.railway.app |
 
 The existing PostgreSQL volume is 5000 MB in sfo. No public PostgreSQL endpoint
