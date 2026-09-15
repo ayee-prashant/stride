@@ -128,3 +128,24 @@ Quick creation defaults to the authenticated creator. Existing tasks without
 an assignee retain the creator as their responsible person. Delete uses the
 existing archive timestamp and a Trash/restore interface. The built-in saved
 My open tasks view resets filters with one click and is the initial landing view.
+
+
+## Read-only GitHub context worker (2026-09-14)
+
+Use the existing PostgreSQL and repository boundary for a small durable source
+queue. A dedicated persistent worker reconciles one configured repository per
+project; application reads never wait for GitHub inside a database transaction.
+Use a repository-scoped GitHub App installation token, native Node RS256 signing
+and bounded fixed-origin Git data reads, adding no new package dependency. The
+web service receives explicit project grants but does not need the App private
+key. Agent identities and human execution authority remain separate future
+boundaries; shared GitHub account access is never treated as agent identity.
+
+Persist immutable source observations, request receipts and source events; keep
+mutable pointers and job state separate. Serialize source publication against
+human context publication and task brief preparation on the existing project
+context lock. Use generation fencing to reject late results. Periodic reads
+provide an honest first increment while webhook/PR/CI reconciliation and
+component impact analysis remain unimplemented. Source text never adopts a
+requirement or executes a command. GITHUB_CONTEXT_SETUP.md in agent-workforce
+records required permissions, verification semantics and operational limits.

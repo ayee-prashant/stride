@@ -18,7 +18,8 @@
     "db:migrate": "node --experimental-strip-types scripts/migrate-postgres.ts",
     "db:provision": "node --experimental-strip-types scripts/provision-postgres.ts",
     "test:auth-runtime": "node scripts/test-auth-runtime.mjs",
-    "worker": "node --experimental-strip-types scripts/scheduled-work.ts"
+    "worker": "node --experimental-strip-types scripts/scheduled-work.ts",
+    "worker:context": "node --experimental-strip-types scripts/github-context-worker.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.1131.0",

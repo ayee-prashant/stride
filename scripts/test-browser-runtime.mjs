@@ -1,14 +1,14 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 
 // Uses the runner's installed Chrome and native Node APIs; no production target,
 // extra package download, browser profile, or authentication bypass is accepted.
-export async function verifyBrowser(origin, cookie) {
+export async function verifyBrowser(origin, cookie, reconcileRepository) {
   if (process.env.CI !== "true" || origin !== "http://127.0.0.1:3107") throw new Error("Browser verification requires the isolated CI server");
   const binary = ["/usr/bin/google-chrome", "/usr/bin/chromium", "/usr/bin/chromium-browser"].find(existsSync);
   if (!binary) throw new Error("The CI runner requires installed Chrome");
@@ -48,6 +48,12 @@ export async function verifyBrowser(origin, cookie) {
     await call("Input.insertText", { text: value });
   }
   const editorClosed = "!document.querySelector('.task-sheet')";
+  async function capture(name) {
+    await waitFor("Array.from(document.querySelectorAll('[data-slot=\"dialog-content\"],.task-sheet')).every(el => getComputedStyle(el).opacity === '1' && !el.getAnimations().some(a => a.playState === 'running'))");
+    await mkdir("artifacts", { recursive: true });
+    const result = await call("Page.captureScreenshot", { format: "png", captureBeyondViewport: false });
+    await writeFile(join("artifacts", `${name}.png`), Buffer.from(result.data, "base64"));
+  }
   try {
     let target;
     for (let attempt = 0; attempt < 150; attempt++) {
@@ -81,11 +87,89 @@ export async function verifyBrowser(origin, cookie) {
     stage = "daily-view";
     await call("Page.navigate", { url: origin });
     await waitFor("document.querySelector('h1')?.textContent === 'My Tasks' && document.querySelector('[aria-label=\"New task title\"]')?.disabled === false");
+    stage = "project-brief-publication";
+    const requirementTitle = `Browser requirement ${crypto.randomUUID().slice(0, 8)}`;
+    await clickButton("Project brief", '[data-slot="sidebar-menu-button"]');
+    await waitFor("document.querySelector('h1')?.textContent === 'Project brief'");
+    await clickButton("Publish context");
+    await fill("#context-title", requirementTitle);
+    await fill("#context-body", "The user can prepare a task brief from this exact requirement. <script>window.__contextXss=true</script>");
+    await fill("#context-reason", "Approved browser fixture requirement.");
+    assert.equal(await evaluate("document.querySelectorAll('form.context-three-pane > section').length"), 3);
+    await capture("context-editor-desktop");
+    await clickButton("Publish approved context");
+    await waitFor(`!document.querySelector('.context-editor-dialog') && Array.from(document.querySelectorAll('.brief-document h4')).some(el => el.textContent === ${JSON.stringify(requirementTitle)})`);
+    assert.equal(await evaluate("window.__contextXss === undefined"), true);
+    await capture("context-project-desktop");
+    stage = "repository-source-enrollment";
+    await clickButton("Connect repository");
+    await waitFor("document.querySelector('.repository-state')?.textContent === 'Waiting for sync'");
+    await reconcileRepository("a");
+    await clickButton("Refresh status");
+    await waitFor("document.querySelector('.repository-state')?.textContent === 'Verified snapshot'");
+    await evaluate("document.querySelector('.repository-files').open = true; document.querySelector('.repository-files>details').open = true; document.querySelector('.repository-context').scrollIntoView({block:'center'})");
+    assert.equal(await evaluate("!window.__repositoryXss && document.querySelector('.repository-files pre').textContent.includes('<script>')"), true);
+    await capture("context-github-desktop");
+    await call("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+    await delay(200);
+    assert.equal(await evaluate("document.documentElement.scrollWidth <= window.innerWidth + 1"), true);
+    await capture("context-project-mobile");
+    await evaluate("document.querySelector('.repository-context').scrollIntoView({block:'start'})");
+    await capture("context-github-mobile");
+    await call("Emulation.setDeviceMetricsOverride", { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
+    await delay(100);
+    await clickButton(`History of ${requirementTitle}`);
+    await waitFor("Boolean(document.querySelector('.brief-history li'))");
+    await clickButton("Close", ".context-editor-dialog button");
+    await clickButton("My Tasks", '[data-slot="sidebar-menu-button"]');
+    await waitFor("document.querySelector('[aria-label=\"New task title\"]')?.disabled === false");
     const title = `Browser acceptance ${crypto.randomUUID().slice(0, 8)}`;
     await fill('[aria-label="New task title"]', title);
     await clickButton("Create task");
     await waitFor(`Array.from(document.querySelectorAll('.task-open strong')).some(el => el.textContent === ${JSON.stringify(title)})`);
     await evaluate(`Array.from(document.querySelectorAll('.task-open')).find(el => el.querySelector('strong')?.textContent === ${JSON.stringify(title)}).click()`);
+    stage = "task-brief-preparation";
+    await evaluate("document.querySelector('.task-context-toggle').click()");
+    await waitFor("Boolean(document.querySelector('.brief-requirement-picker'))");
+    await evaluate(`Array.from(document.querySelectorAll('.brief-requirement-picker label')).find(el => el.textContent.includes(${JSON.stringify(requirementTitle)})).querySelector('button').click()`);
+    await clickButton("Prepare task brief");
+    await waitFor("document.querySelector('.task-brief-status')?.textContent.includes('Brief is current')");
+    stage = "task-brief-context-change";
+    await clickButton("Close", ".task-sheet button"); await waitFor(editorClosed);
+    await clickButton("Project brief", '[data-slot="sidebar-menu-button"]');
+    await clickButton(`Revise ${requirementTitle}`);
+    await fill("#context-body", "The accepted requirement changed after the task brief was prepared.");
+    await fill("#context-reason", "Review an updated requirement.");
+    await capture("context-editor-revision");
+    await clickButton("Publish approved context");
+    await waitFor("!document.querySelector('.context-editor-dialog')");
+    await clickButton("My Tasks", '[data-slot="sidebar-menu-button"]');
+    await waitFor(`Array.from(document.querySelectorAll('.task-open strong')).some(el => el.textContent === ${JSON.stringify(title)})`);
+    await evaluate(`Array.from(document.querySelectorAll('.task-open')).find(el => el.querySelector('strong')?.textContent === ${JSON.stringify(title)}).click()`);
+    await evaluate("document.querySelector('.task-context-toggle').click()");
+    await waitFor("document.querySelector('.task-brief-status')?.textContent.includes('Brief needs a review')");
+    await evaluate("document.querySelector('.task-context-section').scrollIntoView({block:'start'})");
+    await capture("context-task-stale");
+    await clickButton("Prepare updated brief");
+    await waitFor("document.querySelector('.task-brief-status')?.textContent.includes('Brief is current')");
+    stage = "repository-brief-freshness";
+    await reconcileRepository("b");
+    await clickButton("Refresh context");
+    await waitFor("document.querySelector('.task-brief-status')?.textContent.includes('repository connection or commit changed')");
+    await clickButton("Prepare updated brief");
+    await waitFor("document.querySelector('.task-brief-status')?.textContent.includes('Brief is current')");
+    await evaluate("document.querySelector('.saved-task-brief').open = true");
+    assert.equal(await evaluate("document.querySelector('.saved-task-brief .repository-commit a')?.title === 'b'.repeat(40)"), true);
+    await reconcileRepository("unavailable");
+    await clickButton("Refresh context");
+    await waitFor("document.querySelector('.task-brief-status')?.textContent.includes('current access cannot be verified')");
+    assert.equal(await evaluate("document.querySelector('.saved-task-brief') === null"), true);
+    assert.equal(await evaluate("document.querySelector('.brief-requirement-picker legend').textContent.includes('(1/20)')"), true);
+    assert.equal(await evaluate("!document.querySelector('.task-context-content').textContent.includes('Task brief prepared.')"), true);
+    await capture("context-github-unavailable");
+    await reconcileRepository("b");
+    await clickButton("Refresh context");
+    await waitFor("document.querySelector('.task-brief-status')?.textContent.includes('Brief is current')");
     stage = "comments-and-mentions";
     const body = "Review <img src=x onerror=window.__strideXss=true> @";
     await fill("#task-comment", body);

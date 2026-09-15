@@ -4,6 +4,12 @@ import { spawn } from "node:child_process";
 import assert from "node:assert/strict";
 import { setTimeout as delay } from "node:timers/promises";
 import { verifyBrowser } from "./test-browser-runtime.mjs";
+import { Repository } from "../lib/server/repository.ts";
+import { PostgresDatabase } from "../lib/server/postgres-adapter.ts";
+import { RepositorySources } from "../lib/server/repository-sources.ts";
+import { GitHubContextError } from "../lib/server/github-context-provider.ts";
+import { parseBinding } from "../lib/github-context.ts";
+import { observation } from "../tests/repository-source-contract.ts";
 
 const fixtureUrl = new URL(process.env.TEST_DATABASE_URL ?? "");
 if (process.env.CI !== "true" || !["127.0.0.1", "localhost"].includes(fixtureUrl.hostname) || fixtureUrl.pathname !== "/stride_test") {
@@ -14,10 +20,22 @@ fixtureUrl.password = process.env.STRIDE_RUNTIME_PASSWORD;
 const origin = "http://127.0.0.1:3107";
 const ownerEmail = process.env.STRIDE_BOOTSTRAP_EMAIL;
 const ownerPassword = process.env.STRIDE_BOOTSTRAP_PASSWORD;
+// Seed only an isolated test project grant. The application still uses genuine human sessions.
+const setupPool = new Pool({ connectionString: fixtureUrl.toString(), max: 1 });
+let repositoryBinding;
+try {
+  const user = (await setupPool.query("SELECT id,name,email FROM auth_users WHERE email=$1", [ownerEmail])).rows[0];
+  assert.ok(user);
+  const repository = new Repository(new PostgresDatabase(setupPool));
+  const workspace = (await repository.bootstrap({ userId: user.id, email: user.email, displayName: user.name })).workspaces[0].id;
+  const project = (await repository.metadata(user.id, workspace)).projects[0].id;
+  repositoryBinding = parseBinding({ key: "browser_repository", workspace_id: workspace, project_id: project, repository_id: 1234, installation_id: 5678, owner: "fixture", repository: "project", branch: "main", paths: ["docs/ARCHITECTURE.md"] });
+} finally { await setupPool.end(); }
 const child = spawn(process.execPath, ["node_modules/next/dist/bin/next", "start", "--hostname", "127.0.0.1", "--port", "3107"], {
   env: { ...process.env, NODE_ENV: "test", APP_URL: origin, DATABASE_URL: fixtureUrl.toString(),
     BETTER_AUTH_SECRET: "isolated-ci-session-secret-do-not-use-in-production",
     STRIDE_ALLOWED_EMAILS: ownerEmail,
+    STRIDE_GITHUB_CONTEXT_BINDINGS: JSON.stringify([repositoryBinding]),
     RESEND_API_KEY: "ci-fixture-no-network-delivery", STRIDE_EMAIL_FROM: "test@stride.invalid",
   },
   stdio: "ignore",
@@ -74,6 +92,28 @@ try {
   assert.equal(task.archived_at !== null, true);
   task = await json(await request("/api/tasks/" + task.id + "?workspace_id=" + workspaceId, "PATCH", { version: task.version, archived: false }));
   assert.equal(task.archived_at, null);
+  stage = "project-context";
+  const contextPath = `/api/projects/${metadata.projects[0].id}/context?workspace_id=${workspaceId}`;
+  const contextInput = { request_id: crypto.randomUUID(), expected_version: 0, kind: "requirement", title: "Runtime context requirement", body: "Every task brief preserves the approved requirement version.", change_note: "Runtime contract verification" };
+  const documentPath = `/api/projects/${metadata.projects[0].id}/context/documents?workspace_id=${workspaceId}`;
+  const document = await json(await request(documentPath, "POST", contextInput), 201);
+  assert.equal((await json(await request(documentPath, "POST", contextInput), 201)).document_id, document.document_id);
+  const projectBrief = await json(await request(contextPath));
+  const taskBriefPath = `/api/tasks/${task.id}/context?workspace_id=${workspaceId}`;
+  const taskBrief = await json(await request(taskBriefPath, "POST", { request_id: crypto.randomUUID(), task_version: task.version, context_sequence: projectBrief.sequence, requirement_ids: [document.document_id] }), 201);
+  assert.equal(taskBrief.check.state, "current");
+  assert.equal(taskBrief.check.execution_ready, false);
+  await json(await request(documentPath, "POST", { ...contextInput, request_id: crypto.randomUUID(), document_id: document.document_id, expected_version: document.version, body: "Changed approved requirement." }), 201);
+  const staleBrief = await json(await request(taskBriefPath));
+  assert.equal(staleBrief.check.state, "stale");
+  assert.equal(staleBrief.brief.payload.documents[0].body, contextInput.body);
+  const restricted = new Pool({ connectionString: fixtureUrl.toString(), max: 1 });
+  try {
+    for (const table of ["context_revisions", "context_events", "task_context_briefs", "repository_observations", "repository_source_events", "repository_source_receipts"]) {
+      const privileges = await restricted.query("SELECT has_table_privilege(current_user,$1,'UPDATE') AS can_update, has_table_privilege(current_user,$1,'DELETE') AS can_delete", [table]);
+      assert.deepEqual(privileges.rows[0], { can_update: false, can_delete: false });
+    }
+  } finally { await restricted.end(); }
   stage = "collaboration";
   assert.equal(created.responsible_id, bootstrap.user.userId);
   const commentsPath = "/api/tasks/" + task.id + "/comments?workspace_id=" + workspaceId;
@@ -104,7 +144,18 @@ try {
   assert.equal((await request("/api/invitations?workspace_id=" + workspaceId, "POST", { email: "denied@example.test" })).status, 403);
   await json(await request("/api/auth/sign-out", "POST", {})); cookie = ownerCookie;
   stage = "browser";
-  await verifyBrowser(origin, cookie);
+  const sourcePool = new Pool({ connectionString: fixtureUrl.toString(), max: 1 });
+  try {
+    const repository = new Repository(new PostgresDatabase(sourcePool));
+    const sources = new RepositorySources(repository, [repositoryBinding]);
+    await verifyBrowser(origin, cookie, async (head = "a") => {
+      // Make this test job due immediately; no application endpoint bypasses the normal cooldown.
+      await repository.statement("UPDATE repository_sources SET next_refresh_at=? WHERE workspace_id=? AND project_id=?", new Date().toISOString(), repositoryBinding.workspace_id, repositoryBinding.project_id).run();
+      const claim = await sources.claim(); assert.ok(claim);
+      const result = head === "unavailable" ? new GitHubContextError("access_unavailable") : { ...observation(repositoryBinding, head, "CI repository fact <script>window.__repositoryXss=true</script>"), observed_at: new Date().toISOString() };
+      assert.equal(await sources.finish(claim, result), true);
+    });
+  } finally { await sourcePool.end(); }
   stage = "password-change";
   const changedPassword = ownerPassword + "-changed";
   await json(await request("/api/auth/change-password", "POST", { currentPassword: ownerPassword, newPassword: changedPassword, revokeOtherSessions: true }));
