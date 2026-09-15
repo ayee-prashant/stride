@@ -37,6 +37,7 @@ export const tasks = pgTable("tasks", {
   foreignKey({ columns: [t.workspaceId, t.waitingOnId], foreignColumns: [memberships.workspaceId, memberships.userId] }),
   foreignKey({ name: "task_recurrence_parent_fk", columns: [t.workspaceId, t.recurrenceParentId], foreignColumns: [t.workspaceId, t.id] }),
   unique("uq_task_workspace").on(t.workspaceId, t.id),
+  unique("uq_tasks_context_project").on(t.workspaceId, t.projectId, t.id),
   index("idx_tasks_workspace_project_archive").on(t.workspaceId, t.projectId, t.archivedAt),
   index("idx_tasks_workspace_assignee_archive").on(t.workspaceId, t.assigneeId, t.archivedAt),
   index("idx_tasks_creator_due").on(t.workspaceId, t.createdBy, t.archivedAt, t.dueDate),

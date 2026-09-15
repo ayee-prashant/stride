@@ -33,6 +33,9 @@ user or authentication bypass.
 - npm run test:auth-runtime — CI-only isolated session/task/password flow.
 - node scripts/verify-production.mjs — guarded Railway private-service smoke job.
 - npm run worker — bounded scheduled reminders, email outbox and file cleanup.
+- npm run worker:context — persistent, read-only GitHub source reconciliation.
+  Configure an explicit project grant and GitHub App using
+  [the setup contract](docs/agent-workforce/GITHUB_CONTEXT_SETUP.md).
 - node --experimental-strip-types --test tests/postgres-productivity.integration.test.ts — isolated productivity contracts.
 - node scripts/audit-dependencies.mjs — production and complete dependency audits.
 - node --experimental-strip-types scripts/verify-performance-restore.ts — isolated benchmark and restore drill.
@@ -49,10 +52,11 @@ configuration. Never run the CI fixture against production.
 - docs/API.md — request/response contracts.
 - docs/SECURITY.md and docs/TESTING.md — safeguards and validation.
 - docs/RELEASE_REVIEW.md — actual CI, runtime, and deployment evidence.
-- [Human-supervised agent work](docs/agent-workforce/README.md) — proposed next
+- [Human-supervised agent work](docs/agent-workforce/README.md) — approved next
   product architecture, shared project context, human/agent responsibilities,
   current MCP contracts and ordered
-  delivery plan. These agent capabilities are not implemented yet.
+  delivery plan. [Implementation status](docs/agent-workforce/IMPLEMENTATION_STATUS.md)
+  records the context foundation and remaining agent integration gates.
 
 ## Source layout
 

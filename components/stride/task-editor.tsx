@@ -17,6 +17,7 @@ import { TaskChecklist } from "./task-checklist";
 import { TaskFiles } from "./task-files";
 import type { Attachment } from "@/lib/productivity";
 import { SaveTaskTemplate } from "./templates";
+import { TaskContext } from "./task-context";
 
 function editable(task: Task) { return { title: task.title, description: task.description, status: task.status, priority: task.priority, assignee_id: task.assignee_id, due_date: task.due_date, blocked_reason: task.blocked_reason, waiting_on_id: task.waiting_on_id, recurrence: task.recurrence }; }
 export function TaskEditor({ task, members, userId, admin, onClose, onUpdate, onChanged }: { task: Task; members: Member[]; userId: string; admin: boolean; onClose: () => void; onUpdate: (task: Task, patch: Omit<TaskPatch, "version">) => Promise<Task>; onChanged: () => void }) {
@@ -27,10 +28,11 @@ export function TaskEditor({ task, members, userId, admin, onClose, onUpdate, on
   const [commentBusy, setCommentBusy] = useState(false); const [historyRevision, setHistoryRevision] = useState(0);
   const [file, setFile] = useState<File | null>(null); const [fileBusy, setFileBusy] = useState(false); const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [checklistDraft, setChecklistDraft] = useState(""); const [checklistBusy, setChecklistBusy] = useState(false);
+  const [contextDirty, setContextDirty] = useState(false); const [contextBusy, setContextBusy] = useState(false);
   const [muted, setMuted] = useState<boolean | null>(null); const [linkCopied, setLinkCopied] = useState(false);
   const formDirty = JSON.stringify(draft) !== JSON.stringify(editable(source));
-  const dirty = formDirty || !!commentDraft.body || commentDraft.mentioned_user_ids.length > 0 || !!checklistDraft || !!file;
-  const collaborating = commentBusy || checklistBusy || fileBusy;
+  const dirty = formDirty || !!commentDraft.body || commentDraft.mentioned_user_ids.length > 0 || !!checklistDraft || !!file || contextDirty;
+  const collaborating = commentBusy || checklistBusy || fileBusy || contextBusy;
   useEffect(() => {
     if (!dirty && !busy && !collaborating) return;
     const guard = (event: BeforeUnloadEvent) => { event.preventDefault(); };
@@ -83,8 +85,9 @@ export function TaskEditor({ task, members, userId, admin, onClose, onUpdate, on
         {dirty && <p className="muted text-sm">You have unsaved changes.</p>}
       </form>
       <TaskChecklist task={source} disabled={busy || collaborating} title={checklistDraft} onTitleChange={setChecklistDraft} onBusyChange={setChecklistBusy} onChange={() => { setHistoryRevision(n => n + 1); onChanged(); }} />
-      <TaskFiles task={source} userId={userId} admin={admin} disabled={busy || commentBusy || checklistBusy} file={file} onFileChange={setFile} onBusyChange={setFileBusy} onChanged={setAttachments} revision={historyRevision} />
-      <TaskDiscussion task={source} attachments={attachments} disabled={busy || checklistBusy || fileBusy} members={members} draft={commentDraft} onDraftChange={setCommentDraft} onBusyChange={setCommentBusy} onPosted={() => { setHistoryRevision(value => value + 1); onChanged(); }} />
+      <TaskContext task={source} disabled={busy || formDirty || commentBusy || checklistBusy || fileBusy} onBusyChange={setContextBusy} onDirtyChange={setContextDirty} />
+      <TaskFiles task={source} userId={userId} admin={admin} disabled={busy || commentBusy || checklistBusy || contextBusy} file={file} onFileChange={setFile} onBusyChange={setFileBusy} onChanged={setAttachments} revision={historyRevision} />
+      <TaskDiscussion task={source} attachments={attachments} disabled={busy || checklistBusy || fileBusy || contextBusy} members={members} draft={commentDraft} onDraftChange={setCommentDraft} onBusyChange={setCommentBusy} onPosted={() => { setHistoryRevision(value => value + 1); onChanged(); }} />
       <section className="activity-section"><h3>Activity</h3>{historyError ? <p className="muted">Activity could not be loaded.</p> : <ol>{history.map(item => <li key={item.id}><p><strong>{item.actor_name}</strong> {item.action.startsWith("status:") ? `moved this task to ${STATUS_LABEL[item.action.slice(7) as Task["status"]] ?? "another status"}` : item.action === "commented" ? "added a comment" : `${item.action} this task`}</p><time dateTime={item.created_at}>{new Date(item.created_at).toLocaleString()}</time></li>)}</ol>}<p className="muted text-sm">Created {new Date(source.created_at).toLocaleDateString()} · Version {source.version}</p></section>
     </SheetContent></Sheet>
     <AlertDialog open={discard} onOpenChange={setDiscard}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Discard unsaved changes?</AlertDialogTitle><AlertDialogDescription>Your saved task will remain unchanged.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Keep editing</AlertDialogCancel><AlertDialogAction onClick={onClose}>Discard changes</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
