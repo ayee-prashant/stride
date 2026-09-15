@@ -49,3 +49,7 @@ next-env.d.ts
 # Delivered documentation snapshots are not application source.
 /stride-agent-foundation.zip
 *.tsbuildinfo
+/artifacts/
+
+# Generated checkout-specific local settings and credentials.
+/.stride-local/

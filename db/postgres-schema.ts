@@ -12,6 +12,7 @@ export const workspaces = pgTable("workspaces", {
 export const memberships = pgTable("memberships", {
   workspaceId: text("workspace_id").notNull().references(() => workspaces.id),
   userId: text("user_id").notNull().references(() => users.id), role: text("role", { enum: ["admin", "member"] }).notNull(),
+  epoch: text("epoch").notNull().default(sql`gen_random_uuid()::text`),
 }, t => [primaryKey({ columns: [t.workspaceId, t.userId] }), index("idx_memberships_user").on(t.userId), check("membership_role", sql`${t.role} IN ('admin','member')`)]);
 export const projects = pgTable("projects", {
   id: text("id").primaryKey(), workspaceId: text("workspace_id").notNull().references(() => workspaces.id),
@@ -37,6 +38,7 @@ export const tasks = pgTable("tasks", {
   foreignKey({ columns: [t.workspaceId, t.waitingOnId], foreignColumns: [memberships.workspaceId, memberships.userId] }),
   foreignKey({ name: "task_recurrence_parent_fk", columns: [t.workspaceId, t.recurrenceParentId], foreignColumns: [t.workspaceId, t.id] }),
   unique("uq_task_workspace").on(t.workspaceId, t.id),
+  unique("uq_tasks_context_project").on(t.workspaceId, t.projectId, t.id),
   index("idx_tasks_workspace_project_archive").on(t.workspaceId, t.projectId, t.archivedAt),
   index("idx_tasks_workspace_assignee_archive").on(t.workspaceId, t.assigneeId, t.archivedAt),
   index("idx_tasks_creator_due").on(t.workspaceId, t.createdBy, t.archivedAt, t.dueDate),

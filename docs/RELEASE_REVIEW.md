@@ -1,4 +1,200 @@
-# Release review — 2026-09-14
+# Release review — 2026-09-15
+
+## Live application-owned GitHub connection
+
+The private **Stride ayee-prashant** App (App ID 4949498, installation 161829042)
+is installed on **ayee-prashant/stride only**. The owner explicitly approved
+read-only Contents, Metadata, Pull requests, Checks, Commit statuses and
+Deployments access. Webhooks and user OAuth were not enabled. The signing key's
+public fingerprint was matched to GitHub before transfer; its only persistent
+destination is the private `stride-agents` service. Temporary downloads were
+removed from both synchronized locations. Web receives grant metadata only;
+the scheduled and provisioning services have no GitHub credentials.
+
+The reviewed grant enrolls the owner's existing **First sprint** project and
+one-member workspace, tracks `deploy/vercel-railway`, and includes eight reviewed
+documentation files totaling 60,854 bytes. The authenticated human API enrolled
+source `85ee4fbd-18f3-41b9-98f1-e48d721381dc`. Controlled private job
+`e0886a01-fca8-42fc-a227-ea922f753f0e` observed **pending → current**, verified
+every Git blob and SHA-256 hash at head `8bbd067f62253d68e2ed0d5ae1c1bcdceeef1113`,
+and signed out at 06:22:27 UTC. The initial manifest hash was
+`2ea5c4fac88f137f3105700aefa741b52332a3180a105d113ad9602345d24132`.
+
+Worker diagnostic deployment `da8ea64f-6172-4fa4-a2e2-28e203c53dea` independently
+verified PR #11 at `89154199f6177e72bc83dbcbc40dce3d6f289c8a` at 06:32:58 UTC:
+six changed paths, five successful checks/statuses, the exact repository and
+target branch, and a final PR-head reread. It rejected an older commit for that
+PR and a nonexistent production artifact. All calls used the installed App's
+short-lived, repository-scoped tokens inside the worker.
+
+The production project has no delivery responsibilities or delivery tickets yet.
+An initial diagnostic reached the evidence table's project-configuration foreign
+key; the corrected diagnostic respected that prerequisite and checked the real
+provider directly. **The production evidence queue has not been exercised**;
+its complete contract passed against PostgreSQL in CI. No human responsibilities,
+agent enrollments, task starts or delivery approvals were fabricated for testing.
+
+The most recent 20 actual GitHub Deployment records were readable, including
+Stride production records and preview records, but none had `payload.artifact`.
+Positive UAT/production artifact verification therefore remains an operator
+pipeline prerequisite. Existing host success records cannot substitute for the
+approved immutable artifact identifier; these gates remain blocked until the
+pipeline publishes suitable records. The App remains read-only.
+
+Verification source `89154199f6177e72bc83dbcbc40dce3d6f289c8a`, tree
+`55f20d14ebf4aaa10adf3390e0843809848f3ee3`, passed the complete
+[CI run 34936856432](https://github.com/ayee-prashant/stride/actions/runs/34936856432),
+job 104276547228: 122 native tests, all PostgreSQL/concurrency/MCP contracts,
+migration parity, audit, typecheck, lint, build, real OAuth/CLI/browser acceptance
+and the 41-table content-checked backup restore. The guarded human source check
+is saved in `scripts/verify-github-production.mjs`; PRs against the deployment
+branch now receive the same complete CI gate.
+
+The tracked branch was then fast-forwarded to the already-tested
+`98c65d6a8067033d656168bb32e56bf32a7361a5`, the head of PR #10 merged by the owner
+at 04:15:27 UTC. GitHub's comparison confirmed a single verification-only commit:
+two probe scripts, a regression test and release notes; application and worker
+code were identical. There were zero delivery tickets before this baseline change.
+
+The actual GitHub push triggered three successful deployments at exactly that SHA:
+
+| Service | Deployment | Verification |
+| --- | --- | --- |
+| Web | `4066e128-6fc8-47a3-a5ce-a87180a856e9` | Database-backed healthcheck and subsequent authenticated source read |
+| Coordinator | `fc66ac9a-ffd7-466c-8073-65dc4c441486` | Normal `npm run worker:agents` startup at 06:37:28 UTC, repository configured |
+| Scheduled worker | `cd086456-9354-48a7-890f-dbd4236c5a04` | Real tick at 06:40:03 UTC, sent=0, failed=0 |
+
+Private observation job `adfcdb71-0cef-4eda-9240-8fc80027c985` then verified the
+same persisted source ID at the new branch head. Its `last_verified_at` was
+06:39:00.952 UTC, after the coordinator restart; the new manifest was
+`44ace6070ce1d4645b537d284008873e7051bb215b77e9c67c67f709c55219e7`.
+All eight files and their hashes passed again. The job signed out at 06:40:15 UTC.
+This confirms live external-push detection and synchronization after restart;
+it is not a claim that an in-flight crash or production load was injected.
+Temporary diagnostic commands were restored to the normal worker/provisioning
+commands. Source enrollment, reviewer configuration and GitHub secret scope were
+not changed by the observation check.
+
+See [PR #11](https://github.com/ayee-prashant/stride/pull/11) for the source and
+final rollout record. Public-edge browser checks and positive artifact-receipt
+verification remain outside the successful live checks listed here.
+
+## Attended agent delivery — current release candidate
+
+[PR #10](https://github.com/ayee-prashant/stride/pull/10) contains the complete
+attended delivery implementation and the preceding context/profile increments.
+It adds human responsibilities, BA/SA approval, scoped immutable work packets,
+manual assignment/start grants, checkpoints, specialist/peer/QA/UAT/release gates,
+independent repository/deployment evidence, OAuth enrollment, MCP and a local
+companion. Reports remain proposals until the responsible human accepts them.
+
+The verified domain flow includes both QA and UAT failures followed by development
+and repeated reviews, exact artifact authorization and production closure. It
+also covers same-profile review provenance, duplicate active plan rejection,
+competing claims, stale role/membership/context, original-session revocation,
+private notification cursors and immutable audit receipts. Isolated GitHub-provider
+tests use explicitly simulated endpoints; the live installation checks are recorded
+separately above.
+
+Generated migrations 0006–0008 are additive. Published migration/lock archives were
+checked before commit; prior migration bytes remain unchanged. Provisioning denies
+runtime updates/deletes on packets and audit events. Membership epochs rotate on
+real role changes, while no-op authorization locks preserve them. Attempt authority
+uses a database clock and the original real human session.
+
+Source `ce1da3c23ff189620150b822759e84a2250165a2`, tree
+`b8eddfe2774233421015841a72f7bec42ea54d49`, passed every gate in
+[run 34913707229](https://github.com/ayee-prashant/stride/actions/runs/34913707229),
+job 104206614915. This includes 121 native tests, real PostgreSQL/concurrency,
+maintained modern/legacy MCP, migration parity, dependency audit, typecheck,
+lint, production build and real OAuth/CLI/browser acceptance. The CLI actually
+signed in through PKCE, saved private token files, bridged stdio and prepared a
+packet through its companion. Browser acceptance includes human baseline approval,
+preserved review drafts, safe report text, role configuration, existing task flows
+and desktop/390px controls. Screenshots were retrieved and visually reviewed.
+
+Real integration found internal/public hostname handling, missing consent request
+context and legacy CLI imports; these were corrected using the maintained provider
+and SDK. Test corrections also respect code-replay grant revocation and wait for
+the real companion to finish writing before fixture cleanup. No provider validation
+or human approval boundary was bypassed to make the tests pass.
+
+A PostgreSQL 18 dump/restore compared counts for 41 tables, context/delivery/OAuth
+content checksums and independent writes. On 20,000 synthetic tasks, 20 warm samples
+per query measured p95 46.17 ms (My Tasks), 67.63 ms (board), 28.07 ms (overdue/high)
+and 27.33 ms (title search), with approximately 48.8 KB responses. These are
+unloaded CI query measurements, not production load or backup-policy guarantees.
+
+`stride-agents` is configured as a private coordinator with restricted database
+references. The rollout provisions migrations first, then deploys the exact
+verified source and checks actual startup/readiness/live-verification results.
+Exact production deployment IDs and live-check results are maintained in
+[PR #10](https://github.com/ayee-prashant/stride/pull/10).
+The dedicated application's GitHub App is now configured as recorded above.
+Vercel still returns a team-scope 403 on 2026-09-15. Public-edge browser verification
+is not inferred from private-network checks or the canonical Railway URL.
+
+The initial live probe found that Node 24 fetch drops a supplied Host header,
+so the agent endpoint correctly rejected the private listener authority with 403.
+The verification client now uses bounded node:http requests with the canonical
+Host and a deliberately invalid bearer token, without the human session cookie.
+A loopback HTTP regression checks the actual wire headers for both agent routes.
+Application origin and host checks remain unchanged. Individual probe stages now
+identify failures precisely; exact rerun results are recorded in PR #10.
+
+See [attended setup](agent-workforce/ATTENDED_SETUP.md). No model API is required;
+arbitrary IDE wake-up, automatic assignment and native Windows credential storage
+are outside this first attended release. The following sections are historical
+evidence for earlier increments and deployments.
+
+## Human agent roles — feature review
+
+The human configuration portion of AW-101 is reviewable in
+[draft PR #9](https://github.com/ayee-prashant/stride/pull/9), stacked on the
+human-approved delivery design. Admins propose stable profiles and project roles;
+only the named human operator accepts responsibility. The UI exposes all eleven
+reviewed role prompts, responsibilities, exclusions and proposed file scopes.
+Configuration changes clear acceptance, and each human decision retains its
+original timestamp, reason, prompt and scope. Role acceptance does not grant
+repository access, connect an agent or authorize any task execution.
+
+Source `25581eee5353bab1bf1e8d1cf369e9a03879fb95`, tree
+`24f87a60a560b083a529595711cd9470f51efbc8`, passed every gate in
+[run 34899561606](https://github.com/ayee-prashant/stride/actions/runs/34899561606),
+job 104161966651. This includes 111 native tests; real PostgreSQL contracts and
+competing approvals, configuration changes, retries, quotas and admin demotion;
+generated migration parity; typecheck; lint; production build; genuine-session
+API and browser acceptance; runtime privilege checks; and a 25-table restore
+drill that compares the original registry/context contents. Desktop and 390px
+mobile role screenshots were retrieved and visually inspected. The first run
+had caught TypeScript narrowing and effect-loading errors, which were corrected
+before this complete passing run.
+
+Generated migration `0005_workable_changeling.sql` is additive. Its archive
+digest was verified before restoring the generated files. The lockfile and all
+earlier migration bytes are unchanged. Apply it through provisioning before
+switching the application, and rerun the restricted-role grants. Runtime UPDATE
+and DELETE are denied on agent profiles and role events. No dependency was
+added; at 21:35 UTC the production/full audits reported zero moderate, high or
+critical findings and one low transitive esbuild advisory.
+
+Post-build review checked persisted membership and operator authority, ordered
+membership/workspace/project locks, atomic audit receipts, stale-version/template
+rejection, revocation-safe retries, bounded queries, tenant foreign keys and
+draft preservation. It adds explicit refresh/pagination feedback and mobile
+approval-control visibility/interaction coverage. The latest source checks are
+attached to PR #9 and must pass before any release.
+
+This is a feature increment, not the full multi-agent delivery system or a
+production release. Connection enrollment and revocation epochs, agent identity,
+MCP/IDE adapters, approved start grants, work packets and BA/SA/Dev/QA/UAT/release
+gates remain pending. In particular, historical approval after a human rejoins
+must not become execution authority; the future enrollment contract must add
+renewed validation. Alias/operator transfer is also outside this increment.
+No merge, deployment, live GitHub App setup or external message delivery was
+performed. Current production evidence below remains unchanged. See
+[agent registry setup](agent-workforce/AGENT_REGISTRY_SETUP.md) and
+[implementation status](agent-workforce/IMPLEMENTATION_STATUS.md).
 
 ## Local setup automation — 2026-09-15
 
@@ -333,3 +529,24 @@ Automatic approval review rejected merging PR #2 into main because it requires
 explicit authorization for that default-branch mutation. No direct push or other
 method was used to bypass the rejection. The already deployed c39487f app and
 its persisted database remain operational independently of that merge.
+
+
+## Agent context implementation, 2026-09-14
+
+The three-pane human context foundation passed CI run 34884573544 on commit
+`f81dda634c410c6f8319084aca5cde46c4d2b0e9`, tree
+`516e5c195105431cb74a3df78088cd56992a1c9b`. It is a reviewable feature branch,
+not a production release. The stacked GitHub source increment adds configured
+repository observations, durable synchronization, source-aware task briefs and
+human source review. Its first complete CI passed in run 34889108668 on
+`2ad6bd374a44b214e7d524a0b1fa99d9105178f6` (tree
+`098238b42d1cbffe37c75c8349a2fbe253862963`), including migration 0004, 100 native
+tests, real PostgreSQL/concurrency, runtime grants, audit, build and browser flow.
+The post-build review preserves requirement selections during outages, clarifies
+repository sharing, fixes changed-grant reenrollment and extends restore checks
+to context content. There are now 101 passing native tests. The latest source
+checks are recorded on draft PR #7 and must all pass before release.
+See agent-workforce/IMPLEMENTATION_STATUS.md for actual
+verification evidence and agent-workforce/GITHUB_CONTEXT_SETUP.md for setup and
+explicit source coverage. Existing production deployment evidence above remains
+unchanged. No agent execution, merge, deployment or GitHub App setup is implied.

@@ -16,6 +16,7 @@ The app remains private through server sessions and closed enrollment.
 | Web service | 02968ece-d1c9-4782-b105-4c75f9662af0 |
 | Provisioning service | 1b76c2b4-d393-4984-a2e6-43393fe1b269 |
 | Scheduled worker | 013befc6-2284-460b-a9d0-60e1ef8814bc |
+| Attended agent coordinator | 2b542c91-54f0-49bf-896f-861f9f70f388 |
 | Private file bucket | f48bc018-376f-49f3-a0e2-8e6df54e0043 |
 | App origin | https://stride-app-production-d72b.up.railway.app |
 
@@ -98,6 +99,24 @@ S3 upload/download/deletion in addition to the first-sprint checks. Test records
 are identified from that job's own create responses; no existing task is changed.
 
 ## Rollback and limits
+
+For attended delivery, apply additive migrations 0003–0008 with the controlled
+provisioning job before advancing the web and workers. Its restricted-role grants
+also deny UPDATE/DELETE on delivery packets and events. Preserve all prior
+migration bytes, passwords and accounts.
+
+The private `stride-agents` service runs `npm run worker:agents` continuously with
+one replica, no public domain, and restricted database/TLS references. It expires
+unauthorized attempts and reconciles both context and candidate evidence when
+GitHub settings are present. `npm run worker:agents -- --once` exits nonzero if
+its database/coordinator pass fails. Keep GitHub signing credentials on this worker;
+the web receives only approved project bindings. The existing five-minute
+productivity worker remains separate. See agent-workforce/ATTENDED_SETUP.md.
+
+The controlled production smoke also checks authenticated context, profile and
+delivery routes, OAuth metadata and rejected forged agent credentials. These are
+private-network checks; they do not replace the full isolated OAuth/CLI/browser
+suite or verify a live GitHub installation.
 
 Keep the previous tested application commit available for rollback. Applying an
 older app version does not reverse a database migration. Applied migration files

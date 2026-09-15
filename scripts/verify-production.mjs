@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { probeAgentHttp } from "./probe-agent-http.mjs";
 
 // Run only as a controlled job in the dedicated Stride production environment.
 // This checks the private application service, not public DNS, CDN, or browser UX.
@@ -106,6 +107,37 @@ try {
   assert.ok((await page.text()).includes("My Tasks"));
   assert.equal((await request("/favicon.svg")).status, 200);
   checks.push(stage);
+
+  stage = "agent-context-readiness";
+  const projectPath = "/api/projects/" + encodeURIComponent(metadata.projects[0].id);
+  const context = await json(await request(api(projectPath + "/context")));
+  assert.ok(Array.isArray(context.documents));
+  stage = "agent-registry-readiness";
+  const registry = await json(await request(api(projectPath + "/agents")));
+  assert.ok(Array.isArray(registry.profiles));
+  stage = "agent-delivery-readiness";
+  const delivery = await json(await request(api(projectPath + "/delivery")));
+  assert.ok(Array.isArray(delivery.tickets));
+  stage = "oauth-issuer-readiness";
+  const authorization = await json(await request("/.well-known/oauth-authorization-server"));
+  assert.equal(authorization.issuer, expectedOrigin);
+  assert.equal(new URL(authorization.token_endpoint).origin, expectedOrigin);
+  stage = "oauth-resource-readiness";
+  const resource = await json(await request("/.well-known/oauth-protected-resource/mcp"));
+  assert.equal(resource.resource, expectedOrigin + "/mcp");
+  // Use the HTTP client that actually preserves Host. The destination remains
+  // the guarded private listener; this does not claim public-edge coverage.
+  stage = "agent-mcp-denial";
+  const denied = await probeAgentHttp(target, expectedOrigin, "/mcp");
+  status = denied.status;
+  assert.equal(denied.status, 401);
+  assert.ok(denied.headers.get("www-authenticate")?.includes("oauth-protected-resource/mcp"));
+  stage = "agent-companion-denial";
+  status = (await probeAgentHttp(target, expectedOrigin, "/api/agent-companion")).status;
+  assert.equal(status, 401);
+  stage = "human-delivery-denial";
+  assert.equal((await request(api(projectPath + "/delivery"), "GET", undefined, { cookie: "" })).status, 401);
+  checks.push("agent-delivery-readiness");
 
   stage = "task-persistence";
   const created = await json(await request("/api/tasks?workspace_id=" + encodeURIComponent(workspaceId), "POST", {

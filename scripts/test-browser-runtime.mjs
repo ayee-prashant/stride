@@ -1,14 +1,14 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 
 // Uses the runner's installed Chrome and native Node APIs; no production target,
 // extra package download, browser profile, or authentication bypass is accepted.
-export async function verifyBrowser(origin, cookie) {
+export async function verifyBrowser(origin, cookie, reconcileRepository, deliveryReview) {
   if (process.env.CI !== "true" || origin !== "http://127.0.0.1:3107") throw new Error("Browser verification requires the isolated CI server");
   const binary = ["/usr/bin/google-chrome", "/usr/bin/chromium", "/usr/bin/chromium-browser"].find(existsSync);
   if (!binary) throw new Error("The CI runner requires installed Chrome");
@@ -33,8 +33,8 @@ export async function verifyBrowser(origin, cookie) {
     if (response.exceptionDetails) throw new Error("Browser expression failed");
     return response.result.value;
   }
-  async function waitFor(expression) {
-    for (let attempt = 0; attempt < 80; attempt++) { if (await evaluate(expression)) return; await delay(100); }
+  async function waitFor(expression, attempts = 80) {
+    for (let attempt = 0; attempt < attempts; attempt++) { if (await evaluate(`Boolean(${expression})`)) return; await delay(100); }
     throw new Error("Browser state did not settle");
   }
   async function clickButton(label, selector = "button") {
@@ -48,6 +48,12 @@ export async function verifyBrowser(origin, cookie) {
     await call("Input.insertText", { text: value });
   }
   const editorClosed = "!document.querySelector('.task-sheet')";
+  async function capture(name) {
+    await waitFor("Array.from(document.querySelectorAll('[data-slot=\"dialog-content\"],.task-sheet')).every(el => getComputedStyle(el).opacity === '1' && !el.getAnimations().some(a => a.playState === 'running'))");
+    await mkdir("artifacts", { recursive: true });
+    const result = await call("Page.captureScreenshot", { format: "png", captureBeyondViewport: false });
+    await writeFile(join("artifacts", `${name}.png`), Buffer.from(result.data, "base64"));
+  }
   try {
     let target;
     for (let attempt = 0; attempt < 150; attempt++) {
@@ -81,11 +87,169 @@ export async function verifyBrowser(origin, cookie) {
     stage = "daily-view";
     await call("Page.navigate", { url: origin });
     await waitFor("document.querySelector('h1')?.textContent === 'My Tasks' && document.querySelector('[aria-label=\"New task title\"]')?.disabled === false");
+    stage = "getting-started";
+    await clickButton("Getting started", '[data-slot="sidebar-menu-button"]');
+    await waitFor("document.querySelector('h1')?.textContent === 'Getting started' && document.querySelectorAll('.getting-started-card').length === 3");
+    await capture("context-getting-started-desktop");
+    await evaluate("document.querySelector('.getting-started-faq summary').focus()");
+    await waitFor("document.activeElement === document.querySelector('.getting-started-faq summary')");
+    await call("Input.dispatchKeyEvent", { type: "keyDown", key: "Enter", code: "Enter", text: "\r", unmodifiedText: "\r", windowsVirtualKeyCode: 13 });
+    await call("Input.dispatchKeyEvent", { type: "keyUp", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13 });
+    await waitFor("document.querySelector('.getting-started-faq details').open");
+    assert.equal(await evaluate("document.querySelector('.getting-started').textContent.includes('operator authorizes the exact work packet')"), true);
+    await capture("context-getting-started-desktop");
+    await call("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+    await capture("context-getting-started-mobile");
+    assert.equal(await evaluate("document.documentElement.scrollWidth <= 392"), true);
+    await clickButton("Return to My Tasks");
+    await waitFor("document.querySelector('h1')?.textContent === 'My Tasks'");
+    await call("Emulation.setDeviceMetricsOverride", { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
+    stage = "delivery-human-review";
+    await call("Page.navigate", { url: `${origin}/?${new URLSearchParams({ workspace: deliveryReview.workspaceId, project: deliveryReview.projectId, delivery: deliveryReview.ticketId })}` });
+    await waitFor("document.querySelector('h1')?.textContent === 'Agent delivery'");
+    const deliveryRow = `Array.from(document.querySelectorAll('.delivery-ticket')).find(el => el.querySelector('h3')?.textContent === ${JSON.stringify(deliveryReview.title)})`;
+    await waitFor(`Boolean(${deliveryRow})`);
+    await waitFor("document.querySelectorAll('.delivery-dialog .context-three-pane > section').length === 3");
+    assert.equal(await evaluate("document.querySelector('.delivery-dialog').textContent.includes('Agent-reported evidence')"), true);
+    assert.equal(await evaluate("window.__deliveryXss === undefined"), true);
+    await fill("#delivery-decision-reason", "Human BA accepts the explicit approval and role boundaries");
+    await capture("context-delivery-desktop");
+    await clickButton("Close", ".delivery-dialog button"); await clickButton("Keep reviewing");
+    assert.equal(await evaluate("document.querySelector('#delivery-decision-reason').value"), "Human BA accepts the explicit approval and role boundaries");
+    await call("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+    await capture("context-delivery-mobile"); assert.equal(await evaluate("document.documentElement.scrollWidth <= 392"), true);
+    await evaluate("document.querySelector('.delivery-dialog .context-human-approval').scrollIntoView({ block: 'center' })");
+    await evaluate("document.querySelector('.delivery-dialog .context-human-approval input').click()");
+    await capture("context-delivery-mobile-review");
+    await clickButton("Approve requirements baseline", ".delivery-dialog button");
+    await waitFor("document.querySelector('.delivery-dialog').textContent.includes('This outcome is accepted')");
+    await clickButton("Close", ".delivery-dialog button");
+    await call("Emulation.setDeviceMetricsOverride", { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
+    await clickButton("Connections"); await waitFor("document.querySelector('.delivery-center').textContent.includes('Isolated MCP laptop')");
+    stage = "agent-role-registration";
+    const agentAlias = `BROWSER-${crypto.randomUUID().slice(0, 8)}`;
+    await clickButton("Team and agents", '[data-slot="sidebar-menu-button"]');
+    await waitFor("document.querySelector('h1')?.textContent === 'Team and agents'");
+    await clickButton("Add agent role");
+    await fill("#agent-alias", agentAlias);
+    await fill("#agent-read-paths", "lib/\ntests/");
+    await fill("#agent-write-paths", "tests/");
+    await fill("#agent-reason", "Human reviewed browser fixture role");
+    await waitFor("Boolean(document.querySelector('.agent-review-check input:not(:disabled)'))");
+    assert.equal(await evaluate("document.querySelectorAll('.agent-role-dialog form.context-three-pane > section').length"), 3);
+    assert.equal(await evaluate("document.querySelector('.agent-role-dialog').textContent.includes('Outside my role')"), true);
+    await capture("context-agent-role-desktop");
+    await clickButton("Close", ".agent-role-dialog button");
+    await clickButton("Keep editing");
+    assert.equal(await evaluate("document.querySelector('#agent-alias').value"), agentAlias);
+    await evaluate("document.querySelector('.agent-review-check input').click()");
+    await clickButton("Propose role configuration", ".agent-role-dialog button");
+    await waitFor(`!document.querySelector('.agent-role-dialog') && Array.from(document.querySelectorAll('.agent-card h3')).some(el => el.textContent === ${JSON.stringify(agentAlias)})`);
+    const agentCard = `Array.from(document.querySelectorAll('.agent-card')).find(el => el.querySelector('h3')?.textContent === ${JSON.stringify(agentAlias)})`;
+    assert.equal(await evaluate(`${agentCard}.textContent.includes('Awaiting operator review')`), true);
+    await evaluate(`${agentCard}.querySelector('button').click()`);
+    await waitFor("Boolean(document.querySelector('.agent-review-check input:not(:disabled)'))");
+    await fill("#agent-reason", "Accept responsibility after reviewing the exact prompt and scope");
+    await call("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+    await capture("context-agent-role-mobile");
+    assert.equal(await evaluate("document.documentElement.scrollWidth <= 392"), true);
+    await evaluate("document.querySelector('.agent-review-check').scrollIntoView({ block: 'center' })");
+    await waitFor("(() => { const box = document.querySelector('.agent-role-dialog button[type=submit]')?.getBoundingClientRect(); return box && box.top >= 0 && box.bottom <= innerHeight && box.left >= 0 && box.right <= innerWidth; })()");
+    await capture("context-agent-role-mobile-review");
+    await evaluate("document.querySelector('.agent-review-check input').click()");
+    await clickButton("Accept operator responsibility", ".agent-role-dialog button");
+    await waitFor(`!document.querySelector('.agent-role-dialog') && ${agentCard}.textContent.includes('Operator approved')`);
+    assert.equal(await evaluate(`${agentCard}.textContent.includes('Not connected')`), true);
+    await call("Emulation.setDeviceMetricsOverride", { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
+    await capture("context-agent-registry-desktop");
+    await evaluate(`Array.from(${agentCard}.querySelectorAll('button')).find(el => el.textContent.trim() === 'History').click()`);
+    await waitFor("Boolean(document.querySelector('.agent-history-dialog .brief-history li'))");
+    assert.equal(await evaluate("document.querySelector('.agent-history-dialog').textContent.includes('initialized') && document.querySelector('.agent-history-dialog').textContent.includes('registered')"), true);
+    await clickButton("Close", ".agent-history-dialog button");
+    await waitFor("!document.querySelector('.agent-history-dialog')");
+    stage = "project-brief-publication";
+    const requirementTitle = `Browser requirement ${crypto.randomUUID().slice(0, 8)}`;
+    await clickButton("Project brief", '[data-slot="sidebar-menu-button"]');
+    await waitFor("document.querySelector('h1')?.textContent === 'Project brief'");
+    await clickButton("Publish context");
+    await fill("#context-title", requirementTitle);
+    await fill("#context-body", "The user can prepare a task brief from this exact requirement. <script>window.__contextXss=true</script>");
+    await fill("#context-reason", "Approved browser fixture requirement.");
+    assert.equal(await evaluate("document.querySelectorAll('form.context-three-pane > section').length"), 3);
+    await capture("context-editor-desktop");
+    await clickButton("Publish approved context");
+    await waitFor(`!document.querySelector('.context-editor-dialog') && Array.from(document.querySelectorAll('.brief-document h4')).some(el => el.textContent === ${JSON.stringify(requirementTitle)})`);
+    assert.equal(await evaluate("window.__contextXss === undefined"), true);
+    await capture("context-project-desktop");
+    stage = "repository-source-enrollment";
+    await clickButton("Connect repository");
+    await waitFor("document.querySelector('.repository-state')?.textContent === 'Waiting for sync'");
+    await reconcileRepository("a");
+    await clickButton("Refresh status");
+    await waitFor("document.querySelector('.repository-state')?.textContent === 'Verified snapshot'");
+    await evaluate("document.querySelector('.repository-files').open = true; document.querySelector('.repository-files>details').open = true; document.querySelector('.repository-context').scrollIntoView({block:'center'})");
+    assert.equal(await evaluate("!window.__repositoryXss && document.querySelector('.repository-files pre').textContent.includes('<script>')"), true);
+    await capture("context-github-desktop");
+    await call("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+    await delay(200);
+    assert.equal(await evaluate("document.documentElement.scrollWidth <= window.innerWidth + 1"), true);
+    await capture("context-project-mobile");
+    await evaluate("document.querySelector('.repository-context').scrollIntoView({block:'start'})");
+    await capture("context-github-mobile");
+    await call("Emulation.setDeviceMetricsOverride", { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
+    await delay(100);
+    await clickButton(`History of ${requirementTitle}`);
+    await waitFor("Boolean(document.querySelector('.brief-history li'))");
+    await clickButton("Close", ".context-editor-dialog button");
+    await clickButton("My Tasks", '[data-slot="sidebar-menu-button"]');
+    await waitFor("document.querySelector('[aria-label=\"New task title\"]')?.disabled === false");
     const title = `Browser acceptance ${crypto.randomUUID().slice(0, 8)}`;
     await fill('[aria-label="New task title"]', title);
     await clickButton("Create task");
     await waitFor(`Array.from(document.querySelectorAll('.task-open strong')).some(el => el.textContent === ${JSON.stringify(title)})`);
     await evaluate(`Array.from(document.querySelectorAll('.task-open')).find(el => el.querySelector('strong')?.textContent === ${JSON.stringify(title)}).click()`);
+    stage = "task-brief-preparation";
+    await evaluate("document.querySelector('.task-context-toggle').click()");
+    await waitFor("Boolean(document.querySelector('.brief-requirement-picker'))");
+    await evaluate(`Array.from(document.querySelectorAll('.brief-requirement-picker label')).find(el => el.textContent.includes(${JSON.stringify(requirementTitle)})).querySelector('button').click()`);
+    await clickButton("Prepare task brief");
+    await waitFor("document.querySelector('.task-brief-status')?.textContent.includes('Brief is current')");
+    stage = "task-brief-context-change";
+    await clickButton("Close", ".task-sheet button"); await waitFor(editorClosed);
+    await clickButton("Project brief", '[data-slot="sidebar-menu-button"]');
+    await clickButton(`Revise ${requirementTitle}`);
+    await fill("#context-body", "The accepted requirement changed after the task brief was prepared.");
+    await fill("#context-reason", "Review an updated requirement.");
+    await capture("context-editor-revision");
+    await clickButton("Publish approved context");
+    await waitFor("!document.querySelector('.context-editor-dialog')");
+    await clickButton("My Tasks", '[data-slot="sidebar-menu-button"]');
+    await waitFor(`Array.from(document.querySelectorAll('.task-open strong')).some(el => el.textContent === ${JSON.stringify(title)})`);
+    await evaluate(`Array.from(document.querySelectorAll('.task-open')).find(el => el.querySelector('strong')?.textContent === ${JSON.stringify(title)}).click()`);
+    await evaluate("document.querySelector('.task-context-toggle').click()");
+    await waitFor("document.querySelector('.task-brief-status')?.textContent.includes('Brief needs a review')");
+    await evaluate("document.querySelector('.task-context-section').scrollIntoView({block:'start'})");
+    await capture("context-task-stale");
+    await clickButton("Prepare updated brief");
+    await waitFor("document.querySelector('.task-brief-status')?.textContent.includes('Brief is current')");
+    stage = "repository-brief-freshness";
+    await reconcileRepository("b");
+    await clickButton("Refresh context");
+    await waitFor("document.querySelector('.task-brief-status')?.textContent.includes('repository connection or commit changed')");
+    await clickButton("Prepare updated brief");
+    await waitFor("document.querySelector('.task-brief-status')?.textContent.includes('Brief is current')");
+    await evaluate("document.querySelector('.saved-task-brief').open = true");
+    assert.equal(await evaluate("document.querySelector('.saved-task-brief .repository-commit a')?.title === 'b'.repeat(40)"), true);
+    await reconcileRepository("unavailable");
+    await clickButton("Refresh context");
+    await waitFor("document.querySelector('.task-brief-status')?.textContent.includes('current access cannot be verified')");
+    assert.equal(await evaluate("document.querySelector('.saved-task-brief') === null"), true);
+    assert.equal(await evaluate("document.querySelector('.brief-requirement-picker legend').textContent.includes('(1/20)')"), true);
+    assert.equal(await evaluate("!document.querySelector('.task-context-content').textContent.includes('Task brief prepared.')"), true);
+    await capture("context-github-unavailable");
+    await reconcileRepository("b");
+    await clickButton("Refresh context");
+    await waitFor("document.querySelector('.task-brief-status')?.textContent.includes('Brief is current')");
     stage = "comments-and-mentions";
     const body = "Review <img src=x onerror=window.__strideXss=true> @";
     await fill("#task-comment", body);
@@ -109,6 +273,16 @@ export async function verifyBrowser(origin, cookie) {
     await waitFor("document.querySelector('#task-blocked')?.value === 'Waiting for review' && document.querySelector('.checklist-progress')?.value === 1");
     stage = "comments-and-mentions";
     await fill("#task-comment", "Unsent comment stays here");
+    stage = "background-comment-update-preserves-draft";
+    const linkedTask = new URL(deepLink);
+    const remoteTaskPath = `${origin}/api/tasks/${encodeURIComponent(linkedTask.searchParams.get("task"))}?${new URLSearchParams({ workspace_id: linkedTask.searchParams.get("workspace") })}`;
+    const remoteCommentPath = remoteTaskPath.replace("?", "/comments?");
+    const remoteComment = `Update from another client ${crypto.randomUUID().slice(0, 8)}`;
+    const remoteCommentResult = await fetch(remoteCommentPath, { method: "POST", headers: { Cookie: cookie, Origin: origin, "Content-Type": "application/json" }, body: JSON.stringify({ body: remoteComment, mentioned_user_ids: [] }) });
+    assert.equal(remoteCommentResult.ok, true);
+    await waitFor(`Array.from(document.querySelectorAll('.comment-body')).some(el => el.textContent === ${JSON.stringify(remoteComment)})`, 420);
+    assert.equal(await evaluate("document.querySelector('#task-comment').value"), "Unsent comment stays here");
+    await capture("context-collaboration-draft");
     await clickButton("Close", ".task-sheet button");
     await clickButton("Keep editing");
     assert.equal(await evaluate("document.querySelector('#task-comment').value"), "Unsent comment stays here");
@@ -118,6 +292,12 @@ export async function verifyBrowser(origin, cookie) {
     stage = "board-transitions-and-trash";
     await clickButton("Project board", '[data-slot="sidebar-menu-button"]');
     await waitFor(`Array.from(document.querySelectorAll('.board-task-title')).some(el => el.textContent === ${JSON.stringify(title)})`);
+    stage = "background-task-update";
+    const remoteTask = await (await fetch(remoteTaskPath, { headers: { Cookie: cookie } })).json();
+    const remotePatch = await fetch(remoteTaskPath, { method: "PATCH", headers: { Cookie: cookie, Origin: origin, "Content-Type": "application/json" }, body: JSON.stringify({ version: remoteTask.version, priority: "high" }) });
+    assert.equal(remotePatch.ok, true);
+    await waitFor(`Array.from(document.querySelectorAll('.board-card')).find(el => el.querySelector('.board-task-title')?.textContent === ${JSON.stringify(title)})?.querySelector('.priority-high')`, 420);
+    stage = "board-transitions-and-trash";
     await clickButton(`Start ${title}`);
     await waitFor(`Array.from(document.querySelectorAll('.column-in_progress .board-task-title')).some(el => el.textContent === ${JSON.stringify(title)})`);
     await clickButton(`Complete ${title}`);
@@ -147,6 +327,8 @@ export async function verifyBrowser(origin, cookie) {
     await clickButton(`Quick edit ${bulkTitle}`);
     await clickButton(`Priority for ${bulkTitle}`);
     await clickButton("high priority", '[role="option"]');
+    await clickButton("Refresh tasks");
+    assert.equal(await evaluate("document.querySelector('[data-slot=\"popover-content\"]')?.textContent.includes('high priority')"), true);
     await clickButton("Save", '[data-slot="popover-content"] button');
     await waitFor(`Array.from(document.querySelectorAll('.inline-task-trigger')).some(el => el.getAttribute('aria-label') === ${JSON.stringify(`Quick edit ${bulkTitle}`)} && el.textContent.includes('high'))`);
     await clickButton("Save view"); await fill('[aria-label="Saved view name"]', "Browser focus"); await clickButton("Save filters");
@@ -169,6 +351,7 @@ export async function verifyBrowser(origin, cookie) {
     assert.deepEqual(runtimeErrors, []);
     console.log("Browser task, checklist, blocker, deep link, quick edit, bulk, saved view, shortcut, collaboration and 390px layout checks passed.");
   } catch (error) {
+    try { await capture("context-failure"); } catch { /* Preserve the original failure if the page is unavailable. */ }
     console.error(JSON.stringify({ event: "browser_check_failed", stage, reason: error instanceof Error ? error.message : "unknown", ...(stage === "chrome-start" ? { chromeExit: chrome.exitCode, startupLog } : {}) })); throw error;
   } finally {
     for (const operation of pending.values()) { clearTimeout(operation.timer); operation.reject(new Error("Browser closed")); }

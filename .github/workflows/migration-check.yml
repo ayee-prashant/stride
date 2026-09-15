@@ -1,13 +1,33 @@
 name: Verify hosting migration
 on:
   pull_request:
-    branches: [main]
+    branches: [main, deploy/vercel-railway, design/human-agent-workforce, feature/agent-context-foundation, design/human-approved-delivery, feature/agent-role-registry]
 permissions:
   contents: read
 concurrency:
   group: migration-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 jobs:
+  local-setup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm run setup:local -- --app-port 3109 --db-port 55439
+      - run: npm run doctor:local
+      - name: Verify real local provisioning is repeatable
+        run: node scripts/test-local-setup.mjs
+        env:
+          STRIDE_LOCAL_FIXTURE: isolated-runner
+      - name: Stop only this checkout's local database
+        if: ${{ always() }}
+        run: npm run stop:local
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -34,8 +54,15 @@ jobs:
           node-version: '24'
       - run: npm ci --no-audit --no-fund
       - run: npm run db:generate
-      - name: Check committed migration history
-        run: test -z "$(git status --porcelain -- package-lock.json drizzle-postgres)"
+      - name: Report generated migration sources for review
+        run: |
+          node --input-type=module <<'NODE'
+          import { execFileSync } from 'node:child_process';
+          import { readFileSync } from 'node:fs';
+          import { gzipSync } from 'node:zlib';
+          const names = execFileSync('git', ['ls-files', '--modified', '--others', '--exclude-standard', 'drizzle-postgres'], { encoding: 'utf8' }).trim().split('\n').filter(Boolean);
+          for (const path of names) console.log('GENERATED_MIGRATION', JSON.stringify({ path, gzip: gzipSync(readFileSync(path)).toString('base64') }));
+          NODE
       - uses: actions/upload-artifact@v4
         id: generated
         with:
@@ -44,8 +71,11 @@ jobs:
             package-lock.json
             drizzle-postgres/
           retention-days: 7
+      - name: Check committed migration history
+        run: test -z "$(git status --porcelain -- package-lock.json drizzle-postgres)"
       - run: bash -n infra/postgres/tls-start.sh
       - run: node --check scripts/verify-production.mjs
+      - run: node --check scripts/verify-github-production.mjs
       - run: npm test
       - run: npm run test:postgres
         env:
@@ -55,14 +85,27 @@ jobs:
         run: node --experimental-strip-types --test tests/postgres-productivity.integration.test.ts
         env:
           TEST_DATABASE_URL: postgresql://stride_test:isolated_ci_fixture@127.0.0.1:5432/stride_test
+      - name: Verify context authority and competing writers on PostgreSQL
+        run: node --experimental-strip-types --test tests/postgres-context.integration.test.ts
+        env:
+          TEST_DATABASE_URL: postgresql://stride_test:isolated_ci_fixture@127.0.0.1:5432/stride_test
+      - name: Verify GitHub source reconciliation and competing workers on PostgreSQL
+        run: node --experimental-strip-types --test tests/postgres-repository-sources.integration.test.ts
+        env:
+          TEST_DATABASE_URL: postgresql://stride_test:isolated_ci_fixture@127.0.0.1:5432/stride_test
+      - name: Verify human agent roles and concurrent decisions on PostgreSQL
+        run: node --experimental-strip-types --test tests/postgres-agent-registry.integration.test.ts
+        env:
+          TEST_DATABASE_URL: postgresql://stride_test:isolated_ci_fixture@127.0.0.1:5432/stride_test
+      - name: Verify complete human delivery and concurrent agent claims on PostgreSQL
+        run: node --experimental-strip-types --test tests/postgres-delivery.integration.test.ts
+        env:
+          TEST_DATABASE_URL: postgresql://stride_test:isolated_ci_fixture@127.0.0.1:5432/stride_test
+      - name: Verify modern and legacy MCP using the maintained client
+        run: node --experimental-strip-types --test tests/mcp.integration.test.ts
       - name: Audit dependencies
         run: node scripts/audit-dependencies.mjs
         if: ${{ !cancelled() && steps.generated.outcome == 'success' }}
-      - name: Verify query performance and backup restoration
-        run: node --experimental-strip-types scripts/verify-performance-restore.ts
-        env:
-          TEST_DATABASE_URL: postgresql://stride_test:isolated_ci_fixture@127.0.0.1:5432/stride_test
-          TEST_POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
         with:
@@ -85,6 +128,11 @@ jobs:
           STRIDE_BOOTSTRAP_EMAIL: owner@stride.invalid
           STRIDE_BOOTSTRAP_NAME: Isolated CI owner
           STRIDE_BOOTSTRAP_PASSWORD: isolated-ci-owner-password-not-for-production
+      - name: Verify attended coordinator startup without a repository secret
+        run: npm run worker:agents -- --once
+        env:
+          NODE_ENV: test
+          DATABASE_URL: postgresql://stride_app:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef@127.0.0.1:5432/stride_test
       - name: Verify real session and task flow
         run: npm run test:auth-runtime
         env:
@@ -92,3 +140,15 @@ jobs:
           STRIDE_RUNTIME_PASSWORD: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
           STRIDE_BOOTSTRAP_EMAIL: owner@stride.invalid
           STRIDE_BOOTSTRAP_PASSWORD: isolated-ci-owner-password-not-for-production
+      - name: Verify query performance and backup restoration
+        run: node --experimental-strip-types scripts/verify-performance-restore.ts
+        env:
+          TEST_DATABASE_URL: postgresql://stride_test:isolated_ci_fixture@127.0.0.1:5432/stride_test
+          TEST_POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+      - name: Keep context interface review images
+        uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: context-ui-${{ github.event.pull_request.head.sha }}
+          path: artifacts/context-*.png
+          retention-days: 7
