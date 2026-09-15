@@ -16,9 +16,12 @@ No model API is required.
    job. Provisioning grants the runtime read/insert access to immutable source
    observations, source events and request receipts, and denies their update or
    deletion. Existing migrations and human task data are preserved.
-2. Create a GitHub App with repository **Contents: read** and **Metadata: read**.
-   Install it only on the repositories to be enrolled. This slice does not need
-   GitHub write, pull-request, Actions, organization or account-wide permissions.
+2. Create a private GitHub App with repository **Contents: read**, **Metadata: read**,
+   **Pull requests: read**, **Checks: read**, **Commit statuses: read** and
+   **Deployments: read** for the attended delivery release. The source reader alone
+   uses Contents and Metadata; the delivery verifier uses all six. Install it only
+   on the repository to be enrolled. No write, Actions, organization or account
+   permissions are required. Polling does not require an active webhook or user OAuth.
    Keep the private key in the host secret manager, never in a repository file.
 3. Set `STRIDE_GITHUB_CONTEXT_BINDINGS` on the web service and context worker to
    the same JSON array of explicit project grants. The IDs must refer to existing
@@ -42,9 +45,11 @@ No model API is required.
    `STRIDE_GITHUB_APP_PRIVATE_KEY`. The web service does not need the signing key.
    A PEM value may contain actual newlines or escaped `\n` characters. The worker
    refuses partial settings, invalid keys, duplicate grants and unsupported paths.
-5. Start one persistent service with `npm run worker:context`, the same immutable
+5. Start one persistent service with `npm run worker:agents`, the same immutable
    source version as the web app, its runtime database URL and verified database
    TLS configuration. The existing scheduled email/reminder job remains separate.
+   The coordinator performs both source reconciliation and delivery evidence reads;
+   an additional source-only worker is unnecessary.
    Allow at least 45 seconds for graceful termination of an in-flight read.
 6. The project grant delegates read access to current members of its Stride
    workspace. Review that audience and the configured files before enrollment.
@@ -96,13 +101,15 @@ no repository source is connected.
   after the new configuration reaches the web replicas. Restart/update **all** web
   and worker replicas when changing or removing a grant.
 
-## Scope and limits
+## Source component scope and limits
 
-This first slice observes configured files at the enrolled branch. It does not
-index the entire repository, discover all requirements, ingest PR/CI evidence,
-protect branches, associate a shared GitHub account with an agent, implement
-webhook delivery, or authorize agent work. `repository_mode` is `observed`, source
-coverage is `configured_files`, and task briefs keep `execution_ready: false`.
+The source component observes configured files at the enrolled branch. It does
+not index the entire repository, discover all requirements, protect branches,
+implement webhook delivery, or authorize agent work. `repository_mode` is `observed`
+and source coverage is `configured_files`. Context-only briefs keep
+`execution_ready: false`; attended execution uses separately approved delivery packets.
+PR/CI evidence, stable agent profiles and execution gates belong to the delivery
+service described in ATTENDED_SETUP.md.
 Any branch head change conservatively invalidates a source-aware task brief;
 component-specific code impact rules are not implemented yet.
 
@@ -128,8 +135,10 @@ against PostgreSQL, with competing worker and source/brief publication tests.
 Provider tests use signed synthetic App JWTs and mocked GitHub responses. Browser
 verification uses genuine local test sessions and a fixture observation through
 the real queue and database service; it does not contact GitHub or add an auth bypass.
-A real installed GitHub App, an external push and worker restart remain mandatory
-live-integration checks before advertising the source connection as deployed.
+An installed App, an external push and worker restart are separate live-integration
+checks. Current installation and verification records are in ../RELEASE_REVIEW.md.
+The guarded production source check receives no GitHub signing key and operates
+through an authenticated human session on the private application network.
 
 Follow IMPLEMENTATION_STATUS.md and DELIVERY_PLAN.md for source indexing, PR/CI
 reconciliation, actor identities, proposals, MCP/OAuth, start approvals and the

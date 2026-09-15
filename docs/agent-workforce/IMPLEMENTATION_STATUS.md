@@ -36,10 +36,15 @@ mobile delivery screenshots were retrieved and visually reviewed. These are
 isolated acceptance results; exact production rollout and live-check evidence is
 tracked in [PR #10](https://github.com/ayee-prashant/stride/pull/10).
 
-The deployed application needs its own GitHub App installation and worker-only
-signing key. Those credentials are not available through the development GitHub
-connector. BA requirements work does not require GitHub; source-aware development
-and independent candidate/deployment acceptance stay blocked until it is connected.
+The deployed application now has its own private GitHub App, installed only on
+`ayee-prashant/stride`, with its signing key confined to `stride-agents`. Live
+document synchronization and PR/check verification passed; see ../RELEASE_REVIEW.md
+and PR #11 for exact source, deployment and verification records. The existing
+deployment pipeline still needs immutable artifact IDs in GitHub Deployment payloads
+for positive UAT/release verification. Humans also configure project reviewers and
+enroll their own IDE agents. BA requirements work does not require GitHub;
+source-aware development requires a current source observation and the responsible
+human's reviewed assignment and start grant.
 No OpenRouter or model API is required. Arbitrary IDE auto-wake and automatic task
 assignment remain outside the approved first attended release.
 

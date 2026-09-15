@@ -1,5 +1,84 @@
 # Release review — 2026-09-15
 
+## Live application-owned GitHub connection
+
+The private **Stride ayee-prashant** App (App ID 4949498, installation 161829042)
+is installed on **ayee-prashant/stride only**. The owner explicitly approved
+read-only Contents, Metadata, Pull requests, Checks, Commit statuses and
+Deployments access. Webhooks and user OAuth were not enabled. The signing key's
+public fingerprint was matched to GitHub before transfer; its only persistent
+destination is the private `stride-agents` service. Temporary downloads were
+removed from both synchronized locations. Web receives grant metadata only;
+the scheduled and provisioning services have no GitHub credentials.
+
+The reviewed grant enrolls the owner's existing **First sprint** project and
+one-member workspace, tracks `deploy/vercel-railway`, and includes eight reviewed
+documentation files totaling 60,854 bytes. The authenticated human API enrolled
+source `85ee4fbd-18f3-41b9-98f1-e48d721381dc`. Controlled private job
+`e0886a01-fca8-42fc-a227-ea922f753f0e` observed **pending → current**, verified
+every Git blob and SHA-256 hash at head `8bbd067f62253d68e2ed0d5ae1c1bcdceeef1113`,
+and signed out at 06:22:27 UTC. The initial manifest hash was
+`2ea5c4fac88f137f3105700aefa741b52332a3180a105d113ad9602345d24132`.
+
+Worker diagnostic deployment `da8ea64f-6172-4fa4-a2e2-28e203c53dea` independently
+verified PR #11 at `89154199f6177e72bc83dbcbc40dce3d6f289c8a` at 06:32:58 UTC:
+six changed paths, five successful checks/statuses, the exact repository and
+target branch, and a final PR-head reread. It rejected an older commit for that
+PR and a nonexistent production artifact. All calls used the installed App's
+short-lived, repository-scoped tokens inside the worker.
+
+The production project has no delivery responsibilities or delivery tickets yet.
+An initial diagnostic reached the evidence table's project-configuration foreign
+key; the corrected diagnostic respected that prerequisite and checked the real
+provider directly. **The production evidence queue has not been exercised**;
+its complete contract passed against PostgreSQL in CI. No human responsibilities,
+agent enrollments, task starts or delivery approvals were fabricated for testing.
+
+The most recent 20 actual GitHub Deployment records were readable, including
+Stride production records and preview records, but none had `payload.artifact`.
+Positive UAT/production artifact verification therefore remains an operator
+pipeline prerequisite. Existing host success records cannot substitute for the
+approved immutable artifact identifier; these gates remain blocked until the
+pipeline publishes suitable records. The App remains read-only.
+
+Verification source `89154199f6177e72bc83dbcbc40dce3d6f289c8a`, tree
+`55f20d14ebf4aaa10adf3390e0843809848f3ee3`, passed the complete
+[CI run 34936856432](https://github.com/ayee-prashant/stride/actions/runs/34936856432),
+job 104276547228: 122 native tests, all PostgreSQL/concurrency/MCP contracts,
+migration parity, audit, typecheck, lint, build, real OAuth/CLI/browser acceptance
+and the 41-table content-checked backup restore. The guarded human source check
+is saved in `scripts/verify-github-production.mjs`; PRs against the deployment
+branch now receive the same complete CI gate.
+
+The tracked branch was then fast-forwarded to the already-tested
+`98c65d6a8067033d656168bb32e56bf32a7361a5`, the head of PR #10 merged by the owner
+at 04:15:27 UTC. GitHub's comparison confirmed a single verification-only commit:
+two probe scripts, a regression test and release notes; application and worker
+code were identical. There were zero delivery tickets before this baseline change.
+
+The actual GitHub push triggered three successful deployments at exactly that SHA:
+
+| Service | Deployment | Verification |
+| --- | --- | --- |
+| Web | `4066e128-6fc8-47a3-a5ce-a87180a856e9` | Database-backed healthcheck and subsequent authenticated source read |
+| Coordinator | `fc66ac9a-ffd7-466c-8073-65dc4c441486` | Normal `npm run worker:agents` startup at 06:37:28 UTC, repository configured |
+| Scheduled worker | `cd086456-9354-48a7-890f-dbd4236c5a04` | Real tick at 06:40:03 UTC, sent=0, failed=0 |
+
+Private observation job `adfcdb71-0cef-4eda-9240-8fc80027c985` then verified the
+same persisted source ID at the new branch head. Its `last_verified_at` was
+06:39:00.952 UTC, after the coordinator restart; the new manifest was
+`44ace6070ce1d4645b537d284008873e7051bb215b77e9c67c67f709c55219e7`.
+All eight files and their hashes passed again. The job signed out at 06:40:15 UTC.
+This confirms live external-push detection and synchronization after restart;
+it is not a claim that an in-flight crash or production load was injected.
+Temporary diagnostic commands were restored to the normal worker/provisioning
+commands. Source enrollment, reviewer configuration and GitHub secret scope were
+not changed by the observation check.
+
+See [PR #11](https://github.com/ayee-prashant/stride/pull/11) for the source and
+final rollout record. Public-edge browser checks and positive artifact-receipt
+verification remain outside the successful live checks listed here.
+
 ## Attended agent delivery — current release candidate
 
 [PR #10](https://github.com/ayee-prashant/stride/pull/10) contains the complete
@@ -13,8 +92,9 @@ The verified domain flow includes both QA and UAT failures followed by developme
 and repeated reviews, exact artifact authorization and production closure. It
 also covers same-profile review provenance, duplicate active plan rejection,
 competing claims, stale role/membership/context, original-session revocation,
-private notification cursors and immutable audit receipts. GitHub-provider tests
-use explicitly simulated endpoints; no live GitHub installation is claimed.
+private notification cursors and immutable audit receipts. Isolated GitHub-provider
+tests use explicitly simulated endpoints; the live installation checks are recorded
+separately above.
 
 Generated migrations 0006–0008 are additive. Published migration/lock archives were
 checked before commit; prior migration bytes remain unchanged. Provisioning denies
@@ -50,9 +130,9 @@ references. The rollout provisions migrations first, then deploys the exact
 verified source and checks actual startup/readiness/live-verification results.
 Exact production deployment IDs and live-check results are maintained in
 [PR #10](https://github.com/ayee-prashant/stride/pull/10).
-The dedicated application's GitHub App key/bindings are not configured. Vercel
-still returns a team-scope 403 on 2026-09-15. Neither limit is concealed by the CI
-fixtures or by the canonical Railway application URL.
+The dedicated application's GitHub App is now configured as recorded above.
+Vercel still returns a team-scope 403 on 2026-09-15. Public-edge browser verification
+is not inferred from private-network checks or the canonical Railway URL.
 
 The initial live probe found that Node 24 fetch drops a supplied Host header,
 so the agent endpoint correctly rejected the private listener authority with 403.
