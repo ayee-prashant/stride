@@ -98,6 +98,6 @@ export async function verifyAgentRuntime({ origin, request, json, userId, worksp
     assert.equal((await raw("/mcp", { method: "POST", headers: bearer(rotated) })).status, 401);
     console.log(JSON.stringify({ event: "agent_runtime_passed", checks: ["real_oauth_pkce", "code_single_use", "resource_isolation", "modern_mcp", "human_start", "report_requires_human_review", "refresh_rotation", "connection_revocation"] }));
     return { title, ticketId: ticket.id, workspaceId, projectId };
-  } catch (error) { console.error(JSON.stringify({ event: "agent_runtime_failed", stage, kind: error?.name, expected: typeof error?.expected === "number" ? error.expected : undefined, actual: typeof error?.actual === "number" ? error.actual : undefined, frames: error instanceof Error ? error.stack?.split("\n").filter(line => line.trim().startsWith("at ")).slice(0, 3) : [] })); throw error; }
+  } catch (error) { console.error(JSON.stringify({ event: "agent_runtime_failed", stage, kind: error?.name, code: typeof error?.code === "string" && /^[A-Z_]{1,40}$/.test(error.code) ? error.code : undefined, expected: typeof error?.expected === "number" ? error.expected : undefined, actual: typeof error?.actual === "number" ? error.actual : undefined, frames: error instanceof Error ? error.stack?.split("\n").filter(line => line.trim().startsWith("at ")).slice(0, 3) : [] })); throw error; }
   finally { await client?.close(); }
 }

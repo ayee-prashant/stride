@@ -6,6 +6,15 @@ import { join } from "node:path";
 import { Client } from "@modelcontextprotocol/client";
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
 
+async function stop(child) {
+  if (!child || child.exitCode !== null || child.signalCode !== null) return;
+  await new Promise(resolve => {
+    const timeout = setTimeout(() => child.kill("SIGKILL"), 18000);
+    child.once("exit", () => { clearTimeout(timeout); resolve(); });
+    child.kill("SIGTERM");
+  });
+}
+
 /** Exercise the shipped CLI and SDK OAuth helper, not a replacement transport. */
 export async function verifyAgentCli({ origin, connection, request, json, profileId, ticketId, overviewPath, packetHash }) {
   assert.equal(process.env.CI, "true"); assert.equal(origin, "http://127.0.0.1:3107");
@@ -63,7 +72,7 @@ export async function verifyAgentCli({ origin, connection, request, json, profil
     await client.connect(transport); assert.equal((await client.listTools()).tools.length, 7);
     const role = await client.callTool({ name: "stride_get_role", arguments: {} }); assert.equal(!!role.isError, false);
     assert.equal((role.structuredContent?.result ?? JSON.parse(role.content[0].text)).profile_id, profileId);
-    await client.close(); client = undefined;
+    await client.close(); client = undefined; transport = undefined;
     stage = "attended-watcher";
     watcher = spawn(process.execPath, ["scripts/stride-agent.mjs", "watch", "--connection", connection.id, "--ticket", ticketId], { stdio: ["ignore", "ignore", "ignore"] });
     let prepared = false;
@@ -79,7 +88,8 @@ export async function verifyAgentCli({ origin, connection, request, json, profil
     console.error(JSON.stringify({ event: "agent_cli_failed", stage, kind: error?.name, expected: typeof error?.expected === "number" ? error.expected : undefined, actual: typeof error?.actual === "number" ? error.actual : undefined }));
     throw error;
   } finally {
-    login?.kill(); watcher?.kill(); await client?.close(); await transport?.close();
+    await stop(login); await stop(watcher);
+    if (client) await client.close(); else await transport?.close();
     // This directory was proven absent and belongs to this random CI enrollment.
     await rm(directory, { recursive: true, force: true });
   }
