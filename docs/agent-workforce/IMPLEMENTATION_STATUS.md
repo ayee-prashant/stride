@@ -1,7 +1,8 @@
 # Agent workforce implementation
 
 Implementation approved on 2026-09-14. Work is on
-`feature/agent-context-foundation`, based on the reviewed design. This record
+`feature/agent-context-foundation` and the next stacked branch
+`feature/github-project-context`, based on the reviewed design. This record
 distinguishes working application behavior from remaining delivery gates.
 
 ## Context foundation implemented
@@ -26,8 +27,8 @@ distinguishes working application behavior from remaining delivery gates.
   saves; a person must explicitly discard them when closing.
 
 These are human-prepared **task briefs**, not authorized agent work packets.
-The response always has `execution_ready: false` and explicitly reports GitHub
-source coverage as `not_connected`. No credential or execution authority is
+The response always has `execution_ready: false`. Projects without an enrolled
+GitHub source report source coverage as `not_connected`. No credential or execution authority is
 created by publishing context or preparing a brief.
 
 ## Verification
@@ -39,29 +40,70 @@ migration was committed. The generated snapshot and migration were retrieved
 and reviewed; the new task unique constraint was moved before its referencing
 foreign key in migration 0003. Existing migrations and the lockfile are unchanged.
 
-The complete PostgreSQL, concurrent-writer, runtime-role, browser and interface
-checks passed in [CI run 34883532152](https://github.com/ayee-prashant/stride/actions/runs/34883532152)
-for source `036e89fe25df721a6c546285f1b5aea380a3df64` (tree
-`9fb2353e237fc7ec6ca12d22772a214bff60a2a0`). The browser verified publication,
-history, task preparation, a relevant revision marking the brief stale, and
-preparing an updated brief, followed by all existing productivity flows.
+The final context-foundation checks passed in
+[CI run 34884573544](https://github.com/ayee-prashant/stride/actions/runs/34884573544)
+for source `f81dda634c410c6f8319084aca5cde46c4d2b0e9` (tree
+`516e5c195105431cb74a3df78088cd56992a1c9b`). This includes PostgreSQL,
+concurrent publication and permission revocation, migrations, runtime grants,
+audit, performance/restore, type checking, lint, build and browser acceptance.
+The three-pane document dialog is **Published context → Your draft → Review &
+publish**. Its desktop, mobile, revision history, preserved drafts and stale brief
+flows were verified. This code remains on the feature branch; it is not deployed.
 
-The post-build review adds explicit serialization with permission revocation
-and project archival, concurrent context-binding checks, and desktop/mobile
-screen captures. Those changes require a fresh complete CI run before release.
+## GitHub source foundation implemented
+
+- Admin enrollment uses a server-owned project-to-repository grant, with a
+  separate read-only GitHub App key confined to the context worker.
+- Durable, fenced source jobs pin all configured files to one verified commit,
+  verify blob hashes, handle incomplete reads and provider cooldowns, and recover
+  from expired workers without accepting late results.
+- Source observations and human publications share a commit-ordered change
+  cursor. Human decisions and observed code remain separate records.
+- Task briefs include immutable source manifests and exact file contents. A
+  changed commit invalidates the brief; an expired check, outage or removed grant
+  blocks preparation and withholds cached private source files.
+- Project brief includes enrollment, source status, commit/file review, refresh
+  and disconnect controls. Task briefs show their saved repository versions.
+
+The first complete source CI passed in
+[run 34889108668](https://github.com/ayee-prashant/stride/actions/runs/34889108668)
+on `2ad6bd374a44b214e7d524a0b1fa99d9105178f6` (tree
+`098238b42d1cbffe37c75c8349a2fbe253862963`). Its gates include 100 native tests,
+real PostgreSQL source/context contracts and competing workers, migration parity,
+runtime grants, audit, type/lint/build, performance/restore and the genuine
+session/browser flow. Desktop/mobile source review and outage screenshots were
+retrieved and visually inspected.
+
+Post-build review preserves selected requirements during source outages, clears
+obsolete success notices, allows explicit reenrollment after a changed project
+grant, improves task-brief spacing, and verifies restored context record contents.
+The expanded native suite has **101 passing tests**. The latest complete check
+results are attached to [draft PR #7](https://github.com/ayee-prashant/stride/pull/7);
+each new source commit must pass the full gate before release.
+Setup, coverage and limits are in [GITHUB_CONTEXT_SETUP.md](GITHUB_CONTEXT_SETUP.md).
+No GitHub App credentials have been provisioned for the deployed application.
+
+## Human-approved delivery design authored
+
+[Human-approved delivery](HUMAN_APPROVED_DELIVERY.md) specifies BA/solution approval, manual profile assignment, operator start, engineering/QA/UAT gates, rework, separate release and production closure. The [role catalog](ROLE_CATALOG.md) includes eleven specialized prompts with explicit responsibilities, exclusions and file/action boundaries. Initialization, project-baseline, ticket, deterministic handoff and audit/metric contracts are also authored.
+
+These are reviewable design/template files, not deployed agent features. Profiles, template adoption, generated packets, workflow guards, IDE notices and process analytics still require their implementation gates. Humans select profiles in the first release; automatic assignment is deferred. No LLM API is required for these core contracts.
 
 ## Remaining gates
 
-1. GitHub repository enrollment, verified source observations, incremental
-   reconciliation, source permissions and bounded coverage (AW-006).
+1. Installed GitHub App/live external-push validation, then PR/CI
+   reconciliation, indexed traceability and webhook handling (AW-006).
 2. MCP 2026-07-28 and maintained OAuth integration/client compatibility
    evidence (AW-001/002), fake-launch safety proof (AW-003).
 3. Context proposals, typed source links, decision adoption, indexed traceability,
    source-aware immutable manifests, checkpoints and cold-start recovery.
 4. Agent profiles, enrolled connections and actor-aware work items; human start
    grants, atomic claims, fenced attempts and human result acceptance.
-5. CLI/IDE notices and supported execution adapters, multi-role plans and
-   handoffs, operational load/recovery gates and a verified release.
+5. CLI/IDE notices and supported execution adapters; human-adopted role templates,
+   BA/solution plan gates, manual assignment, generated handoff drafts and
+   candidate-bound QA/UAT/rework/release workflows (AW-301/306/307/308/309).
+6. Agent audit/flow metrics and reviewed process suggestions (AW-407), operational
+   load/recovery gates and a verified release.
 
 The context foundation contributes to AW-004/005/106/107. Those tickets are not
 marked complete because their full source and agent contracts remain pending.

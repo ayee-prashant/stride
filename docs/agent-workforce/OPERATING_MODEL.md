@@ -36,9 +36,11 @@ A role belongs to a workspace and is enabled for specific projects. A profile ma
 | Documentation | Update user and developer documentation | Cannot rewrite trusted execution policy |
 | Performance / data specialist | Measure and propose targeted improvements | Cannot widen data access or spend |
 
+UAT is a separate business-scenario contribution with final acceptance owned by a business human. The [role catalog](ROLE_CATALOG.md) provides eleven specialized prompts, initialization and explicit file/action boundaries. Every agent declares its responsibilities and what is outside its role before substantive authorized work.
+
 Frontend, backend and full-stack developer are optional specializations. Projects may define additional roles using the same contract; no custom workflow programming is needed for the first release.
 
-Three providers can back five profiles, for example SA-1, DEV-1, DEV-2, REVIEW-1 and QA-1. Provider choice is independent of role. Do not label a provider as inherently the best architect or reviewer. Route using approved capabilities and availability.
+Three providers can back five profiles, for example SA-1, DEV-1, DEV-2, REVIEW-1 and QA-1. Provider choice is independent of role. Do not label a provider as inherently the best architect or reviewer. Let humans select using approved capabilities and availability.
 
 ## Work hierarchy and routing
 
@@ -46,15 +48,15 @@ A human ticket describes an outcome. An accepted plan contains bounded work item
 
 An agent-created ticket starts as a **proposal**, visible in the same human queue with its author and suggested role. It links the current context, relevant requirement or new-scope request, evidence of the gap and related work/PRs. Stride checks duplicate candidates and scope before a human accepts or edits it into a normal ticket. An agent can propose child work and role assignments, but cannot expand the accepted plan or authorize the next agent to execute it. Within an accepted plan, Stride can materialize its approved work items automatically.
 
-Role routing chooses an eligible profile and notifies its operator. Eligibility requires project membership and grants, the role, repository/runtime capability, remaining capacity and applicable limits. An offline or busy profile is shown as unavailable. No eligible profile leaves the work visibly queued; Stride does not silently switch to an unapproved tool.
+Stride lists eligible profiles and an authorized human manually selects one. Eligibility requires project membership and grants, the role, repository/runtime capability, remaining capacity and applicable limits. The architect may recommend a profile, but cannot assign or start it. An offline or busy profile is shown as unavailable. No selection leaves the work visibly queued. Notify the selected profile's operator; automatic selection, reassignment and autonomous starts are deferred.
 
-The operator sees a short review: objective, repository, permitted changes, expected output, limits and why their agent was selected. They can **Start**, **Edit scope**, **Decline**, or **Choose another eligible agent**. Start records an authorization and then opens or launches the supported client. On a client without launch support it shows the packet and a suggested instruction to give the agent. No hidden automatic execution follows assignment alone.
+The operator sees a short review: objective, repository, permitted changes, expected output, limits and why their agent was selected. They can **Start**, **Edit scope**, **Decline**, or, with assignment authority, **Choose another eligible agent**. Otherwise they can request reassignment. Scope changes require the relevant scope owner before a revised start decision; an operator cannot enlarge accepted work merely by editing this form. Start records an authorization and then opens or launches the supported client. On a client without launch support it shows the packet and a suggested instruction to give the agent. No hidden automatic execution follows assignment alone.
 
 ## Workflow templates
 
 Small fix: development, focused validation, human review and acceptance. Optional specialist review depends on risk. Solo mode can use one agent in successive roles, with a clear “same agent reviewed its own work” label and human review. Separate sessions or different model names do not prove independent review.
 
-Standard feature: architecture when needed, human plan acceptance, development work, an integration candidate, peer review and QA against the same candidate, human acceptance, and a separate release decision.
+Standard software delivery follows [Human-approved delivery](HUMAN_APPROVED_DELIVERY.md): accepted BA requirements and solution/plan, development, candidate-bound engineering review, QA, verified UAT, business-human acceptance and separate release/production closure. Reuse accepted project baselines; add specialists according to risk. The diagram below shows the contribution review pattern, not the full software-delivery completion policy.
 
 ```mermaid
 flowchart TD
@@ -72,13 +74,15 @@ flowchart TD
     A --> L["Separate merge and release decision"]
 ```
 
+The default software-delivery policy admits a candidate to QA after the engineering human's gate. A separately approved workflow may collect independent review/QA evidence concurrently as illustrated, but must preserve each required human gate before UAT. Human contribution acceptance in the diagram is not production completion.
+
 Parallel developers need separate workspaces, agreed interfaces and compatible scopes. Assign an integration owner. Review and QA target the integrated commit, not two incompatible branch heads. A later commit makes earlier candidate approvals stale. Security-sensitive changes add specialist evidence and the required human authority before acceptance.
 
 Every downstream assignment follows the operator-start rule. To reduce repeated clicks, an operator may approve an explicit bundle of frozen work packets for their own profiles. Dependency gates still apply. Approval does not cover future tasks or revisions; expired approval is requested again when the work becomes ready.
 
 ## State model
 
-The existing ticket statuses stay **To do, In progress, Done**. For tickets with agent work, Done requires a human acceptance decision for the current outcome and required gates. A direct status edit, bulk action, recurrence completion or alternate API must use that same guard. Agent submission cannot complete the parent ticket. Legacy tickets without agent work keep their normal flow.
+The existing ticket statuses stay **To do, In progress, Done**. For tickets with agent work, Done requires a human acceptance decision for the current outcome and required gates. A direct status edit, bulk action, recurrence completion or alternate API must use that same guard. Agent submission cannot complete the parent ticket. For opted-in software-delivery tickets, the selected completion policy additionally requires verified production delivery and human closure; a BA/design/document contribution can be accepted at its own artifact gate. Delivery stage, role work state, attempt state and waiting reason remain separate. Legacy tickets without agent work keep their normal flow.
 
 | Work-item state | Meaning | Permitted next state |
 | --- | --- | --- |

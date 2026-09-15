@@ -10,6 +10,18 @@ Status: proposed future configuration contract. This Markdown is not an authoriz
 - Expected input artifacts:
 - Expected contribution and output schema:
 
+## Responsibilities and explicit exclusions
+
+- Responsibilities this role owns within the packet:
+- Outside my role, with the responsible receiving role/human for each exclusion:
+- Applicable [specialized template](../ROLE_CATALOG.md), version and hash:
+- Human-adopted base prompt version/hash:
+- Permitted read paths/resources, write paths/artifact classes and execution targets/actions:
+- Default denied actions and required escalation:
+- Initialization and role-change rules from [ROLE_INITIALIZATION.md](ROLE_INITIALIZATION.md):
+
+One active role per attempt. Permissions come from current grants intersected with the packet; this section describes their intended scope and cannot grant access.
+
 ## Working instructions
 
 - Read the accepted packet and referenced policy version.
@@ -21,6 +33,9 @@ Status: proposed future configuration contract. This Markdown is not an authoriz
 - Submit concise findings and reproducible evidence against the specified revision.
 - Publish a structured checkpoint for a handoff; do not assume another machine has this conversation or unpublished edits.
 - Propose additional tickets or role handoffs; do not authorize their execution.
+- Recommend profiles only; humans manually select them in this release.
+- Declare responsibilities, outside-role boundaries and missing inputs before substantive authorized work.
+- Return the structured [submission contract](../PROMPT_HANDOFFS.md); distinguish report recommendations from human gate decisions.
 
 ## Completion and review
 

@@ -119,3 +119,48 @@ worker sends through Resend only when both credentials and sender are configured
 Missing email configuration produces a uniform unavailable response. The worker
 also creates deduplicated in-app due reminders and optional daily count digests;
 digests are disabled by default and muted tasks are excluded.
+
+
+## Human project context and GitHub sources
+
+These endpoints share the existing authenticated-human, current workspace
+membership, JSON mutation, origin, quota and private/no-store response boundary.
+They are not agent endpoints. Query parameters are strict and reject duplicates.
+All use `?workspace_id=<current workspace>`.
+
+| Method and path | Contract |
+| --- | --- |
+| GET `/api/projects/:projectId/context` | Current published documents and the project sequence |
+| POST `/api/projects/:projectId/context/documents` | Admin publication with UUID request ID and expected document version |
+| GET `/api/projects/:projectId/context/documents/:documentId` | Immutable history; optional `before` version, 20 results/page |
+| GET `/api/projects/:projectId/context/changes` | Human and source events; optional `after` sequence, 100 results/page |
+| GET `/api/projects/:projectId/repository` | Approved enrollment choices, current source status and authorized verified files |
+| POST `/api/projects/:projectId/repository` | Admin connects an approved `binding_key`; body also needs `request_id` and `version` (0 for first enrollment) |
+| POST `/api/projects/:projectId/repository/refresh` | Member queues a sync with current connection `version` and UUID `request_id`; provider cooldowns still apply |
+| POST `/api/projects/:projectId/repository/disconnect` | Admin disconnects with current connection `version` and UUID `request_id` |
+| GET `/api/tasks/:taskId/context` | Latest immutable task brief and current advisory validity check |
+| GET `/api/tasks/:taskId/context/:briefId` | A specific saved brief, reauthorized against current source access |
+| POST `/api/tasks/:taskId/context` | Prepare from `task_version`, `context_sequence`, 1–20 `requirement_ids` and UUID `request_id` |
+
+Connect and Refresh return 202 (queued); Disconnect returns 200. Source mutations
+return the original immutable operation receipt and a freshly authorized current
+view. Retrying a previously accepted request never repeats its mutation. A key
+reused for another operation, input or human returns 409. The API never accepts
+GitHub tokens, installation IDs, repository URLs, arbitrary source files or
+observations from a client. Enrollment choices come from server-owned grants.
+
+A task brief contains selected requirements, all active project decisions and
+constraints, and (when connected) a verified repository manifest with exact
+commit/file versions. `source_coverage.github` is `not_connected` or `verified`;
+`repository.observation.coverage` is `configured_files`. Every check
+has `execution_ready: false`: preparing context is not a start approval.
+Source outages/expiry/grant changes prevent new source-aware briefs. A response
+may have `brief: null` and an unavailable check when its historical private files
+cannot currently be disclosed. The stored snapshot and fingerprint stay intact.
+
+Changes return `kind`, sequence, nullable document/source IDs and a human author
+or null for system observations. Consumers must handle source events as well as
+document publications, paginate via `next_cursor`, and reload the project on
+`CONTEXT_RESYNC_REQUIRED`. A sequence is project-scoped, not an MCP transport
+session or reconnection token. See the agent-workforce contracts for future agent
+identities, execution gates and application-level recovery.

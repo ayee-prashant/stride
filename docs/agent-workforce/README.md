@@ -19,7 +19,7 @@ Shared project context is a prerequisite for this workflow. Stride maintains acc
 | Human | Agent | Stride |
 | --- | --- | --- |
 | Defines the outcome, priority and acceptance criteria | Investigates and proposes a plan | Stores the ticket, context and decisions |
-| Owns an agent and authorizes its work | Designs, implements, tests or reviews within its assigned role | Routes work to eligible profiles and notifies their operators |
+| Manually selects an agent and authorizes its work | Designs, implements, tests or reviews within its assigned role | Lists eligible profiles and notifies the selected operator |
 | Answers questions and authorizes scope changes | Reports blockers, evidence and proposed next work | Enforces assignment, approval, dependency and capacity rules |
 | Accepts or requests changes | Submits a contribution for review | Shows verified progress, attribution and the next human action |
 | Authorizes merge and release | Prepares a candidate and release evidence | Checks that approvals still match the candidate |
@@ -53,6 +53,11 @@ No new LLM API is required for context storage, packet assembly, source reconcil
 5. [Security and reliability](SECURITY_AND_RELIABILITY.md): approval enforcement, execution boundaries and recovery.
 6. [Delivery plan](DELIVERY_PLAN.md): ordered slices, dependencies and observable acceptance gates.
 7. [Design review](DESIGN_REVIEW.md): requirement coverage, corrections and implementation uncertainties.
-8. Templates: [role brief](templates/ROLE_BRIEF.md), [work packet](templates/WORK_PACKET.md), [handoff](templates/HANDOFF.md), and [context change](templates/CONTEXT_CHANGE.md).
+8. [Human-approved delivery](HUMAN_APPROVED_DELIVERY.md): BA/solution approval, manual assignment, development/review/QA/UAT, rework and release gates.
+9. [Role catalog](ROLE_CATALOG.md): responsibilities, explicit exclusions, file/action access and eleven ready-to-adopt specialized prompts.
+10. [Prompt handoffs](PROMPT_HANDOFFS.md) and [audit/metrics](AUDIT_AND_METRICS.md): deterministic next-work drafts, evidence, human decisions and process improvement proposals.
+11. Templates: [project baseline](templates/PROJECT_BASELINE.md), [delivery ticket](templates/DELIVERY_TICKET.md), [role initialization](templates/ROLE_INITIALIZATION.md), [role brief](templates/ROLE_BRIEF.md), [work packet](templates/WORK_PACKET.md), [handoff](templates/HANDOFF.md), and [context change](templates/CONTEXT_CHANGE.md).
 
 These documents define a design baseline, not permission to execute tickets, change production policy or skip repository instructions. Existing `AGENTS.md` remains the development entry point. Begin future implementation with the compatibility/security slice in the delivery plan and update actual completion evidence after each slice.
+
+The source synchronization increment is described in [GITHUB_CONTEXT_SETUP.md](GITHUB_CONTEXT_SETUP.md).

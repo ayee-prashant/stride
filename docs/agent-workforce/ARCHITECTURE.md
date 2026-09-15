@@ -61,6 +61,12 @@ Use a server-constructed `ActorContext` discriminated as human, agent or system.
 
 The human task-completion service must check current agent-work gates for opted-in tickets. Route every completion path through it, including bulk updates, recurrence, alternate APIs and restoration/reopening behavior. This is the deliberate compatibility seam; merely hiding the Done button is insufficient. Generalized direct agent writes to legacy tasks are deferred until an actor-aware migration is justified.
 
+## Human-approved delivery extension
+
+The [delivery workflow](HUMAN_APPROVED_DELIVERY.md) adds a versioned workflow instance with delivery stage, human gate decisions, candidate/environment manifests and findings alongside the existing role work items and attempts. Preserve the legacy task-status enum. Every opted-in completion entry point evaluates its selected completion policy, including production verification where required.
+
+Use immutable adopted base/role-template versions and deterministic [packet assembly](PROMPT_HANDOFFS.md). Generated handoffs are drafts, not assignment or start authority. Separate report acceptance, quality-gate outcome and release authorization; accepting a valid report that records failure cannot pass a gate. The [audit contract](AUDIT_AND_METRICS.md) defines attribution and duration evidence. These are proposed logical extensions, not already-created tables or runtime features.
+
 ## Data aggregates and invariants
 
 | Aggregate / records | Required invariants |
@@ -87,8 +93,8 @@ Dependency types distinguish an available submitted artifact, a verified integra
 
 1. Accept or update a bounded plan/work item in a transaction with its work event and outbox entry.
 2. The coordinator finds accepted work with satisfied dependencies, no active attempt and available policy limits. Serialize plan expansion to prevent concurrent cycle/fan-out violations.
-3. Choose a profile deterministically: approved role/capability, access, availability and capacity, followed by priority/age and a fair tie-break. Prefer continuity only within these rules. No LLM selects permissions.
-4. Create one expiring assignment offer. Notify that profile's operator. Reserve no execution lease while a human considers the request.
+3. Build an eligibility list using approved role/capability, access, availability and capacity. An architect may propose a recommendation; an authorized human manually selects the profile. There is no automatic selection or reassignment in the first release. No LLM selects permissions.
+4. Validate that human selection and create one expiring assignment offer. Notify the selected profile's operator. Reserve no execution lease while a human considers the request.
 5. Assemble a complete context manifest from verified mandatory sources. A human decision binds the packet/manifest, profile, connection selection policy, repository base SHA, requirement/role/policy versions, permitted actions and limits. Selection of a different profile or material change requires another authorization.
 6. Claim atomically checks current material context and policy versions, consumes an eligible authorization, reserves profile/workspace capacity, creates one attempt and lease, and establishes run-scoped authority. Required context must be acknowledged by the attended agent or prepared for launch by the trusted adapter as specified in CONTEXT_PROTOCOL.md. Deliver any separate run credential outside model-visible tool results. Simultaneous claimers must produce one winner. A retry with the same idempotency key returns that attempt, not a new run.
 7. Only then may the companion launch work. Its durable launch receipt keys on attempt ID; a lost response must not start a second process. A generic MCP host can claim from an already human-started session; that process may report progress only after the claim.
