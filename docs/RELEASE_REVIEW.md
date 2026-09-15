@@ -196,6 +196,77 @@ performed. Current production evidence below remains unchanged. See
 [agent registry setup](agent-workforce/AGENT_REGISTRY_SETUP.md) and
 [implementation status](agent-workforce/IMPLEMENTATION_STATUS.md).
 
+## Local setup automation — 2026-09-15
+
+Local branch `feature/local-setup`, based on `ef69db5`, adds `npm run setup` and
+`docs/LOCAL_SETUP.md`. Fresh setup installs the locked tree, generates separate
+runtime/admin/account secrets, starts a labelled loopback-only PG18 container
+with persistent storage, and runs the existing provisioner. It reuses saved
+credentials and restores missing generated environment files after interruption.
+Existing accounts retain their changed passwords. Unmanaged environments,
+changed options, remote Docker endpoints and conflicting resources are rejected.
+
+Actual local verification on Windows with Node 24.15.0:
+
+- `npm ci`: passed; 602 locked packages installed, lockfile unchanged.
+- `npm test`: passed, **85 tests**, including 12 setup regressions.
+- `npm run typecheck`: passed after correcting script environment and callback types.
+- `npm run build`: passed; native Next.js production routes compiled successfully.
+- ESLint API with the repository configuration: **154 files, zero errors and zero
+  warnings**. The `npm run lint` process stalled; a debug run finished linting a
+  file but did not exit. The API verification awaited every result before an
+  explicit exit. No lint rules were disabled; generated `work/` fixtures were excluded.
+- `npm run test:setup`: **passed on 2026-09-16**, its first successful run in any
+  environment. One test, 21.4s, against a real Docker engine 29.5.3 with a cached
+  `postgres:18` image. It provisioned a real PG18 container on free loopback
+  ports, verified the generated owner password against the stored hash, changed
+  that password, wrote sentinel data, stopped the container, reran setup, and
+  confirmed the changed password, the sentinel row and all three environment
+  files survived. It also asserted the restricted `stride_app` role holds none of
+  `rolsuper`, `rolcreatedb`, `rolcreaterole`, `rolreplication`, `rolbypassrls`,
+  that the runtime role can read the data, and that no generated secret appears in
+  captured logs. Fixture cleanup was verified afterwards: no container or volume
+  matching `stride-local-<32 hex>` remained, and `work/` was empty.
+- The earlier `dockerInference` preflight failure recorded below was an
+  environment fault, not a source defect. With a working engine the same test
+  passes unmodified.
+- Existing authenticated/browser runtime checks still did not run locally. Prior
+  release results below are historical evidence, not a pass for this source.
+
+Still held back: a `migration-check.yml` change adding a `npm run test:setup`
+step. It is absent because the authenticated GitHub token carries `gist`,
+`read:org` and `repo` but not `workflow`, and GitHub rejects any push whose ref
+updates a file under `.github/workflows`. Until it lands, CI does not exercise
+the setup path. Apply it after `gh auth refresh -h github.com -s workflow`:
+
+```powershell
+git checkout backup/local-setup-with-ci-change -- .github/workflows/migration-check.yml
+```
+
+That change was resized once the test actually ran. The original version raised
+the job budget from 15 to 30 minutes, sized from a review estimate made before
+the test had ever executed. Measurement contradicts that estimate: the test
+takes 21s locally, and the eight most recent `migration-check` runs finished in
+2m6s to 3m41s against the existing 15-minute budget. The step therefore adds
+roughly 60-90s in CI including the image pull, so the job budget stays at 15
+minutes and only the step carries a 5-minute timeout, which still makes a hang
+attributable to this step rather than a generic job timeout.
+
+Docker Desktop 4.77.0 initially failed on an inaccessible `dockerInference` Unix
+socket. Its runtime socket directories were renamed as backups, leaving Docker
+volumes and configuration intact. Startup progressed past that error, but the
+Linux engine still did not become ready. A targeted Docker/WSL restart was tried;
+this environment issue remains separate from the setup implementation.
+
+Second architecture/security review: setup uses only Node built-ins and the
+existing provisioner, adds no dependencies or migration changes, keeps admin
+credentials out of `.env.local`, filters inherited provisioning overrides, uses
+argument arrays without a shell, and never prints generated secrets or raw
+subprocess failures. New secret files use exclusive writes and POSIX mode 0600;
+Windows uses the checkout's inherited ACL. Container reuse verifies ownership,
+image, loopback binding and persistent mount. Recovery does not delete databases
+or reset passwords. Production source, audience and deployment were not changed.
+
 ## Reminder concurrency follow-up
 
 The documentation-only commit 0e262e6 triggered CI run 34866667041, which

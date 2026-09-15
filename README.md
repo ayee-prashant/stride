@@ -32,17 +32,29 @@ then uses Change password after signing in. No credential is committed here.
 
 ## Development and operation
 
-For a fresh local checkout, use Node 24 and local Docker Compose on Linux, macOS
-or WSL, then run **npm run setup:local** and **npm run dev:local**. Setup generates
-private local credentials, isolates this checkout's PostgreSQL 18 volume/ports,
-and applies committed migrations. It preserves existing configuration and passwords.
-Read [Local development](docs/LOCAL_DEVELOPMENT.md) for login retrieval, diagnostics,
-worktrees and verification. Connecting an IDE to hosted Stride only needs the
-attended setup guide; it does not require another Stride database.
+Use Node 24 and the committed npm lockfile. This merge brought together two
+local-environment tools that were developed in parallel; **they overlap and are
+pending consolidation**, so pick one per checkout rather than running both.
+
+`npm run setup:local` then `npm run dev:local` uses local Docker Compose on
+Linux, macOS or WSL. It generates private local credentials, isolates this
+checkout's PostgreSQL 18 volume and ports, and applies committed migrations,
+preserving existing configuration and passwords. Read
+[Local development](docs/LOCAL_DEVELOPMENT.md) for login retrieval, diagnostics,
+worktrees and verification. This is the path wired into CI.
+
+`npm run setup` then `npm run dev` uses Docker directly and prompts for your
+local account details before generating credentials, starting PostgreSQL and
+provisioning the database. It also offers `--check` for a read-only preflight
+and `--json` for scripted or agent use. See [local setup](docs/LOCAL_SETUP.md)
+for your initial password, alternate ports, repeat runs, and manual setup
+without Docker.
 
 Manually configured development still uses .env.example and npm run dev.
-Production has no default credential or authentication bypass.
+Production has no default credential or authentication bypass, and uses
+docs/DEPLOYMENT.md.
 
+- npm run setup — prepare a local development environment with PostgreSQL.
 - npm ci — install the locked dependency tree.
 - npm run dev — start the native Next.js development server on loopback.
 - npm run doctor:local — read-only local setup diagnostics.
