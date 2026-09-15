@@ -28,9 +28,16 @@ export async function verifyAgentCli({ origin, connection, request, json, profil
         queue = queue.then(async () => {
           const url = new URL(line); assert.equal(url.origin, origin); assert.equal(url.pathname, "/api/auth/oauth2/authorize");
           const navigation = await json(await request(url.pathname + url.search, "GET", undefined, { accept: "application/json" }));
-          const consent = new URL(navigation.url, origin); assert.equal(consent.origin, origin); assert.equal(consent.pathname, "/connect/consent");
-          const approved = await json(await request("/api/connect/consent", "POST", { accept: true, oauth_query: consent.search.slice(1) }));
-          const callback = new URL(approved.url); assert.equal(callback.origin, "http://127.0.0.1:43871"); assert.equal(callback.pathname, "/callback");
+          const destination = new URL(navigation.url, origin);
+          let callback = destination;
+          // The earlier protocol checks may already have granted consent to
+          // this exact client/resource. The provider can then return directly.
+          if (destination.origin === origin) {
+            assert.equal(destination.pathname, "/connect/consent");
+            const approved = await json(await request("/api/connect/consent", "POST", { accept: true, oauth_query: destination.search.slice(1) }));
+            callback = new URL(approved.url);
+          }
+          assert.equal(callback.origin, "http://127.0.0.1:43871"); assert.equal(callback.pathname, "/callback");
           assert.equal(callback.searchParams.get("state"), url.searchParams.get("state")); assert.equal(callback.searchParams.get("iss"), origin);
           assert.equal((await fetch(callback, { redirect: "error", signal: AbortSignal.timeout(10000) })).status, 200);
           approvals++;
