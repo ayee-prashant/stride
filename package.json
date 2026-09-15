@@ -6,6 +6,7 @@
     "node": "24.x"
   },
   "scripts": {
+    "setup": "node --experimental-strip-types scripts/setup.ts",
     "install:ci": "npm ci",
     "dev": "next dev --hostname 127.0.0.1",
     "build": "next build",
@@ -13,6 +14,7 @@
     "typecheck": "tsc --noEmit",
     "test": "node scripts/test.mjs",
     "test:postgres": "node --experimental-strip-types --test tests/postgres.integration.test.ts",
+    "test:setup": "node --experimental-strip-types --test tests/local-setup.integration.test.ts",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate --config=drizzle.postgres.config.ts",
     "db:migrate": "node --experimental-strip-types scripts/migrate-postgres.ts",

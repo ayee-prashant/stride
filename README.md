@@ -20,10 +20,14 @@ then uses Change password after signing in. No credential is committed here.
 
 ## Development and operation
 
-Use Node 24 and the committed npm lockfile. Copy .env.example into an untracked
-local environment file and configure explicit credentials; there is no default
-user or authentication bypass.
+Use Node 24 and the committed npm lockfile. For a fresh checkout, start Docker
+Desktop and run `npm run setup`, then `npm run dev`. Setup asks for your local
+account details, generates private credentials, starts PostgreSQL, and provisions
+the database. See [local setup](docs/LOCAL_SETUP.md) for your initial password,
+alternate ports, repeat runs, and manual setup without Docker. There is no
+default user or authentication bypass. Production uses docs/DEPLOYMENT.md.
 
+- npm run setup — prepare a local development environment with PostgreSQL.
 - npm ci — install the locked dependency tree.
 - npm run dev — start the native Next.js development server on loopback.
 - npm test — domain, repository, HTTP, adapter, and transport tests.

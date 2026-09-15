@@ -10,7 +10,7 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     services:
       postgres:
         image: postgres:18
@@ -47,6 +47,9 @@ jobs:
       - run: bash -n infra/postgres/tls-start.sh
       - run: node --check scripts/verify-production.mjs
       - run: npm test
+      - name: Verify fresh local setup and database restart
+        run: npm run test:setup
+        timeout-minutes: 10
       - run: npm run test:postgres
         env:
           NODE_ENV: test

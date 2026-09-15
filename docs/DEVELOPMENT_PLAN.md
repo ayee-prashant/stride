@@ -1,5 +1,14 @@
 # Ordered development plan
 
+## Local development follow-up — 2026-09-15
+
+The user selected local setup automation as the next change. Acceptance: a fresh
+checkout can run `npm run setup`, provide a local email/name, and receive a
+provisioned PostgreSQL environment with generated credentials. Reruns preserve
+configuration, account passwords and database data; failures explain recovery.
+Implementation and regression tests are present. See LOCAL_SETUP.md and the
+current RELEASE_REVIEW.md entry for verification and environment limitations.
+
 Each slice includes validation and tests, rather than postponing security to the end.
 
 The active next release is ordered in PRODUCTIVITY_RELEASE.md. Its ten approved
