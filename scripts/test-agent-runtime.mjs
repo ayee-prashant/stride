@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 import { REVIEW_GATES } from "../lib/delivery.ts";
+import { verifyAgentCli } from "./test-agent-cli.mjs";
 
 /** Real OAuth, real sessions and the published MCP client against the isolated built app. */
 export async function verifyAgentRuntime({ origin, request, json, userId, workspaceId, projectId }) {
@@ -51,7 +52,8 @@ export async function verifyAgentRuntime({ origin, request, json, userId, worksp
       return raw(discovery.token_endpoint, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ grant_type: "authorization_code", client_id: code.purpose === "agent" ? connection.client_id : connection.companion_client_id, code: code.code, code_verifier: verifier, redirect_uri: "http://127.0.0.1:43871/callback", resource: `${origin}${code.purpose === "agent" ? "/mcp" : "/api/agent-companion"}` }) });
     }
     stage = "pkce";
-    assert.equal((await exchange(await authorize("agent"), randomBytes(48).toString("base64url"))).status, 400);
+    const badVerifier = await json(await exchange(await authorize("agent"), randomBytes(48).toString("base64url")), 401);
+    assert.equal(badVerifier.error, "invalid_request"); assert.equal(badVerifier.access_token, undefined);
     const agentCode = await authorize("agent"); const agentTokens = await json(await exchange(agentCode));
     assert.equal((await exchange(agentCode)).status, 400); assert.ok(agentTokens.refresh_token);
     const companionTokens = await json(await exchange(await authorize("companion")));
@@ -70,6 +72,8 @@ export async function verifyAgentRuntime({ origin, request, json, userId, worksp
     await tool("stride_initialize", { request_id: randomUUID(), template_hash: role.template_hash, accept_role: true, accept_exclusions: true });
     const packet = (await tool("stride_work_packet", { ticket_id: ticket.id })).packet;
     await tool("stride_claim", { request_id: randomUUID(), ticket_id: ticket.id, attempt_id: randomUUID(), packet_hash: packet.hash }, true);
+    stage = "shipped-cli";
+    await verifyAgentCli({ origin, connection, request, json, profileId: binding.profile_id, ticketId: ticket.id, overviewPath: base + suffix, packetHash: packet.hash });
     stage = "human-start-and-report";
     await json(await raw("/api/agent-companion", { method: "POST", headers: { ...bearer(companionTokens), "content-type": "application/json" }, body: JSON.stringify({ preparation: { packet_id: packet.id, packet_hash: packet.hash, checkout: packet.payload.repository?.commit ?? null, repository_id: packet.payload.repository?.repository_id ?? null, clean: true } }) }));
     ticket = (await human(`${base}/tickets/${ticket.id}/start`, { ...decision(ticket.version), connection_id: connection.id, packet_hash: packet.hash, accept_start: true })).ticket;

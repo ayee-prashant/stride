@@ -87,7 +87,7 @@ async function login(purpose) {
     const received = new Promise((resolve, reject) => {
       server = createServer((request, response) => {
         const url = new URL(request.url, callback); const provided = url.searchParams.get("state") ?? ""; const expected = provider.data.state ?? "";
-        if (request.method !== "GET" || request.headers.host !== "127.0.0.1:43871" || url.pathname !== "/callback" || url.search.length > 16000 || provided.length !== expected.length || !expected || !timingSafeEqual(Buffer.from(provided), Buffer.from(expected))) { response.writeHead(400); response.end("Invalid authorization callback."); return; }
+        if (request.method !== "GET" || request.headers.host !== "127.0.0.1:43871" || url.pathname !== "/callback" || url.search.length > 16000 || Buffer.byteLength(provided) !== Buffer.byteLength(expected) || !expected || !timingSafeEqual(Buffer.from(provided), Buffer.from(expected))) { response.writeHead(400); response.end("Invalid authorization callback."); return; }
         if (!url.searchParams.get("code") || url.searchParams.get("iss") !== site.origin) { response.writeHead(400); response.end("Authorization was denied or the issuer did not match."); reject(new Error("Authorization denied or issuer mismatch.")); return; }
         response.writeHead(200, { "Content-Type": "text/plain", "Cache-Control": "no-store", "Referrer-Policy": "no-referrer", "X-Content-Type-Options": "nosniff" }); response.end("Connection approval received. Return to your terminal."); resolve({ authorizationCode: url.searchParams.get("code"), iss: url.searchParams.get("iss") });
       }); server.on("error", reject); server.listen(43871, "127.0.0.1");
