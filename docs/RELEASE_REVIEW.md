@@ -1,5 +1,60 @@
 # Release review — 2026-09-14
 
+## Local setup automation — 2026-09-15
+
+Local branch `feature/local-setup`, based on `ef69db5`, adds `npm run setup` and
+`docs/LOCAL_SETUP.md`. Fresh setup installs the locked tree, generates separate
+runtime/admin/account secrets, starts a labelled loopback-only PG18 container
+with persistent storage, and runs the existing provisioner. It reuses saved
+credentials and restores missing generated environment files after interruption.
+Existing accounts retain their changed passwords. Unmanaged environments,
+changed options, remote Docker endpoints and conflicting resources are rejected.
+
+Actual local verification on Windows with Node 24.15.0:
+
+- `npm ci`: passed; 602 locked packages installed, lockfile unchanged.
+- `npm test`: passed, **85 tests**, including 12 setup regressions.
+- `npm run typecheck`: passed after correcting script environment and callback types.
+- `npm run build`: passed; native Next.js production routes compiled successfully.
+- ESLint API with the repository configuration: **154 files, zero errors and zero
+  warnings**. The `npm run lint` process stalled; a debug run finished linting a
+  file but did not exit. The API verification awaited every result before an
+  explicit exit. No lint rules were disabled; generated `work/` fixtures were excluded.
+- `npm run test:setup`: attempted, failed at the Docker availability preflight.
+  Its assertions have **not yet passed anywhere**: the CI step that would run it
+  is held back from this branch (see the note below), so it has not run in PR CI
+  either. It checks real provisioning, restricted-role queries, hashed
+  credentials, stopped-container recovery, and preservation of a changed password
+  and sentinel data; only its own fixture resources are cleaned up.
+- Existing real-PostgreSQL and authenticated/browser runtime checks did not run
+  locally because the Docker engine was unavailable. Prior release results below
+  are historical evidence, not a pass for this source.
+
+Held back from this branch: a `migration-check.yml` change adding a
+`npm run test:setup` step (with its own 10-minute step timeout, and the job
+budget raised from 15 to 30 minutes to absorb the Docker image pull and two
+container cycles). It is not included because the authenticated GitHub token
+lacks the `workflow` OAuth scope, so a push containing workflow edits is
+rejected. The change is preserved on the local branch
+`backup/local-setup-with-ci-change`. Apply it in a follow-up push after running
+`gh auth refresh -h github.com -s workflow`. Until then CI for this branch is
+unchanged from `main` and does not exercise the new setup path.
+
+Docker Desktop 4.77.0 initially failed on an inaccessible `dockerInference` Unix
+socket. Its runtime socket directories were renamed as backups, leaving Docker
+volumes and configuration intact. Startup progressed past that error, but the
+Linux engine still did not become ready. A targeted Docker/WSL restart was tried;
+this environment issue remains separate from the setup implementation.
+
+Second architecture/security review: setup uses only Node built-ins and the
+existing provisioner, adds no dependencies or migration changes, keeps admin
+credentials out of `.env.local`, filters inherited provisioning overrides, uses
+argument arrays without a shell, and never prints generated secrets or raw
+subprocess failures. New secret files use exclusive writes and POSIX mode 0600;
+Windows uses the checkout's inherited ACL. Container reuse verifies ownership,
+image, loopback binding and persistent mount. Recovery does not delete databases
+or reset passwords. Production source, audience and deployment were not changed.
+
 ## Reminder concurrency follow-up
 
 The documentation-only commit 0e262e6 triggered CI run 34866667041, which
