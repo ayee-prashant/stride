@@ -21,13 +21,24 @@ Actual local verification on Windows with Node 24.15.0:
   file but did not exit. The API verification awaited every result before an
   explicit exit. No lint rules were disabled; generated `work/` fixtures were excluded.
 - `npm run test:setup`: attempted, failed at the Docker availability preflight.
-  The new real-PG18 test is present in PR CI, but its assertions have **not yet
-  passed locally**. It checks real provisioning, restricted-role queries, hashed
+  Its assertions have **not yet passed anywhere**: the CI step that would run it
+  is held back from this branch (see the note below), so it has not run in PR CI
+  either. It checks real provisioning, restricted-role queries, hashed
   credentials, stopped-container recovery, and preservation of a changed password
   and sentinel data; only its own fixture resources are cleaned up.
 - Existing real-PostgreSQL and authenticated/browser runtime checks did not run
   locally because the Docker engine was unavailable. Prior release results below
   are historical evidence, not a pass for this source.
+
+Held back from this branch: a `migration-check.yml` change adding a
+`npm run test:setup` step (with its own 10-minute step timeout, and the job
+budget raised from 15 to 30 minutes to absorb the Docker image pull and two
+container cycles). It is not included because the authenticated GitHub token
+lacks the `workflow` OAuth scope, so a push containing workflow edits is
+rejected. The change is preserved on the local branch
+`backup/local-setup-with-ci-change`. Apply it in a follow-up push after running
+`gh auth refresh -h github.com -s workflow`. Until then CI for this branch is
+unchanged from `main` and does not exercise the new setup path.
 
 Docker Desktop 4.77.0 initially failed on an inaccessible `dockerInference` Unix
 socket. Its runtime socket directories were renamed as backups, leaving Docker

@@ -167,8 +167,9 @@ checkout fixture and PG18 container on free loopback ports, applies real migrati
 verifies the generated login password and restricted role, changes the fixture's
 password, and reruns setup after stopping the database. It checks data, password
 and file preservation, then removes only its own fixture container/volume. It is
-also part of pull-request CI. Dependency installation is covered separately by
-`npm ci`; the fixture reuses installed dependencies.
+not yet wired into pull-request CI; see RELEASE_REVIEW.md. Dependency
+installation is covered separately by `npm ci`; the fixture reuses installed
+dependencies.
 
 The Docker invocation follows [Docker's container run documentation](https://docs.docker.com/engine/containers/run/)
 and the [official PostgreSQL image's PG18 volume layout](https://hub.docker.com/_/postgres).
