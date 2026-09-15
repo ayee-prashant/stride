@@ -64,6 +64,13 @@
       "when": 1789428480351,
       "tag": "0008_vengeful_scorpion",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1789512985871,
+      "tag": "0009_right_eternity",
+      "breakpoints": true
     }
   ]
 }
