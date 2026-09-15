@@ -17,7 +17,7 @@ export type AgentBindingSummary = {
   alias: string; operator_id: string; operator_name: string; tool_label: string;
   version: number; state: AgentRoleState; template_hash: string; updated_at: string;
   approved_by: string | null; approved_at: string | null; operator_available: boolean;
-  template_current: boolean; connection_state: "not_connected"; execution_ready: false;
+  template_current: boolean; connection_state: "not_connected" | "enrolled"; execution_ready: false;
   can_initialize: boolean; can_configure: boolean; can_revoke: boolean;
 };
 export type AgentBinding = AgentBindingSummary & { read_paths: string[]; write_paths: string[]; template_body: string };

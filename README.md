@@ -1,4 +1,15 @@
-# Stride — focused task management
+# Stride — human-supervised agent delivery
+
+Coordinate AI agents across machines with shared project context, scoped roles,
+manual assignments and human approval at every delivery gate. BA requirements,
+architecture plans, development, peer review, QA, UAT and release each retain
+their evidence and accountable human. Agents connect through OAuth and MCP;
+the attended companion supplies private notifications and execution leases.
+
+Start with [the attended setup guide](docs/agent-workforce/ATTENDED_SETUP.md).
+The verified application and deployment record are in
+[PR #10](https://github.com/ayee-prashant/stride/pull/10). Source-aware work requires
+the application's own GitHub App configuration; no model API is required.
 
 A small-team task app with quick creation, My Tasks, project boards, three task
 statuses, priorities, due dates, creator-default ownership, search/filters,
@@ -12,7 +23,7 @@ The native Next.js application and PostgreSQL run on Railway. Better Auth provid
 private email/password sessions; public registration is disabled. Vercel supplies
 a submitted entry redirect whose terminal status is not yet verified.
 
-Application: https://stride-app-production-d72b.up.railway.app
+Application: [Open Stride](https://stride-app-production-d72b.up.railway.app)
 
 The owner retrieves the initial password from the stride-provision service's
 STRIDE_BOOTSTRAP_PASSWORD variable in the authenticated Railway dashboard,
@@ -33,6 +44,8 @@ user or authentication bypass.
 - npm run test:auth-runtime — CI-only isolated session/task/password flow.
 - node scripts/verify-production.mjs — guarded Railway private-service smoke job.
 - npm run worker — bounded scheduled reminders, email outbox and file cleanup.
+- npm run worker:agents — persistent attended execution, source and evidence coordinator.
+- npm run agent -- login|mcp|watch ... — use the exact machine setup command from Agent delivery.
 - npm run worker:context — persistent, read-only GitHub source reconciliation.
   Configure an explicit project grant and GitHub App using
   [the setup contract](docs/agent-workforce/GITHUB_CONTEXT_SETUP.md).
@@ -52,11 +65,11 @@ configuration. Never run the CI fixture against production.
 - docs/API.md — request/response contracts.
 - docs/SECURITY.md and docs/TESTING.md — safeguards and validation.
 - docs/RELEASE_REVIEW.md — actual CI, runtime, and deployment evidence.
-- [Human-supervised agent work](docs/agent-workforce/README.md) — approved next
+- [Human-supervised agent work](docs/agent-workforce/README.md) — approved
   product architecture, shared project context, human/agent responsibilities,
   current MCP contracts and ordered
   delivery plan. [Implementation status](docs/agent-workforce/IMPLEMENTATION_STATUS.md)
-  records the context foundation and remaining agent integration gates.
+  records the implemented release, verification and remaining external setup.
 
 ## Source layout
 
@@ -68,13 +81,13 @@ configuration. Never run the CI fixture against production.
 - scripts/ — provisioning and isolated/live verification.
 - infra/ — private database TLS startup and Vercel entry source.
 
-The productivity application 78cfbb0 passed 73 native tests, real PostgreSQL
+The preceding productivity application 78cfbb0 passed 73 native tests, real PostgreSQL
 contracts, typecheck, lint, production compilation, real password reset and
 invitation flows, and browser acceptance. An isolated 20,000-task benchmark and
 PostgreSQL backup/restore drill passed. The dependency audit found no moderate,
 high or critical advisories and one low-severity transitive esbuild advisory.
 [PR #4](https://github.com/ayee-prashant/stride/pull/4) contains this release.
-The 919d0d8 release is deployed on Railway; all 12 controlled live checks passed,
+That release passed all 12 controlled live checks on Railway,
 including real private file storage. Main remains unchanged.
 See docs/RELEASE_REVIEW.md for exact deployment evidence,
 measured limits, and email/Vercel connection status.

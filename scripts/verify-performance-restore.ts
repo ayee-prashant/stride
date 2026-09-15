@@ -45,7 +45,7 @@ try {
   execFileSync("docker", ["exec", container, "createdb", "-U", "stride_test", "stride_restore"], { stdio: "pipe" });
   execFileSync("docker", ["exec", container, "pg_restore", "-U", "stride_test", "--dbname=stride_restore", "--no-owner", "--no-privileges", "--exit-on-error", "/tmp/stride-ci.dump"], { stdio: "pipe" });
   const restoredUrl = new URL(url); restoredUrl.pathname = "/stride_restore"; restorePool = new Pool({ connectionString: restoredUrl.href, max: 1 });
-  const contextTables = ["project_context_heads", "context_documents", "context_revisions", "context_events", "task_context_briefs", "task_context_bindings", "repository_sources", "repository_observations", "repository_source_heads", "repository_source_events", "repository_source_receipts", "agent_profiles", "agent_role_bindings", "agent_role_events"];
+  const contextTables = ["project_context_heads", "context_documents", "context_revisions", "context_events", "task_context_briefs", "task_context_bindings", "repository_sources", "repository_observations", "repository_source_heads", "repository_source_events", "repository_source_receipts", "agent_profiles", "agent_role_bindings", "agent_role_events", "delivery_projects", "delivery_tickets", "agent_connections", "delivery_packets", "delivery_attempts", "delivery_events", "delivery_notices", "delivery_evidence", "auth_oauth_client", "auth_oauth_resource", "auth_oauth_client_resource", "auth_oauth_refresh_token", "auth_oauth_access_token", "auth_oauth_consent", "auth_oauth_client_assertion", "auth_jwks"];
   const tables = ["tasks", "checklist_items", "memberships", "comments", "notifications", "invitations", "account_admissions", "saved_views", "task_templates", "attachments", "email_outbox", ...contextTables];
   for (const table of tables) {
     const sourceCount: { rows: { n: number }[] } = await pool.query(`SELECT COUNT(*)::integer AS n FROM ${table}`);
@@ -58,7 +58,7 @@ try {
     const query = `SELECT COUNT(*)::integer AS n,md5(COALESCE(string_agg(md5(to_jsonb(t)::text),'' ORDER BY md5(to_jsonb(t)::text)),'')) AS checksum FROM ${table} t`;
     const sourceRows: { rows: { n: number; checksum: string }[] } = await pool.query(query);
     const restoredRows: { rows: { n: number; checksum: string }[] } = await restorePool.query(query);
-    assert.ok(sourceRows.rows[0].n > 0, `Missing context restore fixture for ${table}`);
+    if (!["auth_oauth_access_token", "auth_oauth_client_assertion"].includes(table)) assert.ok(sourceRows.rows[0].n > 0, `Missing context restore fixture for ${table}`);
     assert.deepEqual(restoredRows.rows, sourceRows.rows, `Restored context differs for ${table}`);
   }
   const restoredRepo = new Repository(new PostgresDatabase(restorePool));

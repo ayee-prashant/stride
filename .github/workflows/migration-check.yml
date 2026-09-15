@@ -1,7 +1,7 @@
 name: Verify hosting migration
 on:
   pull_request:
-    branches: [main, design/human-agent-workforce, feature/agent-context-foundation, design/human-approved-delivery]
+    branches: [main, design/human-agent-workforce, feature/agent-context-foundation, design/human-approved-delivery, feature/agent-role-registry]
 permissions:
   contents: read
 concurrency:
@@ -67,14 +67,15 @@ jobs:
         run: node --experimental-strip-types --test tests/postgres-agent-registry.integration.test.ts
         env:
           TEST_DATABASE_URL: postgresql://stride_test:isolated_ci_fixture@127.0.0.1:5432/stride_test
+      - name: Verify complete human delivery and concurrent agent claims on PostgreSQL
+        run: node --experimental-strip-types --test tests/postgres-delivery.integration.test.ts
+        env:
+          TEST_DATABASE_URL: postgresql://stride_test:isolated_ci_fixture@127.0.0.1:5432/stride_test
+      - name: Verify modern and legacy MCP using the maintained client
+        run: node --experimental-strip-types --test tests/mcp.integration.test.ts
       - name: Audit dependencies
         run: node scripts/audit-dependencies.mjs
         if: ${{ !cancelled() && steps.generated.outcome == 'success' }}
-      - name: Verify query performance and backup restoration
-        run: node --experimental-strip-types scripts/verify-performance-restore.ts
-        env:
-          TEST_DATABASE_URL: postgresql://stride_test:isolated_ci_fixture@127.0.0.1:5432/stride_test
-          TEST_POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
         with:
@@ -97,6 +98,11 @@ jobs:
           STRIDE_BOOTSTRAP_EMAIL: owner@stride.invalid
           STRIDE_BOOTSTRAP_NAME: Isolated CI owner
           STRIDE_BOOTSTRAP_PASSWORD: isolated-ci-owner-password-not-for-production
+      - name: Verify attended coordinator startup without a repository secret
+        run: npm run worker:agents -- --once
+        env:
+          NODE_ENV: test
+          DATABASE_URL: postgresql://stride_app:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef@127.0.0.1:5432/stride_test
       - name: Verify real session and task flow
         run: npm run test:auth-runtime
         env:
@@ -104,6 +110,11 @@ jobs:
           STRIDE_RUNTIME_PASSWORD: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
           STRIDE_BOOTSTRAP_EMAIL: owner@stride.invalid
           STRIDE_BOOTSTRAP_PASSWORD: isolated-ci-owner-password-not-for-production
+      - name: Verify query performance and backup restoration
+        run: node --experimental-strip-types scripts/verify-performance-restore.ts
+        env:
+          TEST_DATABASE_URL: postgresql://stride_test:isolated_ci_fixture@127.0.0.1:5432/stride_test
+          TEST_POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
       - name: Keep context interface review images
         uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}

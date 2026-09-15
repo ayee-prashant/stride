@@ -10,8 +10,8 @@ const missing = () => new AppError(404, "NOT_FOUND", "This agent role is unavail
 const conflict = (message = "This role changed. Refresh and review its current configuration.") => new AppError(409, "AGENT_CONFLICT", message);
 const memberGuard = "EXISTS(SELECT 1 FROM memberships m WHERE m.workspace_id=? AND m.user_id=?)";
 const hash = (v: unknown) => createHash("sha256").update(JSON.stringify(v)).digest("hex");
-type StoredBinding = Omit<AgentBinding, "read_paths" | "write_paths" | "operator_available"> & { read_paths: string; write_paths: string; operator_available: number };
-const bindingSelect = "SELECT b.*,p.alias,p.operator_id,p.tool_label,u.name AS operator_name,CASE WHEN m.user_id IS NULL THEN 0 ELSE 1 END AS operator_available FROM agent_role_bindings b JOIN agent_profiles p ON p.workspace_id=b.workspace_id AND p.id=b.profile_id JOIN users u ON u.id=p.operator_id LEFT JOIN memberships m ON m.workspace_id=p.workspace_id AND m.user_id=p.operator_id";
+type StoredBinding = Omit<AgentBinding, "read_paths" | "write_paths" | "operator_available"> & { read_paths: string; write_paths: string; operator_available: number; has_connection: number };
+const bindingSelect = "SELECT CASE WHEN EXISTS(SELECT 1 FROM agent_connections c WHERE c.workspace_id=b.workspace_id AND c.project_id=b.project_id AND c.binding_id=b.id AND c.binding_version=b.version AND c.membership_epoch=m.epoch AND c.state='active') THEN 1 ELSE 0 END AS has_connection,b.*,p.alias,p.operator_id,p.tool_label,u.name AS operator_name,CASE WHEN m.user_id IS NULL THEN 0 ELSE 1 END AS operator_available FROM agent_role_bindings b JOIN agent_profiles p ON p.workspace_id=b.workspace_id AND p.id=b.profile_id JOIN users u ON u.id=p.operator_id LEFT JOIN memberships m ON m.workspace_id=p.workspace_id AND m.user_id=p.operator_id";
 
 /** Human-only registration/role decisions. This service issues no agent credentials or run grants. */
 export class AgentRegistryRepository {
@@ -48,7 +48,7 @@ export class AgentRegistryRepository {
       role_id: row.role_id, alias: row.alias, operator_id: row.operator_id, operator_name: row.operator_name,
       tool_label: row.tool_label, version: row.version, state: row.state, template_hash: row.template_hash,
       updated_at: row.updated_at, approved_by: row.approved_by, approved_at: row.approved_at,
-      operator_available: available, template_current: current, connection_state: "not_connected", execution_ready: false,
+      operator_available: available, template_current: current, connection_state: Number(row.has_connection) === 1 ? "enrolled" : "not_connected", execution_ready: false,
       can_initialize: !archived && available && current && row.state === "pending" && row.operator_id === userId && row.version < 1000,
       can_configure: !archived && available && admin && row.version < 1000,
       can_revoke: row.state !== "revoked" && (admin || row.operator_id === userId),

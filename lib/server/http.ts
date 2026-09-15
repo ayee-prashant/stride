@@ -7,6 +7,9 @@ import { ProductivityRepository } from "./productivity-repository.ts";
 import { contextRoute } from "./context-http.ts";
 import { agentRoute } from "./agent-http.ts";
 import type { GitHubBinding } from "../github-context.ts";
+import { deliveryRoute } from "./delivery-http.ts";
+import type { ConnectionProvisioner } from "./delivery-http.ts";
+import type { DeliveryOptions } from "./delivery-store.ts";
 
 // Enough for 8,000 Unicode description characters plus metadata, still bounded.
 export const MAX_BODY_BYTES = 32_768;
@@ -40,7 +43,7 @@ export async function readJson(request: Request): Promise<unknown> {
   try { return JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(joined)); }
   catch { throw new AppError(400, "INVALID_JSON", "Enter a valid JSON request."); }
 }
-export type Dependencies = { githubBindings?: () => GitHubBinding[]; identity: () => Promise<Identity | null>; repository: () => Repository; origin?: () => string; invitations?: () => Invitations; attachments?: () => Attachments; inviteIdentity?: () => Promise<Identity | null>; capabilities?: () => { email: boolean; attachments: boolean } };
+export type Dependencies = { deliveryOptions?: () => DeliveryOptions; provisionConnection?: ConnectionProvisioner; githubBindings?: () => GitHubBinding[]; identity: () => Promise<Identity | null>; repository: () => Repository; origin?: () => string; invitations?: () => Invitations; attachments?: () => Attachments; inviteIdentity?: () => Promise<Identity | null>; capabilities?: () => { email: boolean; attachments: boolean } };
 function routeIdentifier(value: string): string {
   try { return identifier(decodeURIComponent(value)); }
   catch { throw new AppError(400, "INVALID_INPUT", "Invalid record identifier."); }
@@ -72,7 +75,7 @@ export async function handleApi(request: Request, dependencies: Dependencies): P
       result = await repository.bootstrap(user);
     } else {
       const workspaceId = identifier(url.searchParams.get("workspace_id"));
-      const context = await agentRoute(repository, user.userId, workspaceId, url, request.method, input) ?? await contextRoute(repository, user.userId, workspaceId, url, request.method, input, dependencies.githubBindings);
+      const context = await deliveryRoute(repository, user.userId, workspaceId, url, request.method, input, dependencies.deliveryOptions?.(), dependencies.provisionConnection) ?? await agentRoute(repository, user.userId, workspaceId, url, request.method, input) ?? await contextRoute(repository, user.userId, workspaceId, url, request.method, input, dependencies.githubBindings);
       if (context) { result = context.body; status = context.status; }
       else if (route === "/api/capabilities" && request.method === "GET") { await repository.membership(user.userId, workspaceId); result = dependencies.capabilities?.() ?? { email: false, attachments: false }; }
       else if (route === "/api/invitations" && ["GET", "POST"].includes(request.method) && dependencies.invitations) result = request.method === "GET" ? await dependencies.invitations().list(user.userId, workspaceId) : await dependencies.invitations().create(user.userId, workspaceId, input);

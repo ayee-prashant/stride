@@ -3,6 +3,7 @@ import { openEmail } from "../lib/server/email.ts";
 import { spawn } from "node:child_process";
 import assert from "node:assert/strict";
 import { setTimeout as delay } from "node:timers/promises";
+import { verifyAgentRuntime } from "./test-agent-runtime.mjs";
 import { verifyBrowser } from "./test-browser-runtime.mjs";
 import { Repository } from "../lib/server/repository.ts";
 import { PostgresDatabase } from "../lib/server/postgres-adapter.ts";
@@ -48,7 +49,11 @@ async function request(path, method = "GET", body, extraHeaders = {}) {
     ...(body === undefined ? {} : { body: JSON.stringify(body) }), signal: AbortSignal.timeout(10000),
   });
   const newCookies = response.headers.getSetCookie();
-  if (newCookies.length) cookie = newCookies.map(value => value.split(";")[0]).join("; ");
+  if (newCookies.length) {
+    const jar = new Map(cookie.split("; ").filter(Boolean).map(pair => [pair.slice(0, pair.indexOf("=")), pair.slice(pair.indexOf("=") + 1)]));
+    for (const value of newCookies) { const pair = value.split(";")[0]; const at = pair.indexOf("="); if (at > 0) { const name = pair.slice(0, at); const content = pair.slice(at + 1); if (content) jar.set(name, content); else jar.delete(name); } }
+    cookie = [...jar].map(([name, value]) => `${name}=${value}`).join("; ");
+  }
   return response;
 }
 async function json(response, expected = 200) {
@@ -128,7 +133,7 @@ try {
   assert.equal(staleBrief.brief.payload.documents[0].body, contextInput.body);
   const restricted = new Pool({ connectionString: fixtureUrl.toString(), max: 1 });
   try {
-    for (const table of ["context_revisions", "context_events", "task_context_briefs", "repository_observations", "repository_source_events", "repository_source_receipts", "agent_profiles", "agent_role_events"]) {
+    for (const table of ["context_revisions", "context_events", "task_context_briefs", "repository_observations", "repository_source_events", "repository_source_receipts", "agent_profiles", "agent_role_events", "delivery_packets", "delivery_events"]) {
       const privileges = await restricted.query("SELECT has_table_privilege(current_user,$1,'UPDATE') AS can_update, has_table_privilege(current_user,$1,'DELETE') AS can_delete", [table]);
       assert.deepEqual(privileges.rows[0], { can_update: false, can_delete: false });
     }
@@ -162,6 +167,8 @@ try {
   assert.equal((await json(await request("/api/workspace?workspace_id=" + workspaceId))).role, "member");
   assert.equal((await request("/api/invitations?workspace_id=" + workspaceId, "POST", { email: "denied@example.test" })).status, 403);
   await json(await request("/api/auth/sign-out", "POST", {})); cookie = ownerCookie;
+  stage = "agent-runtime";
+  const deliveryReview = await verifyAgentRuntime({ origin, request, json, userId: bootstrap.user.userId, workspaceId, projectId: metadata.projects[0].id });
   stage = "browser";
   const sourcePool = new Pool({ connectionString: fixtureUrl.toString(), max: 1 });
   try {
@@ -173,7 +180,7 @@ try {
       const claim = await sources.claim(); assert.ok(claim);
       const result = head === "unavailable" ? new GitHubContextError("access_unavailable") : { ...observation(repositoryBinding, head, "CI repository fact <script>window.__repositoryXss=true</script>"), observed_at: new Date().toISOString() };
       assert.equal(await sources.finish(claim, result), true);
-    });
+    }, deliveryReview);
   } finally { await sourcePool.end(); }
   stage = "password-change";
   const changedPassword = ownerPassword + "-changed";
@@ -212,8 +219,8 @@ try {
   assert.equal((await request("/api/workspace?workspace_id=" + workspaceId, "GET", undefined, { cookie: cookieBeforeSignOut })).status, 401);
   assert.equal((await request("/api/workspace?workspace_id=" + workspaceId, "GET", undefined, { cookie: signedInCookie })).status, 401);
   console.log("Authenticated Next.js/PostgreSQL runtime flow passed.");
-} catch {
-  console.error(JSON.stringify({ event: "auth_runtime_check_failed", stage }));
+} catch (error) {
+  console.error(JSON.stringify({ event: "auth_runtime_check_failed", stage, kind: error?.name, expected: typeof error?.expected === "number" ? error.expected : undefined, actual: typeof error?.actual === "number" ? error.actual : undefined, frames: error instanceof Error ? error.stack?.split("\n").filter(line => line.trim().startsWith("at ")).slice(0, 3) : [] }));
   process.exitCode = 1;
 } finally {
   child.kill("SIGTERM");

@@ -1,0 +1,83 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { fixture } from "./sqlite.ts";
+import { digest } from "../lib/server/delivery-store.ts";
+import { parseReport, validatePlan } from "../lib/delivery.ts";
+import { setupDelivery, completeDelivery, report, rid } from "./delivery-contract.ts";
+const setup = () => setupDelivery(fixture);
+test("another sign-in cannot resume a running attempt, and revoked sign-in fences it", async () => {
+  const f = await setup(); const authorized = await f.s.authorizeStart(f.owner.userId, f.workspace, f.project, f.t.id, f.startInput);
+  const claim = { request_id: rid(), ticket_id: f.t.id, attempt_id: authorized.ticket!.attempt_id, packet_hash: f.packet.hash };
+  await f.s.claim(f.actor, claim);
+  const fresh = { ...f.actor, session_id: "another-isolated-sign-in" };
+  await assert.rejects(f.s.claim(fresh, claim));
+  await assert.rejects(f.s.writeAttempt(fresh, "submit", { request_id: rid(), attempt_id: claim.attempt_id, expected_version: 2, submit: report() }));
+  assert.equal((await f.s.agentPacket(fresh, f.t.id)).execution_authorized, false);
+  f.c.options.sessionActive = async () => false;
+  await f.prepare();
+  assert.equal((await f.s.attempt(f.workspace, f.project, claim.attempt_id!)).state, "lease_lost");
+});
+test("notifications page from newest for humans and forward for companions without losing events", async () => {
+  const f = await setup();
+  const initial = (await f.repo.statement("SELECT MAX(sequence) AS n FROM delivery_events").first<{ n: number }>())!.n;
+  for (let i = 1; i <= 55; i++) await f.s.event({ kind: "human", id: f.owner.userId }, f.workspace, f.project, f.t.id, "test_notice", "Isolated notification fixture", rid(), digest(i), {}, [f.owner.userId]);
+  const latest = await f.s.notices(f.owner.userId, f.workspace, f.project, 0, true);
+  assert.equal(latest.notices[0].sequence, initial + 55); assert.equal(latest.has_more, true);
+  const older = await f.s.notices(f.owner.userId, f.workspace, f.project, latest.next_cursor, true);
+  assert.ok(older.notices.every(n => n.sequence < latest.next_cursor));
+  const forward = await f.s.companionNotices(f.actor, initial + 50); assert.deepEqual(forward.notices.map(n => n.sequence), [51, 52, 53, 54, 55].map(n => n + initial));
+  await f.repo.addMember(f.owner.userId, f.workspace, { email: f.other.email, role: "member" });
+  assert.equal((await f.s.notices(f.other.userId, f.workspace, f.project)).notices.length, 0);
+});
+test("full BA, architecture, specialist review, failed QA rework, UAT and production acceptance flow", async () => { await completeDelivery(fixture); });
+test("BA work needs role acknowledgement, companion preparation and a separate exact human start", async () => {
+  const f = await setup();
+  await assert.rejects(f.s.claim(f.actor, { request_id: rid(), ticket_id: f.t.id, attempt_id: rid(), packet_hash: f.packet.hash }));
+  await assert.rejects(f.repo.updateTask(f.owner.userId, f.workspace, f.t.task_id, { version: 1, status: "done" }), /human delivery gates/);
+  const authorized = await f.s.authorizeStart(f.owner.userId, f.workspace, f.project, f.t.id, f.startInput);
+  const input = { request_id: rid(), ticket_id: f.t.id, attempt_id: authorized.ticket!.attempt_id, packet_hash: f.packet.hash };
+  const started = await f.s.claim(f.actor, input); assert.equal(started.execution_authorized, true);
+  assert.equal((await f.s.claim(f.actor, input)).replayed, true);
+  const outcome = report();
+  const submitted = await f.s.writeAttempt(f.actor, "submit", { request_id: rid(), attempt_id: authorized.ticket!.attempt_id, expected_version: 2, submit: outcome });
+  assert.equal(submitted.ticket!.phase, "in_review");
+  assert.equal((await f.s.configuration(f.workspace, f.project)).baseline, null);
+  const reviewed = await f.s.review(f.owner.userId, f.workspace, f.project, f.t.id, { request_id: rid(), expected_version: submitted.ticket!.version, decision: "accept", report_hash: digest(outcome), reason: "Scope and acceptance criteria approved by BA human" });
+  assert.equal(reviewed.ticket!.phase, "accepted");
+  assert.equal((await f.repo.task(f.owner.userId, f.workspace, f.t.task_id)).status, "done");
+  assert.equal((await f.s.configuration(f.workspace, f.project)).baseline?.documents.length, 1);
+  const events = await f.repo.statement("SELECT actor_kind,actor_id,operator_id FROM delivery_events WHERE action='report_submitted'").first<{ actor_kind: string; actor_id: string; operator_id: string }>();
+  assert.equal(events?.actor_kind, "agent"); assert.equal(events?.actor_id, f.b.profile_id); assert.equal(events?.operator_id, f.owner.userId);
+  await assert.rejects(f.repo.updateTask(f.owner.userId, f.workspace, f.t.task_id, { version: 2, status: "todo" }), /immutable/);
+});
+test("revocation fences claims and writes; reconnecting does not revive an old approval", async () => {
+  const f = await setup(); const started = await f.s.authorizeStart(f.owner.userId, f.workspace, f.project, f.t.id, f.startInput);
+  const current = await f.c.connection(f.workspace, f.project, f.connection.id);
+  await f.c.revoke(f.owner.userId, f.workspace, f.project, current.id, { request_id: rid(), expected_version: current.version, reason: "Laptop disconnected" });
+  await assert.rejects(f.s.claim(f.actor, { request_id: rid(), ticket_id: f.t.id, attempt_id: started.ticket!.attempt_id, packet_hash: f.packet.hash }), /revoked/);
+  assert.equal((await f.s.attempt(f.workspace, f.project, started.ticket!.attempt_id!)).state, "cancelled");
+});
+test("expired companion lease cannot be resurrected by a late heartbeat", async () => {
+  const f = await setup(); const authorized = await f.s.authorizeStart(f.owner.userId, f.workspace, f.project, f.t.id, f.startInput);
+  await f.s.claim(f.actor, { request_id: rid(), ticket_id: f.t.id, attempt_id: authorized.ticket!.attempt_id, packet_hash: f.packet.hash });
+  await f.repo.statement("UPDATE delivery_attempts SET lease_until='2000-01-01T00:00:00.000Z' WHERE id=?", authorized.ticket!.attempt_id!).run();
+  await f.prepare(); await f.s.reconcile();
+  assert.equal((await f.s.attempt(f.workspace, f.project, authorized.ticket!.attempt_id!)).state, "lease_lost");
+  await assert.rejects(f.s.writeAttempt(f.actor, "submit", { request_id: rid(), attempt_id: authorized.ticket!.attempt_id, expected_version: 2, submit: report() }), /no longer active/);
+});
+test("removed and re-added membership has a new epoch and rejects the previous connection", async () => {
+  const f = await setup(); await f.repo.addMember(f.owner.userId, f.workspace, { email: f.other.email, role: "member" });
+  const before = await f.repo.statement("SELECT epoch FROM memberships WHERE workspace_id=? AND user_id=?", f.workspace, f.other.userId).first<{ epoch: string }>();
+  await f.repo.statement("DELETE FROM memberships WHERE workspace_id=? AND user_id=?", f.workspace, f.other.userId).run();
+  await f.repo.addMember(f.owner.userId, f.workspace, { email: f.other.email, role: "member" });
+  const after = await f.repo.statement("SELECT epoch FROM memberships WHERE workspace_id=? AND user_id=?", f.workspace, f.other.userId).first<{ epoch: string }>();
+  assert.notEqual(before?.epoch, after?.epoch);
+  await f.repo.statement("UPDATE memberships SET epoch=? WHERE workspace_id=? AND user_id=?", rid(), f.workspace, f.owner.userId).run();
+  await assert.rejects(f.c.validateConnection(f.actor), /membership|Membership/);
+});
+test("strict reports reject fake authority, contradictory QA and cyclic plans", () => {
+  assert.throws(() => parseReport({ ...report(), approved_by: "agent" }));
+  const failed = report(); failed.evidence.checks[0].result = "fail"; assert.throws(() => parseReport(failed), /passing report/);
+  const issues = report(); issues.outcome = "issues"; assert.throws(() => parseReport(issues), /findings/);
+  assert.throws(() => validatePlan([{ key: "a", depends_on: ["b"] }, { key: "b", depends_on: ["a"] }] as never), /acyclic/);
+});

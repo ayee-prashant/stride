@@ -1,6 +1,30 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { createServer } from "node:http";
+import { probeAgentHttp } from "../scripts/probe-agent-http.mjs";
 import { applicationOrigin, authenticationSettings, allowedEmails, postgresSettings } from "../lib/server/deployment-config.ts";
+
+test("private production probes preserve the canonical Host without a human session", async () => {
+  const seen: { method?: string; path?: string; host?: string; origin?: string; cookie?: string; authorization?: string }[] = [];
+  const origin = "https://stride.example";
+  const server = createServer((request, response) => {
+    seen.push({ method: request.method, path: request.url, host: request.headers.host, origin: request.headers.origin, cookie: request.headers.cookie, authorization: request.headers.authorization });
+    request.resume();
+    response.writeHead(401, { "www-authenticate": `Bearer resource_metadata="${origin}/.well-known/oauth-protected-resource/mcp"` });
+    response.end("Denied");
+  });
+  await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
+  try {
+    const address = server.address(); assert.ok(address && typeof address === "object");
+    const target = new URL(`http://127.0.0.1:${address.port}`);
+    for (const path of ["/mcp", "/api/agent-companion"] as const) {
+      const result = await probeAgentHttp(target, origin, path);
+      assert.equal(result.status, 401);
+      assert.ok(result.headers.get("www-authenticate")?.includes("oauth-protected-resource/mcp"));
+    }
+    assert.deepEqual(seen, ["/mcp", "/api/agent-companion"].map(path => ({ method: path === "/mcp" ? "POST" : "GET", path, host: "stride.example", origin, cookie: undefined, authorization: "Bearer invalid-release-verification" })));
+  } finally { await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve())); }
+});
 
 test("production origins reject redirects, credentials and insecure protocols", () => {
   for (const APP_URL of ["", "http://localhost:3000", "http://stride.example", "https://attacker@stride.example", "https://stride.example/auth", "https://stride.example/?next=attacker", "https://stride.example/#x"]) {
