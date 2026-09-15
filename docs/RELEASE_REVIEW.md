@@ -20,25 +20,41 @@ Actual local verification on Windows with Node 24.15.0:
   warnings**. The `npm run lint` process stalled; a debug run finished linting a
   file but did not exit. The API verification awaited every result before an
   explicit exit. No lint rules were disabled; generated `work/` fixtures were excluded.
-- `npm run test:setup`: attempted, failed at the Docker availability preflight.
-  Its assertions have **not yet passed anywhere**: the CI step that would run it
-  is held back from this branch (see the note below), so it has not run in PR CI
-  either. It checks real provisioning, restricted-role queries, hashed
-  credentials, stopped-container recovery, and preservation of a changed password
-  and sentinel data; only its own fixture resources are cleaned up.
-- Existing real-PostgreSQL and authenticated/browser runtime checks did not run
-  locally because the Docker engine was unavailable. Prior release results below
-  are historical evidence, not a pass for this source.
+- `npm run test:setup`: **passed on 2026-09-16**, its first successful run in any
+  environment. One test, 21.4s, against a real Docker engine 29.5.3 with a cached
+  `postgres:18` image. It provisioned a real PG18 container on free loopback
+  ports, verified the generated owner password against the stored hash, changed
+  that password, wrote sentinel data, stopped the container, reran setup, and
+  confirmed the changed password, the sentinel row and all three environment
+  files survived. It also asserted the restricted `stride_app` role holds none of
+  `rolsuper`, `rolcreatedb`, `rolcreaterole`, `rolreplication`, `rolbypassrls`,
+  that the runtime role can read the data, and that no generated secret appears in
+  captured logs. Fixture cleanup was verified afterwards: no container or volume
+  matching `stride-local-<32 hex>` remained, and `work/` was empty.
+- The earlier `dockerInference` preflight failure recorded below was an
+  environment fault, not a source defect. With a working engine the same test
+  passes unmodified.
+- Existing authenticated/browser runtime checks still did not run locally. Prior
+  release results below are historical evidence, not a pass for this source.
 
-Held back from this branch: a `migration-check.yml` change adding a
-`npm run test:setup` step (with its own 10-minute step timeout, and the job
-budget raised from 15 to 30 minutes to absorb the Docker image pull and two
-container cycles). It is not included because the authenticated GitHub token
-lacks the `workflow` OAuth scope, so a push containing workflow edits is
-rejected. The change is preserved on the local branch
-`backup/local-setup-with-ci-change`. Apply it in a follow-up push after running
-`gh auth refresh -h github.com -s workflow`. Until then CI for this branch is
-unchanged from `main` and does not exercise the new setup path.
+Still held back: a `migration-check.yml` change adding a `npm run test:setup`
+step. It is absent because the authenticated GitHub token carries `gist`,
+`read:org` and `repo` but not `workflow`, and GitHub rejects any push whose ref
+updates a file under `.github/workflows`. Until it lands, CI does not exercise
+the setup path. Apply it after `gh auth refresh -h github.com -s workflow`:
+
+```powershell
+git checkout backup/local-setup-with-ci-change -- .github/workflows/migration-check.yml
+```
+
+That change was resized once the test actually ran. The original version raised
+the job budget from 15 to 30 minutes, sized from a review estimate made before
+the test had ever executed. Measurement contradicts that estimate: the test
+takes 21s locally, and the eight most recent `migration-check` runs finished in
+2m6s to 3m41s against the existing 15-minute budget. The step therefore adds
+roughly 60-90s in CI including the image pull, so the job budget stays at 15
+minutes and only the step carries a 5-minute timeout, which still makes a hang
+attributable to this step rather than a generic job timeout.
 
 Docker Desktop 4.77.0 initially failed on an inaccessible `dockerInference` Unix
 socket. Its runtime socket directories were renamed as backups, leaving Docker

@@ -166,10 +166,11 @@ database, installation and end-to-end evidence.
 checkout fixture and PG18 container on free loopback ports, applies real migrations,
 verifies the generated login password and restricted role, changes the fixture's
 password, and reruns setup after stopping the database. It checks data, password
-and file preservation, then removes only its own fixture container/volume. It is
-not yet wired into pull-request CI; see RELEASE_REVIEW.md. Dependency
-installation is covered separately by `npm ci`; the fixture reuses installed
-dependencies.
+and file preservation, then removes only its own fixture container/volume. It
+passes against a real Docker engine in about 21 seconds with a cached
+`postgres:18` image. It is not yet wired into pull-request CI; see
+RELEASE_REVIEW.md. Dependency installation is covered separately by `npm ci`;
+the fixture reuses installed dependencies.
 
 The Docker invocation follows [Docker's container run documentation](https://docs.docker.com/engine/containers/run/)
 and the [official PostgreSQL image's PG18 volume layout](https://hub.docker.com/_/postgres).
