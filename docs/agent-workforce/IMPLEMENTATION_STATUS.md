@@ -27,11 +27,14 @@ Implemented behavior includes:
 - Three-pane human context editing and delivery review, preserved drafts, mobile
   controls, private review links and immutable, timestamped audit records.
 
-The native, PostgreSQL/concurrency, maintained MCP, migration, dependency-audit,
-type, lint and production-build gates have passed. Final real OAuth, shipped CLI,
-browser and restore acceptance are still being completed. This paragraph does
-not claim the attended release is deployed; current exact release evidence is
-recorded in ../RELEASE_REVIEW.md.
+All required CI gates passed on `ce1da3c23ff189620150b822759e84a2250165a2` in
+[run 34913707229](https://github.com/ayee-prashant/stride/actions/runs/34913707229):
+121 native tests, PostgreSQL/concurrency, maintained modern/legacy MCP, migration
+parity, dependency audit, typecheck, lint, production build, real OAuth, shipped
+CLI, complete browser acceptance and a 41-table restore drill. Desktop and 390px
+mobile delivery screenshots were retrieved and visually reviewed. These are
+isolated acceptance results; exact production rollout and live-check evidence is
+tracked in [PR #10](https://github.com/ayee-prashant/stride/pull/10).
 
 The deployed application needs its own GitHub App installation and worker-only
 signing key. Those credentials are not available through the development GitHub

@@ -1,10 +1,11 @@
 # Ordered delivery plan
 
-Status: design approved; the human context foundation, configured GitHub source
-increment and human profile/role configuration are implemented. [Implementation status](IMPLEMENTATION_STATUS.md) tracks evidence
-and incomplete contracts. The complete delivery slices below remain pending
-until all their acceptance gates pass. Existing task-management deployment
-evidence remains in [the current release review](../RELEASE_REVIEW.md).
+Status: the attended context, profile, connection and human-gated delivery release
+is implemented and has passed its complete CI gate. [Implementation status](IMPLEMENTATION_STATUS.md)
+records actual coverage and external setup. The phase tables below remain the
+broader roadmap; they do not imply vendor-specific adapters, managed runners or
+optional automation have shipped. Exact application/deployment evidence is in
+[the current release review](../RELEASE_REVIEW.md) and PR #10.
 
 ## Delivery rule
 

@@ -22,16 +22,34 @@ runtime updates/deletes on packets and audit events. Membership epochs rotate on
 real role changes, while no-op authorization locks preserve them. Attempt authority
 uses a database clock and the original real human session.
 
-The native (121 tests), real PostgreSQL/concurrency, maintained modern/legacy MCP,
-migration-parity, dependency audit, typecheck, lint and production build gates have
-passed. Real OAuth integration exposed internal/public hostname handling, consent
-request-context and fetch-navigation issues; these were corrected without bypassing
-provider authorization. The final OAuth, shipped-CLI, browser and restore gates are
-still running. No production deployment of this candidate is claimed yet.
+Source `ce1da3c23ff189620150b822759e84a2250165a2`, tree
+`b8eddfe2774233421015841a72f7bec42ea54d49`, passed every gate in
+[run 34913707229](https://github.com/ayee-prashant/stride/actions/runs/34913707229),
+job 104206614915. This includes 121 native tests, real PostgreSQL/concurrency,
+maintained modern/legacy MCP, migration parity, dependency audit, typecheck,
+lint, production build and real OAuth/CLI/browser acceptance. The CLI actually
+signed in through PKCE, saved private token files, bridged stdio and prepared a
+packet through its companion. Browser acceptance includes human baseline approval,
+preserved review drafts, safe report text, role configuration, existing task flows
+and desktop/390px controls. Screenshots were retrieved and visually reviewed.
 
-`stride-agents` has been prepared as a private coordinator with restricted database
-references. The rollout must provision migrations first, then deploy the exact
-verified source and inspect actual startup/readiness/live-verification results.
+Real integration found internal/public hostname handling, missing consent request
+context and legacy CLI imports; these were corrected using the maintained provider
+and SDK. Test corrections also respect code-replay grant revocation and wait for
+the real companion to finish writing before fixture cleanup. No provider validation
+or human approval boundary was bypassed to make the tests pass.
+
+A PostgreSQL 18 dump/restore compared counts for 41 tables, context/delivery/OAuth
+content checksums and independent writes. On 20,000 synthetic tasks, 20 warm samples
+per query measured p95 46.17 ms (My Tasks), 67.63 ms (board), 28.07 ms (overdue/high)
+and 27.33 ms (title search), with approximately 48.8 KB responses. These are
+unloaded CI query measurements, not production load or backup-policy guarantees.
+
+`stride-agents` is configured as a private coordinator with restricted database
+references. The rollout provisions migrations first, then deploys the exact
+verified source and checks actual startup/readiness/live-verification results.
+Exact production deployment IDs and live-check results are maintained in
+[PR #10](https://github.com/ayee-prashant/stride/pull/10).
 The dedicated application's GitHub App key/bindings are not configured. Vercel
 still returns a team-scope 403 on 2026-09-15. Neither limit is concealed by the CI
 fixtures or by the canonical Railway application URL.

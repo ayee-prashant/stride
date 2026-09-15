@@ -137,5 +137,13 @@ Release authorization records the tested artifact, environment, configuration,
 migration and recovery plan. Deployment itself stays under the human's existing
 host workflow. Stride independently verifies its outcome before human closure.
 
+The first release conservatively invalidates active source-aware packets whenever
+the tracked baseline branch moves, including changes outside this ticket's files.
+Deploy the reviewed immutable candidate while keeping that baseline stable through
+closure. Merging into the tracked branch during an active workflow requires a fresh
+context review and assignment; it is not silently treated as the old packet. This
+release does not claim semantic impact analysis or automatic reconciliation of a
+moving integration branch.
+
 No OpenRouter or model API is required. The IDE agent uses its own model access;
 Stride supplies coordination, context, evidence and approval boundaries.
