@@ -6,21 +6,20 @@ import { availablePort, guardLocalEnvironment, loadLocalSettings, localDockerEnd
 const root = fileURLToPath(new URL("../", import.meta.url));
 const [command, ...args] = process.argv.slice(2);
 let dockerEndpoint;
-function run(binary, arguments_, environment = {}, timeout = 180_000) {
+function run(binary, arguments_, environment = {}, timeout = 180_000, failureHint) {
   const result = spawnSync(binary, arguments_, { cwd: root, env: { ...process.env, ...environment }, encoding: "utf8", timeout, maxBuffer: 2 * 1024 * 1024 });
-  if (result.status !== 0 || result.error) throw new Error(`The ${binary === process.execPath ? "Node" : binary} step failed. Run npm run doctor:local for prerequisite checks; configuration and database data are preserved.`);
+  if (result.status !== 0 || result.error) throw new Error(failureHint ?? `The ${binary === process.execPath ? "Node" : binary} step failed. Configuration and database data are preserved. See docs/LOCAL_DEVELOPMENT.md for recovery steps.`);
   return result.stdout.trim();
 }
 function prerequisites() {
-  run("git", ["--version"]);
-  run("git", ["check-ignore", "--quiet", ".stride-local/settings.json"]);
-  run("git", ["check-ignore", "--quiet", ".env.local"]);
-  run("docker", ["compose", "version"], {}, 10_000);
+  run("git", ["--version"], {}, 10_000, "Install Git and run this command in a reviewed Stride checkout.");
+  for (const path of [".stride-local/settings.json", ".env.local"]) run("git", ["check-ignore", "--quiet", path], {}, 10_000, "Private local files must be excluded by the checkout's Git ignore rules before setup can continue.");
+  run("docker", ["compose", "version"], {}, 10_000, "Install Docker with Compose v2, then rerun npm run doctor:local.");
   const contextEndpoint = JSON.parse(run("docker", ["context", "inspect", "--format", "{{json .Endpoints.docker.Host}}"], {}, 10_000));
   const endpoint = process.env.DOCKER_CONTEXT ? contextEndpoint : process.env.DOCKER_HOST || contextEndpoint;
   if (!localDockerEndpoint(endpoint)) throw new Error("Select a local Unix-socket Docker context. Remote Docker engines are not supported for local setup.");
   dockerEndpoint = endpoint;
-  run("docker", ["--host", endpoint, "info", "--format", "{{.ServerVersion}}"], { DOCKER_HOST: "", DOCKER_CONTEXT: "" }, 10_000);
+  run("docker", ["--host", endpoint, "info", "--format", "{{.ServerVersion}}"], { DOCKER_HOST: "", DOCKER_CONTEXT: "" }, 10_000, "Start your local Docker engine. On Windows, enable its WSL integration and run this command inside WSL.");
 }
 function compose(settings, arguments_) {
   return run("docker", ["--host", dockerEndpoint, "compose", "--project-name", settings.project, "--file", "infra/local/compose.yaml", ...arguments_], { DOCKER_HOST: "", DOCKER_CONTEXT: "", STRIDE_LOCAL_DB_PASSWORD: settings.adminPassword, STRIDE_LOCAL_DB_PORT: String(settings.dbPort) });

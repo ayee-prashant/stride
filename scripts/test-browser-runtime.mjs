@@ -90,8 +90,10 @@ export async function verifyBrowser(origin, cookie, reconcileRepository, deliver
     stage = "getting-started";
     await clickButton("Getting started", '[data-slot="sidebar-menu-button"]');
     await waitFor("document.querySelector('h1')?.textContent === 'Getting started' && document.querySelectorAll('.getting-started-card').length === 3");
+    await capture("context-getting-started-desktop");
     await evaluate("document.querySelector('.getting-started-faq summary').focus()");
-    await call("Input.dispatchKeyEvent", { type: "keyDown", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13 });
+    await waitFor("document.activeElement === document.querySelector('.getting-started-faq summary')");
+    await call("Input.dispatchKeyEvent", { type: "keyDown", key: "Enter", code: "Enter", text: "\r", unmodifiedText: "\r", windowsVirtualKeyCode: 13 });
     await call("Input.dispatchKeyEvent", { type: "keyUp", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13 });
     await waitFor("document.querySelector('.getting-started-faq details').open");
     assert.equal(await evaluate("document.querySelector('.getting-started').textContent.includes('operator authorizes the exact work packet')"), true);
@@ -325,6 +327,8 @@ export async function verifyBrowser(origin, cookie, reconcileRepository, deliver
     await clickButton(`Quick edit ${bulkTitle}`);
     await clickButton(`Priority for ${bulkTitle}`);
     await clickButton("high priority", '[role="option"]');
+    await clickButton("Refresh tasks");
+    assert.equal(await evaluate("document.querySelector('[data-slot=\"popover-content\"]')?.textContent.includes('high priority')"), true);
     await clickButton("Save", '[data-slot="popover-content"] button');
     await waitFor(`Array.from(document.querySelectorAll('.inline-task-trigger')).some(el => el.getAttribute('aria-label') === ${JSON.stringify(`Quick edit ${bulkTitle}`)} && el.textContent.includes('high'))`);
     await clickButton("Save view"); await fill('[aria-label="Saved view name"]', "Browser focus"); await clickButton("Save filters");
@@ -347,6 +351,7 @@ export async function verifyBrowser(origin, cookie, reconcileRepository, deliver
     assert.deepEqual(runtimeErrors, []);
     console.log("Browser task, checklist, blocker, deep link, quick edit, bulk, saved view, shortcut, collaboration and 390px layout checks passed.");
   } catch (error) {
+    try { await capture("context-failure"); } catch { /* Preserve the original failure if the page is unavailable. */ }
     console.error(JSON.stringify({ event: "browser_check_failed", stage, reason: error instanceof Error ? error.message : "unknown", ...(stage === "chrome-start" ? { chromeExit: chrome.exitCode, startupLog } : {}) })); throw error;
   } finally {
     for (const operation of pending.values()) { clearTimeout(operation.timer); operation.reject(new Error("Browser closed")); }
