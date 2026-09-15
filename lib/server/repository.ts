@@ -155,6 +155,10 @@ export class Repository {
   private async updateTaskRecord(userId: string, workspaceId: string, taskId: string, input: unknown): Promise<Task> {
     const patch = parseTaskPatch(input); const current = await this.task(userId, workspaceId, taskId);
     if (current.version !== patch.version) throw conflict();
+    const delivery = await this.statement("SELECT phase FROM delivery_tickets WHERE workspace_id=? AND task_id=?", workspaceId, taskId).first<{ phase: string }>();
+    if (delivery && patch.status === "done" && delivery.phase !== "accepted") throw new AppError(409, "DELIVERY_REVIEW_REQUIRED", "Complete this ticket's human delivery gates before marking it done.");
+    if (delivery && patch.recurrence && patch.recurrence !== "none") throw new AppError(409, "DELIVERY_REVIEW_REQUIRED", "Create a separately approved delivery ticket for repeated agent work.");
+    if (delivery && current.status === "done" && Object.keys(patch).some(key => !["version", "archived"].includes(key))) throw new AppError(409, "DELIVERY_REVIEW_REQUIRED", "Accepted delivery is immutable. Create a follow-up ticket for a new change.");
     if (current.archived_at && (patch.archived !== false || Object.keys(patch).length !== 2)) throw new AppError(409, "ARCHIVED", "Restore this task before editing it.");
     const now = this.now().toISOString(); const mutation = crypto.randomUUID(); const status = patch.status ?? current.status;
     const assignee = patch.assignee_id === undefined ? current.assignee_id : patch.assignee_id;

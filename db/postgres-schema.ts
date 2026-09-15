@@ -12,6 +12,7 @@ export const workspaces = pgTable("workspaces", {
 export const memberships = pgTable("memberships", {
   workspaceId: text("workspace_id").notNull().references(() => workspaces.id),
   userId: text("user_id").notNull().references(() => users.id), role: text("role", { enum: ["admin", "member"] }).notNull(),
+  epoch: text("epoch").notNull().default(sql`gen_random_uuid()::text`),
 }, t => [primaryKey({ columns: [t.workspaceId, t.userId] }), index("idx_memberships_user").on(t.userId), check("membership_role", sql`${t.role} IN ('admin','member')`)]);
 export const projects = pgTable("projects", {
   id: text("id").primaryKey(), workspaceId: text("workspace_id").notNull().references(() => workspaces.id),

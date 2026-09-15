@@ -1,4 +1,120 @@
-# Release review — 2026-09-14
+# Release review — 2026-09-15
+
+## Attended agent delivery — current release candidate
+
+[PR #10](https://github.com/ayee-prashant/stride/pull/10) contains the complete
+attended delivery implementation and the preceding context/profile increments.
+It adds human responsibilities, BA/SA approval, scoped immutable work packets,
+manual assignment/start grants, checkpoints, specialist/peer/QA/UAT/release gates,
+independent repository/deployment evidence, OAuth enrollment, MCP and a local
+companion. Reports remain proposals until the responsible human accepts them.
+
+The verified domain flow includes both QA and UAT failures followed by development
+and repeated reviews, exact artifact authorization and production closure. It
+also covers same-profile review provenance, duplicate active plan rejection,
+competing claims, stale role/membership/context, original-session revocation,
+private notification cursors and immutable audit receipts. GitHub-provider tests
+use explicitly simulated endpoints; no live GitHub installation is claimed.
+
+Generated migrations 0006–0008 are additive. Published migration/lock archives were
+checked before commit; prior migration bytes remain unchanged. Provisioning denies
+runtime updates/deletes on packets and audit events. Membership epochs rotate on
+real role changes, while no-op authorization locks preserve them. Attempt authority
+uses a database clock and the original real human session.
+
+Source `ce1da3c23ff189620150b822759e84a2250165a2`, tree
+`b8eddfe2774233421015841a72f7bec42ea54d49`, passed every gate in
+[run 34913707229](https://github.com/ayee-prashant/stride/actions/runs/34913707229),
+job 104206614915. This includes 121 native tests, real PostgreSQL/concurrency,
+maintained modern/legacy MCP, migration parity, dependency audit, typecheck,
+lint, production build and real OAuth/CLI/browser acceptance. The CLI actually
+signed in through PKCE, saved private token files, bridged stdio and prepared a
+packet through its companion. Browser acceptance includes human baseline approval,
+preserved review drafts, safe report text, role configuration, existing task flows
+and desktop/390px controls. Screenshots were retrieved and visually reviewed.
+
+Real integration found internal/public hostname handling, missing consent request
+context and legacy CLI imports; these were corrected using the maintained provider
+and SDK. Test corrections also respect code-replay grant revocation and wait for
+the real companion to finish writing before fixture cleanup. No provider validation
+or human approval boundary was bypassed to make the tests pass.
+
+A PostgreSQL 18 dump/restore compared counts for 41 tables, context/delivery/OAuth
+content checksums and independent writes. On 20,000 synthetic tasks, 20 warm samples
+per query measured p95 46.17 ms (My Tasks), 67.63 ms (board), 28.07 ms (overdue/high)
+and 27.33 ms (title search), with approximately 48.8 KB responses. These are
+unloaded CI query measurements, not production load or backup-policy guarantees.
+
+`stride-agents` is configured as a private coordinator with restricted database
+references. The rollout provisions migrations first, then deploys the exact
+verified source and checks actual startup/readiness/live-verification results.
+Exact production deployment IDs and live-check results are maintained in
+[PR #10](https://github.com/ayee-prashant/stride/pull/10).
+The dedicated application's GitHub App key/bindings are not configured. Vercel
+still returns a team-scope 403 on 2026-09-15. Neither limit is concealed by the CI
+fixtures or by the canonical Railway application URL.
+
+The initial live probe found that Node 24 fetch drops a supplied Host header,
+so the agent endpoint correctly rejected the private listener authority with 403.
+The verification client now uses bounded node:http requests with the canonical
+Host and a deliberately invalid bearer token, without the human session cookie.
+A loopback HTTP regression checks the actual wire headers for both agent routes.
+Application origin and host checks remain unchanged. Individual probe stages now
+identify failures precisely; exact rerun results are recorded in PR #10.
+
+See [attended setup](agent-workforce/ATTENDED_SETUP.md). No model API is required;
+arbitrary IDE wake-up, automatic assignment and native Windows credential storage
+are outside this first attended release. The following sections are historical
+evidence for earlier increments and deployments.
+
+## Human agent roles — feature review
+
+The human configuration portion of AW-101 is reviewable in
+[draft PR #9](https://github.com/ayee-prashant/stride/pull/9), stacked on the
+human-approved delivery design. Admins propose stable profiles and project roles;
+only the named human operator accepts responsibility. The UI exposes all eleven
+reviewed role prompts, responsibilities, exclusions and proposed file scopes.
+Configuration changes clear acceptance, and each human decision retains its
+original timestamp, reason, prompt and scope. Role acceptance does not grant
+repository access, connect an agent or authorize any task execution.
+
+Source `25581eee5353bab1bf1e8d1cf369e9a03879fb95`, tree
+`24f87a60a560b083a529595711cd9470f51efbc8`, passed every gate in
+[run 34899561606](https://github.com/ayee-prashant/stride/actions/runs/34899561606),
+job 104161966651. This includes 111 native tests; real PostgreSQL contracts and
+competing approvals, configuration changes, retries, quotas and admin demotion;
+generated migration parity; typecheck; lint; production build; genuine-session
+API and browser acceptance; runtime privilege checks; and a 25-table restore
+drill that compares the original registry/context contents. Desktop and 390px
+mobile role screenshots were retrieved and visually inspected. The first run
+had caught TypeScript narrowing and effect-loading errors, which were corrected
+before this complete passing run.
+
+Generated migration `0005_workable_changeling.sql` is additive. Its archive
+digest was verified before restoring the generated files. The lockfile and all
+earlier migration bytes are unchanged. Apply it through provisioning before
+switching the application, and rerun the restricted-role grants. Runtime UPDATE
+and DELETE are denied on agent profiles and role events. No dependency was
+added; at 21:35 UTC the production/full audits reported zero moderate, high or
+critical findings and one low transitive esbuild advisory.
+
+Post-build review checked persisted membership and operator authority, ordered
+membership/workspace/project locks, atomic audit receipts, stale-version/template
+rejection, revocation-safe retries, bounded queries, tenant foreign keys and
+draft preservation. It adds explicit refresh/pagination feedback and mobile
+approval-control visibility/interaction coverage. The latest source checks are
+attached to PR #9 and must pass before any release.
+
+This is a feature increment, not the full multi-agent delivery system or a
+production release. Connection enrollment and revocation epochs, agent identity,
+MCP/IDE adapters, approved start grants, work packets and BA/SA/Dev/QA/UAT/release
+gates remain pending. In particular, historical approval after a human rejoins
+must not become execution authority; the future enrollment contract must add
+renewed validation. Alias/operator transfer is also outside this increment.
+No merge, deployment, live GitHub App setup or external message delivery was
+performed. Current production evidence below remains unchanged. See
+[agent registry setup](agent-workforce/AGENT_REGISTRY_SETUP.md) and
+[implementation status](agent-workforce/IMPLEMENTATION_STATUS.md).
 
 ## Reminder concurrency follow-up
 

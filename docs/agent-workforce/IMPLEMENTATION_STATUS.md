@@ -1,8 +1,55 @@
 # Agent workforce implementation
 
+## Attended delivery release — 2026-09-15
+
+The current implementation is on `feature/agent-delivery`, reviewable in
+[PR #10](https://github.com/ayee-prashant/stride/pull/10). The earlier sections
+below retain the evidence for preceding increments; their pending-execution
+statements describe those older versions.
+
+Implemented behavior includes:
+
+- Stable profiles and eleven scoped role prompts with explicit exclusions.
+  Human role acceptance and machine enrollment are separate decisions.
+- Native OAuth PKCE with distinct agent/companion audiences, short access tokens,
+  rotating refresh tokens, persisted session checks and immediate revocation.
+- MCP 2026-07-28 plus an explicit legacy adapter; a local stdio bridge and an
+  attended terminal companion with private, resumable notification delivery.
+- Human-approved BA requirements and SA design/ticket plans; manual assignment,
+  exact immutable work packets and separate operator authorization for each start.
+- Dev, optional specialists, peer review, QA, UAT and release gates. Reports wait
+  for human acceptance. Failed QA/UAT repeats the affected reviews; repeated
+  failures require replanning. Candidate withdrawal clears downstream authority.
+- Shared approved documents, verified repository snapshots and scoped checkpoints.
+  Context changes, membership changes, old sessions and expired leases fence work.
+- Independent GitHub PR/check/file-scope verification and exact deployment/artifact
+  checks. Agent assertions cannot manufacture repository or release evidence.
+- Three-pane human context editing and delivery review, preserved drafts, mobile
+  controls, private review links and immutable, timestamped audit records.
+
+All required CI gates passed on `ce1da3c23ff189620150b822759e84a2250165a2` in
+[run 34913707229](https://github.com/ayee-prashant/stride/actions/runs/34913707229):
+121 native tests, PostgreSQL/concurrency, maintained modern/legacy MCP, migration
+parity, dependency audit, typecheck, lint, production build, real OAuth, shipped
+CLI, complete browser acceptance and a 41-table restore drill. Desktop and 390px
+mobile delivery screenshots were retrieved and visually reviewed. These are
+isolated acceptance results; exact production rollout and live-check evidence is
+tracked in [PR #10](https://github.com/ayee-prashant/stride/pull/10).
+
+The deployed application needs its own GitHub App installation and worker-only
+signing key. Those credentials are not available through the development GitHub
+connector. BA requirements work does not require GitHub; source-aware development
+and independent candidate/deployment acceptance stay blocked until it is connected.
+No OpenRouter or model API is required. Arbitrary IDE auto-wake and automatic task
+assignment remain outside the approved first attended release.
+
+Use [ATTENDED_SETUP.md](ATTENDED_SETUP.md) for machine setup and the daily workflow.
+
+## Historical increment evidence
+
 Implementation approved on 2026-09-14. Work is on
-`feature/agent-context-foundation` and the next stacked branch
-`feature/github-project-context`, based on the reviewed design. This record
+`feature/agent-context-foundation`, `feature/github-project-context`, and
+`feature/agent-role-registry`, based on the reviewed design. This record
 distinguishes working application behavior from remaining delivery gates.
 
 ## Context foundation implemented
@@ -87,7 +134,33 @@ No GitHub App credentials have been provisioned for the deployed application.
 
 [Human-approved delivery](HUMAN_APPROVED_DELIVERY.md) specifies BA/solution approval, manual profile assignment, operator start, engineering/QA/UAT gates, rework, separate release and production closure. The [role catalog](ROLE_CATALOG.md) includes eleven specialized prompts with explicit responsibilities, exclusions and file/action boundaries. Initialization, project-baseline, ticket, deterministic handoff and audit/metric contracts are also authored.
 
-These are reviewable design/template files, not deployed agent features. Profiles, template adoption, generated packets, workflow guards, IDE notices and process analytics still require their implementation gates. Humans select profiles in the first release; automatic assignment is deferred. No LLM API is required for these core contracts.
+These are reviewable design/template files, not deployed agent features. The first human profile/template configuration increment is described below. Connected-agent initialization, generated packets, workflow guards, IDE notices and process analytics still require their implementation gates. Humans select profiles in the first release; automatic assignment is deferred. No LLM API is required for these core contracts.
+
+## Human role registry implemented
+
+- Team and agents lets admins create stable profiles or reuse a profile in
+  another project/role. Every profile names a current human operator.
+- Eleven reviewed role templates expose responsibilities, explicit exclusions,
+  full prompts and proposed file boundaries in a three-pane review dialog.
+  The exact template and scope are retained with each decision.
+- Only the named operator accepts responsibility. Revised configuration clears
+  that acceptance; operator/admin revocation is versioned and logged. Retries
+  cannot revive a revoked role, and competing decisions have one winner.
+- Profile identity and decision history are immutable to the runtime database
+  role. Reads and writes use the existing human session and tenant boundaries.
+
+This is the human configuration portion of AW-101. All registry responses keep
+`execution_ready: false` and `connection_state: not_connected`; no task start,
+agent credential, repository access, IDE notification or deployment is implied.
+Setup and explicit limits are in [AGENT_REGISTRY_SETUP.md](AGENT_REGISTRY_SETUP.md).
+The source and current verification checks are in
+[draft PR #9](https://github.com/ayee-prashant/stride/pull/9).
+The first complete registry gate passed for `25581eee5353bab1bf1e8d1cf369e9a03879fb95`
+in [run 34899561606](https://github.com/ayee-prashant/stride/actions/runs/34899561606):
+111 native tests, real PostgreSQL/concurrency, migration parity, restricted runtime
+grants, audit, restore, type/lint/build and signed-in browser flow. Desktop and
+mobile images were visually inspected. Post-build refinements and their current
+checks remain visible on the draft PR; this increment is not deployed.
 
 ## Remaining gates
 
@@ -97,9 +170,10 @@ These are reviewable design/template files, not deployed agent features. Profile
    evidence (AW-001/002), fake-launch safety proof (AW-003).
 3. Context proposals, typed source links, decision adoption, indexed traceability,
    source-aware immutable manifests, checkpoints and cold-start recovery.
-4. Agent profiles, enrolled connections and actor-aware work items; human start
-   grants, atomic claims, fenced attempts and human result acceptance.
-5. CLI/IDE notices and supported execution adapters; human-adopted role templates,
+4. Connection enrollment/revocation epochs, agent-side role initialization and
+   actor-aware work items; human start grants, atomic claims, fenced attempts
+   and human result acceptance. Profile configuration alone does not satisfy AW-101.
+5. CLI/IDE notices and supported execution adapters; custom-role lifecycle,
    BA/solution plan gates, manual assignment, generated handoff drafts and
    candidate-bound QA/UAT/rework/release workflows (AW-301/306/307/308/309).
 6. Agent audit/flow metrics and reviewed process suggestions (AW-407), operational
