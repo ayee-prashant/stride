@@ -8,6 +8,26 @@ concurrency:
   group: migration-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 jobs:
+  local-setup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm run setup:local -- --app-port 3109 --db-port 55439
+      - run: npm run doctor:local
+      - name: Verify real local provisioning is repeatable
+        run: node scripts/test-local-setup.mjs
+        env:
+          STRIDE_LOCAL_FIXTURE: isolated-runner
+      - name: Stop only this checkout's local database
+        if: ${{ always() }}
+        run: npm run stop:local
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 15

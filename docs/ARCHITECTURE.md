@@ -84,3 +84,12 @@ Server time plus the viewer's bounded offset determines the calendar date.
 My open tasks is a built-in saved view, so it survives browser/device changes
 without adding a custom view model. Priority sorting applies across the filtered
 result before pagination; default due-date sorting retains the daily sections.
+
+## FAQ usability increment
+
+Task lists and the newest comment page revalidate after 30 seconds while visible
+and online, using a cancellable read loop with no overlapping reads and bounded
+backoff. Task edits, dialogs and bulk selections pause list replacement. Transient
+failures retain the last view with an explicit delayed-update message; access
+failures clear it. Comment drafts and historical-page positions are retained.
+Getting started is an optional guide; My Tasks remains the landing page.

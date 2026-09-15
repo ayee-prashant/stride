@@ -386,3 +386,23 @@ ul.delivery-bullets { list-style:disc; } ol.delivery-bullets { list-style:decima
 @media(max-width:640px) { .agent-card { padding: 1rem; } .agent-toolbar .inline-actions { flex-wrap: wrap; } .agent-card-actions button { flex: 1 1 auto; } }
 
 .delivery-dialog .context-pane { display: flex; flex-direction: column; gap: 0.8rem; align-items: stretch; }
+
+/* Getting started stays optional and keeps the daily task view as the landing page. */
+.getting-started { display: grid; gap: 1.25rem; }
+.getting-started-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.25rem; }
+.getting-started-card { min-width: 0; padding: 1.5rem; background: var(--card); border: 1px solid var(--border); border-radius: .8rem; }
+.getting-started-card > svg { color: var(--primary); margin-bottom: .75rem; }
+.getting-started h2 { font-size: 1.1rem; font-weight: 650; margin-bottom: .5rem; }
+.getting-started p { color: var(--muted-foreground); line-height: 1.6; }
+.getting-started ol { display: grid; gap: 1.5rem; padding-left: 1.2rem; margin-top: 1.5rem; list-style: decimal; }
+.getting-started li > strong, .getting-started li > span { display: block; }
+.getting-started li > span { color: var(--muted-foreground); margin: .35rem 0 .7rem; line-height: 1.55; }
+.getting-started .inline-actions { margin-top: 1rem; }
+.getting-started-faq details { padding: 1rem 0; border-bottom: 1px solid var(--border); }
+.getting-started-faq summary { cursor: pointer; font-weight: 600; }
+.getting-started-faq details p { margin-top: .75rem; }
+.getting-started-faq summary:focus-visible { outline: 2px solid var(--ring); outline-offset: 4px; }
+.getting-started-callout { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem; margin-bottom: 1rem; border: 1px solid var(--border); border-radius: .75rem; background: var(--card); }
+.getting-started-callout p { color: var(--muted-foreground); font-size: .875rem; }
+.task-refresh-row { display: flex; gap: .75rem; align-items: center; justify-content: space-between; margin: .5rem 0; }
+@media (max-width: 700px) { .getting-started-grid { grid-template-columns: minmax(0, 1fr); } .getting-started-callout, .task-refresh-row { align-items: flex-start; flex-direction: column; } .getting-started-card { padding: 1rem; } }

@@ -6,6 +6,7 @@ architecture plans, development, peer review, QA, UAT and release each retain
 their evidence and accountable human. Agents connect through OAuth and MCP;
 the attended companion supplies private notifications and execution leases.
 
+Open **Getting started** in the workspace for the human and agent paths.
 Start with [the attended setup guide](docs/agent-workforce/ATTENDED_SETUP.md).
 The verified application and deployment record are in
 [PR #10](https://github.com/ayee-prashant/stride/pull/10). Source-aware work requires
@@ -31,12 +32,22 @@ then uses Change password after signing in. No credential is committed here.
 
 ## Development and operation
 
-Use Node 24 and the committed npm lockfile. Copy .env.example into an untracked
-local environment file and configure explicit credentials; there is no default
-user or authentication bypass.
+For a fresh local checkout, use Node 24 and local Docker Compose on Linux, macOS
+or WSL, then run **npm run setup:local** and **npm run dev:local**. Setup generates
+private local credentials, isolates this checkout's PostgreSQL 18 volume/ports,
+and applies committed migrations. It preserves existing configuration and passwords.
+Read [Local development](docs/LOCAL_DEVELOPMENT.md) for login retrieval, diagnostics,
+worktrees and verification. Connecting an IDE to hosted Stride only needs the
+attended setup guide; it does not require another Stride database.
+
+Manually configured development still uses .env.example and npm run dev.
+Production has no default credential or authentication bypass.
 
 - npm ci — install the locked dependency tree.
 - npm run dev — start the native Next.js development server on loopback.
+- npm run doctor:local — read-only local setup diagnostics.
+- npm run stop:local — stop this checkout’s local database, preserving its volume.
+- npm run verify — tests, typecheck, lint and build in order; full release gates stay in CI.
 - npm test — domain, repository, HTTP, adapter, and transport tests.
 - npm run test:postgres — real SQL contracts against isolated stride_test.
 - npm run typecheck, npm run lint, npm run build — compile/release gates.

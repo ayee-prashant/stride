@@ -25,6 +25,8 @@ IDE or a production GitHub installation has been tested.
    acceptance criteria, to-dos and optional specialist reviews. Human acceptance
    publishes the design and creates the tickets. Assign profiles manually.
 
+For checkout, port and database isolation, see [local development and worktrees](../LOCAL_DEVELOPMENT.md). Multiple connections use one shared Stride server; each connection still needs its own enrollment.
+
 ## Connect a machine
 
 The companion requires Node 24 and Git on Linux, macOS or WSL. Native Windows

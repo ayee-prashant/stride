@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { api, workspacePath } from "@/lib/client-api";
+import { api, RequestError, workspacePath } from "@/lib/client-api";
+import { useVisibleRefresh } from "@/hooks/use-visible-refresh";
 import type { Attachment } from "@/lib/productivity";
 import type { CommentDraft, CommentPage, Member, Task } from "@/lib/domain";
 
@@ -24,7 +25,7 @@ type Props = {
 export function TaskDiscussion({ task, attachments = [], disabled, members, draft, onDraftChange, onBusyChange, onPosted }: Props) {
   const [offset, setOffset] = useState(0);
   const [revision, setRevision] = useState(0);
-  const [result, setResult] = useState<{ key: string; page?: CommentPage; error?: string }>({ key: "" });
+  const [result, setResult] = useState<{ key: string; page?: CommentPage; error?: string; refreshError?: string }>({ key: "" });
   const [posting, setPosting] = useState(false);
   const [postError, setPostError] = useState("");
   const [mentionPicker, setMentionPicker] = useState(false);
@@ -35,6 +36,17 @@ export function TaskDiscussion({ task, attachments = [], disabled, members, draf
   const key = `${path}:${revision}`;
   const page = result.key === key ? result.page : undefined;
   const error = result.key === key ? result.error : undefined;
+  useVisibleRefresh(key, !!page && !posting && !disabled && offset === 0, async signal => {
+    try {
+      const latest = await api<CommentPage>(path, { signal });
+      if (!signal.aborted) setResult(current => current.key === key ? { key, page: latest } : current);
+    } catch (error) {
+      if (signal.aborted) return;
+      const lostAccess = error instanceof RequestError && [401, 403, 404].includes(error.status);
+      setResult(current => current.key !== key ? current : lostAccess ? { key, error: error.message } : { ...current, refreshError: "Comment updates are delayed. Your draft is preserved." });
+      throw error;
+    }
+  });
   const typedMention = draft.body.match(/(?:^|\s)@([^\s@]*)$/u);
   const filter = (mentionPicker ? mentionSearch : typedMention?.[1] ?? "").toLocaleLowerCase();
   const suggestions = members.filter(member => !draft.mentioned_user_ids.includes(member.user_id) && member.name.toLocaleLowerCase().includes(filter)).slice(0, 8);
@@ -86,6 +98,8 @@ export function TaskDiscussion({ task, attachments = [], disabled, members, draf
       <div className="comment-actions"><Button type="button" size="sm" variant="ghost" aria-expanded={mentionPicker} disabled={posting || disabled || draft.mentioned_user_ids.length >= 10} onClick={() => setMentionPicker(value => !value)}><AtSign size={15} />Mention</Button><Button type="submit" size="sm" disabled={posting || disabled || !draft.body.trim()}><Send size={14} />{posting ? "Posting…" : "Post comment"}</Button></div>
       {postError && <div role="alert" className="error-box"><p>{postError}</p><Button type="button" variant="outline" disabled={posting || disabled} onClick={() => { setOffset(0); setRevision(value => value + 1); }}>Refresh comments before retrying</Button></div>}
     </form>}
+    {result.key === key && result.refreshError && <p role="status" className="muted text-sm">{result.refreshError}</p>}
+    {offset > 0 && <p className="muted text-sm">Older comments stay in place. Return to the newest page for automatic updates.</p>}
     {error ? <div role="alert" className="error-box">{error}<Button variant="outline" onClick={() => setRevision(value => value + 1)}>Retry loading comments</Button></div> : !page ? <p className="muted" role="status">Loading comments…</p> : <>
       {page.comments.length ? <ol className="comment-list">{page.comments.map(comment => <li key={comment.id}><div className="comment-heading"><strong>{comment.author_name}</strong><time dateTime={comment.created_at}>{new Date(comment.created_at).toLocaleString()}</time></div><p className="comment-body">{comment.body}</p>{attachments.filter(file => file.comment_id === comment.id).map(file => <a className="comment-file" key={file.id} href={`/api/files?${new URLSearchParams({ workspace_id: task.workspace_id, id: file.id })}`} download>{file.filename}</a>)}</li>)}</ol> : <p className="muted text-sm">{offset ? "No more comments on this page." : "No comments yet. Keep the next step here."}</p>}
       {(offset > 0 || page.hasMore) && <div className="comment-pagination"><Button size="sm" variant="outline" disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - 30))}>Newer comments</Button><Button size="sm" variant="outline" disabled={!page.hasMore} onClick={() => setOffset(page.nextOffset)}>Older comments</Button></div>}

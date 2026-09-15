@@ -146,3 +146,15 @@ events and request receipts must deny UPDATE and DELETE to the runtime role.
 The browser captures plain-text source rendering, desktop/mobile layouts and
 unavailable cached-content behavior. Installed-App/real-push verification remains
 separate from this deterministic CI gate.
+
+## Local setup and collaboration refresh
+
+`npm run verify` sequences the native suite, typecheck, lint and build. It does
+not replace PostgreSQL, browser, audit, restore or deployed verification. The
+local-setup CI job exercises real Docker PostgreSQL 18 provisioning twice and
+checks that the restricted runtime role and a changed owner password survive.
+New native tests reject environment overrides, nonlocal Docker, unsafe files,
+invalid ports and copied checkout credentials, and check cancellation/backoff.
+The browser gate checks the optional guide at desktop/mobile widths and observes
+changes from a separate HTTP client without a tab-focus event, preserving an
+unsent comment. The browser harness retains its isolated CI destination guard.

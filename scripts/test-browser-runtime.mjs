@@ -33,8 +33,8 @@ export async function verifyBrowser(origin, cookie, reconcileRepository, deliver
     if (response.exceptionDetails) throw new Error("Browser expression failed");
     return response.result.value;
   }
-  async function waitFor(expression) {
-    for (let attempt = 0; attempt < 80; attempt++) { if (await evaluate(expression)) return; await delay(100); }
+  async function waitFor(expression, attempts = 80) {
+    for (let attempt = 0; attempt < attempts; attempt++) { if (await evaluate(expression)) return; await delay(100); }
     throw new Error("Browser state did not settle");
   }
   async function clickButton(label, selector = "button") {
@@ -87,6 +87,21 @@ export async function verifyBrowser(origin, cookie, reconcileRepository, deliver
     stage = "daily-view";
     await call("Page.navigate", { url: origin });
     await waitFor("document.querySelector('h1')?.textContent === 'My Tasks' && document.querySelector('[aria-label=\"New task title\"]')?.disabled === false");
+    stage = "getting-started";
+    await clickButton("Getting started", '[data-slot="sidebar-menu-button"]');
+    await waitFor("document.querySelector('h1')?.textContent === 'Getting started' && document.querySelectorAll('.getting-started-card').length === 3");
+    await evaluate("document.querySelector('.getting-started-faq summary').focus()");
+    await call("Input.dispatchKeyEvent", { type: "keyDown", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13 });
+    await call("Input.dispatchKeyEvent", { type: "keyUp", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13 });
+    await waitFor("document.querySelector('.getting-started-faq details').open");
+    assert.equal(await evaluate("document.querySelector('.getting-started').textContent.includes('operator authorizes the exact work packet')"), true);
+    await capture("context-getting-started-desktop");
+    await call("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+    await capture("context-getting-started-mobile");
+    assert.equal(await evaluate("document.documentElement.scrollWidth <= 392"), true);
+    await clickButton("Return to My Tasks");
+    await waitFor("document.querySelector('h1')?.textContent === 'My Tasks'");
+    await call("Emulation.setDeviceMetricsOverride", { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
     stage = "delivery-human-review";
     await call("Page.navigate", { url: `${origin}/?${new URLSearchParams({ workspace: deliveryReview.workspaceId, project: deliveryReview.projectId, delivery: deliveryReview.ticketId })}` });
     await waitFor("document.querySelector('h1')?.textContent === 'Agent delivery'");
@@ -256,6 +271,16 @@ export async function verifyBrowser(origin, cookie, reconcileRepository, deliver
     await waitFor("document.querySelector('#task-blocked')?.value === 'Waiting for review' && document.querySelector('.checklist-progress')?.value === 1");
     stage = "comments-and-mentions";
     await fill("#task-comment", "Unsent comment stays here");
+    stage = "background-comment-update-preserves-draft";
+    const linkedTask = new URL(deepLink);
+    const remoteTaskPath = `${origin}/api/tasks/${encodeURIComponent(linkedTask.searchParams.get("task"))}?${new URLSearchParams({ workspace_id: linkedTask.searchParams.get("workspace") })}`;
+    const remoteCommentPath = remoteTaskPath.replace("?", "/comments?");
+    const remoteComment = `Update from another client ${crypto.randomUUID().slice(0, 8)}`;
+    const remoteCommentResult = await fetch(remoteCommentPath, { method: "POST", headers: { Cookie: cookie, Origin: origin, "Content-Type": "application/json" }, body: JSON.stringify({ body: remoteComment, mentioned_user_ids: [] }) });
+    assert.equal(remoteCommentResult.ok, true);
+    await waitFor(`Array.from(document.querySelectorAll('.comment-body')).some(el => el.textContent === ${JSON.stringify(remoteComment)})`, 420);
+    assert.equal(await evaluate("document.querySelector('#task-comment').value"), "Unsent comment stays here");
+    await capture("context-collaboration-draft");
     await clickButton("Close", ".task-sheet button");
     await clickButton("Keep editing");
     assert.equal(await evaluate("document.querySelector('#task-comment').value"), "Unsent comment stays here");
@@ -265,6 +290,12 @@ export async function verifyBrowser(origin, cookie, reconcileRepository, deliver
     stage = "board-transitions-and-trash";
     await clickButton("Project board", '[data-slot="sidebar-menu-button"]');
     await waitFor(`Array.from(document.querySelectorAll('.board-task-title')).some(el => el.textContent === ${JSON.stringify(title)})`);
+    stage = "background-task-update";
+    const remoteTask = await (await fetch(remoteTaskPath, { headers: { Cookie: cookie } })).json();
+    const remotePatch = await fetch(remoteTaskPath, { method: "PATCH", headers: { Cookie: cookie, Origin: origin, "Content-Type": "application/json" }, body: JSON.stringify({ version: remoteTask.version, priority: "high" }) });
+    assert.equal(remotePatch.ok, true);
+    await waitFor(`Array.from(document.querySelectorAll('.board-card')).find(el => el.querySelector('.board-task-title')?.textContent === ${JSON.stringify(title)})?.querySelector('.priority-high')`, 420);
+    stage = "board-transitions-and-trash";
     await clickButton(`Start ${title}`);
     await waitFor(`Array.from(document.querySelectorAll('.column-in_progress .board-task-title')).some(el => el.textContent === ${JSON.stringify(title)})`);
     await clickButton(`Complete ${title}`);

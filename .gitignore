@@ -50,3 +50,6 @@ next-env.d.ts
 /stride-agent-foundation.zip
 *.tsbuildinfo
 /artifacts/
+
+# Generated checkout-specific local settings and credentials.
+/.stride-local/
