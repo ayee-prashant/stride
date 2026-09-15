@@ -54,6 +54,14 @@ The dedicated application's GitHub App key/bindings are not configured. Vercel
 still returns a team-scope 403 on 2026-09-15. Neither limit is concealed by the CI
 fixtures or by the canonical Railway application URL.
 
+The initial live probe found that Node 24 fetch drops a supplied Host header,
+so the agent endpoint correctly rejected the private listener authority with 403.
+The verification client now uses bounded node:http requests with the canonical
+Host and a deliberately invalid bearer token, without the human session cookie.
+A loopback HTTP regression checks the actual wire headers for both agent routes.
+Application origin and host checks remain unchanged. Individual probe stages now
+identify failures precisely; exact rerun results are recorded in PR #10.
+
 See [attended setup](agent-workforce/ATTENDED_SETUP.md). No model API is required;
 arbitrary IDE wake-up, automatic assignment and native Windows credential storage
 are outside this first attended release. The following sections are historical
