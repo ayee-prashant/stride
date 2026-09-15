@@ -34,7 +34,7 @@ export async function verifyBrowser(origin, cookie, reconcileRepository, deliver
     return response.result.value;
   }
   async function waitFor(expression, attempts = 80) {
-    for (let attempt = 0; attempt < attempts; attempt++) { if (await evaluate(expression)) return; await delay(100); }
+    for (let attempt = 0; attempt < attempts; attempt++) { if (await evaluate(`Boolean(${expression})`)) return; await delay(100); }
     throw new Error("Browser state did not settle");
   }
   async function clickButton(label, selector = "button") {
