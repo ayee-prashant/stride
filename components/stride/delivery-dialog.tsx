@@ -45,7 +45,7 @@ export function DeliveryDialog({ workspaceId, projectId, ticketId, userId, membe
   const canReview = !!t && cfg?.reviewers[roleGate(t.role_id)] === userId;
   const canStop = assigned?.operator_id === userId || !!cfg && Object.values(cfg.reviewers).includes(userId);
   const ready = !!reason.trim() && reviewed && !busy;
-  const close = () => { if (busy) return; if (reason || environment || artifact || migration || recovery) setDiscard(true); else onClose(); };
+  const close = () => { if (busy) return; if (reason || environment || artifact || configuration || migration || recovery) setDiscard(true); else onClose(); };
   const name = (id: string) => members.find(m => m.user_id === id)?.name ?? "Former member";
   return <><Dialog open onOpenChange={open => { if (!open) close(); }}><DialogContent className="context-editor-dialog context-three-pane-dialog delivery-dialog"><DialogHeader><DialogTitle>{t?.title ?? "Review agent work"}</DialogTitle><DialogDescription>Review the shared context, agent evidence and the next human decision.</DialogDescription></DialogHeader>
     {error && <div role="alert" className="error-box"><p>{error}</p><Button variant="outline" disabled={busy} onClick={() => { void load(); onSaved(); }}>Refresh current work</Button></div>}{notice && <p role="status" className="agent-notice">{notice}</p>}

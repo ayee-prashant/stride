@@ -51,11 +51,16 @@ export async function verifyAgentRuntime({ origin, request, json, userId, worksp
     async function exchange(code, verifier = code.verifier) {
       return raw(discovery.token_endpoint, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ grant_type: "authorization_code", client_id: code.purpose === "agent" ? connection.client_id : connection.companion_client_id, code: code.code, code_verifier: verifier, redirect_uri: "http://127.0.0.1:43871/callback", resource: `${origin}${code.purpose === "agent" ? "/mcp" : "/api/agent-companion"}` }) });
     }
+    const refresh = token => raw(discovery.token_endpoint, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: token, client_id: connection.client_id, resource: `${origin}/mcp` }) });
     stage = "pkce";
     const badVerifier = await json(await exchange(await authorize("agent"), randomBytes(48).toString("base64url")), 401);
     assert.equal(badVerifier.error, "invalid_request"); assert.equal(badVerifier.access_token, undefined);
-    const agentCode = await authorize("agent"); const agentTokens = await json(await exchange(agentCode));
-    assert.equal((await exchange(agentCode)).status, 400); assert.ok(agentTokens.refresh_token);
+    const replayCode = await authorize("agent"); const replayTokens = await json(await exchange(replayCode));
+    assert.equal((await exchange(replayCode)).status, 400);
+    // RFC 6749 code replay also revokes grants issued for that code. Exercise
+    // refresh rotation with a newly authorized grant, not the revoked fixture.
+    assert.equal((await refresh(replayTokens.refresh_token)).status, 400);
+    const agentTokens = await json(await exchange(await authorize("agent"))); assert.ok(agentTokens.refresh_token);
     const companionTokens = await json(await exchange(await authorize("companion")));
     const bearer = tokens => ({ authorization: `Bearer ${tokens.access_token}` });
     stage = "audience-and-origin";
@@ -84,7 +89,6 @@ export async function verifyAgentRuntime({ origin, request, json, userId, worksp
     assert.equal(ticket.phase, "in_review");
     assert.equal((await json(await request(base + suffix))).configuration.baseline, null);
     stage = "refresh-rotation";
-    const refresh = token => raw(discovery.token_endpoint, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: token, client_id: connection.client_id, resource: `${origin}/mcp` }) });
     const rotated = await json(await refresh(agentTokens.refresh_token)); assert.ok(rotated.refresh_token); assert.notEqual(rotated.refresh_token, agentTokens.refresh_token);
     assert.equal((await refresh(agentTokens.refresh_token)).status, 400);
     stage = "connection-revocation";
