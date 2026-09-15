@@ -19,6 +19,7 @@ let running = true; process.once("SIGINT", () => { running = false; }); process.
 try {
   console.info(JSON.stringify({ event: "agent_worker_started", repository_configured: !!provider }));
   while (running) {
+    let failed = false;
     try {
       const result = await new DeliveryService(repo, { bindings, databaseClock: deliveryDatabaseClock, sessionActive: deliverySessionCheck(repo) }).reconcile();
       if (result.examined) console.info(JSON.stringify({ event: "agent_attempts_reconciled", examined: result.examined }));
@@ -26,10 +27,10 @@ try {
         // One source and one candidate observation at a time; both are bounded
         // by provider deadlines and persistent generation/lease fences.
         const outcomes = await Promise.allSettled([reconcileSource(sources, provider), evidence.process(provider)]);
-        for (const outcome of outcomes) if (outcome.status === "rejected") console.error(JSON.stringify({ event: "agent_repository_retry" }));
+        for (const outcome of outcomes) if (outcome.status === "rejected") { failed = true; console.error(JSON.stringify({ event: "agent_repository_retry" })); }
       }
-    } catch { console.error(JSON.stringify({ event: "agent_delivery_worker_retry" })); }
-    if (process.argv.includes("--once")) break;
+    } catch { failed = true; console.error(JSON.stringify({ event: "agent_delivery_worker_retry" })); }
+    if (process.argv.includes("--once")) { if (failed) process.exitCode = 1; break; }
     if (running) await new Promise(resolve => setTimeout(resolve, 10000));
   }
 } finally { await pool.end(); }

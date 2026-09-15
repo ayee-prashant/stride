@@ -107,6 +107,29 @@ try {
   assert.equal((await request("/favicon.svg")).status, 200);
   checks.push(stage);
 
+  stage = "agent-delivery-readiness";
+  const projectPath = "/api/projects/" + encodeURIComponent(metadata.projects[0].id);
+  const context = await json(await request(api(projectPath + "/context")));
+  assert.ok(Array.isArray(context.documents));
+  const registry = await json(await request(api(projectPath + "/agents")));
+  assert.ok(Array.isArray(registry.profiles));
+  const delivery = await json(await request(api(projectPath + "/delivery")));
+  assert.ok(Array.isArray(delivery.tickets));
+  const authorization = await json(await request("/.well-known/oauth-authorization-server"));
+  assert.equal(authorization.issuer, expectedOrigin);
+  assert.equal(new URL(authorization.token_endpoint).origin, expectedOrigin);
+  const resource = await json(await request("/.well-known/oauth-protected-resource/mcp"));
+  assert.equal(resource.resource, expectedOrigin + "/mcp");
+  // The private verification request supplies the same canonical Host that the
+  // public reverse proxy forwards. These checks do not claim public-edge coverage.
+  const agentHeaders = { host: new URL(expectedOrigin).host, cookie: "", authorization: "Bearer invalid-release-verification" };
+  const denied = await request("/mcp", "POST", {}, agentHeaders);
+  assert.equal(denied.status, 401);
+  assert.ok(denied.headers.get("www-authenticate")?.includes("oauth-protected-resource/mcp"));
+  assert.equal((await request("/api/agent-companion", "GET", undefined, agentHeaders)).status, 401);
+  assert.equal((await request(api(projectPath + "/delivery"), "GET", undefined, { cookie: "" })).status, 401);
+  checks.push(stage);
+
   stage = "task-persistence";
   const created = await json(await request("/api/tasks?workspace_id=" + encodeURIComponent(workspaceId), "POST", {
     title: "Deployment verification (automatically archived)",
