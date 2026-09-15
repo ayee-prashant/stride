@@ -32,36 +32,40 @@ then uses Change password after signing in. No credential is committed here.
 
 ## Development and operation
 
-Use Node 24 and the committed npm lockfile. This merge brought together two
-local-environment tools that were developed in parallel; **they overlap and are
-pending consolidation**, so pick one per checkout rather than running both.
+Use Node 24 and the committed npm lockfile. Two local-environment tools exist,
+built in parallel and not yet consolidated. Use one per checkout, not both.
 
-`npm run setup:local` then `npm run dev:local` uses local Docker Compose on
-Linux, macOS or WSL. It generates private local credentials, isolates this
-checkout's PostgreSQL 18 volume and ports, and applies committed migrations,
-preserving existing configuration and passwords. Read
-[Local development](docs/LOCAL_DEVELOPMENT.md) for login retrieval, diagnostics,
-worktrees and verification. This is the path wired into CI.
+**`npm run setup:local` then `npm run dev:local`** is the default and the path
+CI exercises. It uses local Docker Compose on Linux, macOS or WSL, generates
+private local credentials, isolates this checkout's PostgreSQL 18 volume and
+ports, and applies committed migrations, preserving existing configuration and
+passwords. `npm run doctor:local` reports diagnostics and `npm run stop:local`
+stops the database while keeping its volume. Read
+[Local development](docs/LOCAL_DEVELOPMENT.md) for login retrieval, worktrees
+and verification.
 
-`npm run setup` then `npm run dev` uses Docker directly and prompts for your
-local account details before generating credentials, starting PostgreSQL and
-provisioning the database. It also offers `--check` for a read-only preflight
-and `--json` for scripted or agent use. See [local setup](docs/LOCAL_SETUP.md)
-for your initial password, alternate ports, repeat runs, and manual setup
-without Docker.
+**`npm run setup` then `npm run dev`** is the alternative, aimed at scripted and
+agent use. It drives Docker directly, prompts for account details when run
+interactively, and accepts `--check` for a read-only preflight and `--json` for
+one parseable result line on stdout. See [local setup](docs/LOCAL_SETUP.md) for
+your initial password, alternate ports, repeat runs, and manual setup without
+Docker.
 
 Manually configured development still uses .env.example and npm run dev.
 Production has no default credential or authentication bypass, and uses
 docs/DEPLOYMENT.md.
 
-- npm run setup — prepare a local development environment with PostgreSQL.
-- npm ci — install the locked dependency tree.
-- npm run dev — start the native Next.js development server on loopback.
+- npm run setup:local — prepare a local environment with PostgreSQL (default).
+- npm run dev:local — start the development server against that environment.
 - npm run doctor:local — read-only local setup diagnostics.
 - npm run stop:local — stop this checkout’s local database, preserving its volume.
+- npm run setup — alternative local setup; add --check or --json for scripted use.
+- npm ci — install the locked dependency tree.
+- npm run dev — start the native Next.js development server on loopback.
 - npm run verify — tests, typecheck, lint and build in order; full release gates stay in CI.
 - npm test — domain, repository, HTTP, adapter, and transport tests.
 - npm run test:postgres — real SQL contracts against isolated stride_test.
+- npm run test:setup — real Docker provisioning and restart check for npm run setup.
 - npm run typecheck, npm run lint, npm run build — compile/release gates.
 - npm run db:provision — controlled migration, restricted role, approved account.
 - npm run test:auth-runtime — CI-only isolated session/task/password flow.
@@ -96,13 +100,19 @@ configuration. Never run the CI fixture against production.
 
 ## Source layout
 
-- app/ — native Next.js pages and request adapters.
-- components/stride/ — task interface and accessible account/edit dialogs.
+- app/ — native Next.js pages and request adapters, including app/mcp/ for the
+  MCP endpoint and app/connect/ for agent OAuth enrollment.
+- components/stride/ — task interface, accessible account/edit dialogs, and the
+  agent registry, project context and delivery centre.
 - lib/domain.ts — shared contracts and pure validation.
 - lib/server/ — authentication, HTTP guards, application operations, SQL access.
-- db/postgres-schema.ts and drizzle-postgres/ — PostgreSQL schema/migrations.
-- scripts/ — provisioning and isolated/live verification.
+- db/ — Drizzle schemas, split by area: postgres, auth, productivity, context,
+  github-context, agent, delivery, evidence and oauth. Migrations live in
+  drizzle-postgres/.
+- scripts/ — provisioning, local environment tools, and isolated/live verification.
 - infra/ — private database TLS startup and Vercel entry source.
+- docs/agent-workforce/ — agent delivery architecture, MCP contracts, setup
+  guides and implementation status.
 
 The preceding productivity application 78cfbb0 passed 73 native tests, real PostgreSQL
 contracts, typecheck, lint, production compilation, real password reset and
@@ -111,9 +121,14 @@ PostgreSQL backup/restore drill passed. The dependency audit found no moderate,
 high or critical advisories and one low-severity transitive esbuild advisory.
 [PR #4](https://github.com/ayee-prashant/stride/pull/4) contains this release.
 That release passed all 12 controlled live checks on Railway,
-including real private file storage. Main remains unchanged.
+including real private file storage.
 See docs/RELEASE_REVIEW.md for exact deployment evidence,
 measured limits, and email/Vercel connection status.
+
+PRs #5 to #13 were each based on the preceding branch rather than on main, so
+that work reached main only when [PR #15](https://github.com/ayee-prashant/stride/pull/15)
+merged the accumulated stack. Main and `deploy/vercel-railway` now hold the same
+source.
 
 The original Sites starter is retained in Git history and
 docs/HISTORICAL_SITES.md. Its provider identity headers and Worker commands do
