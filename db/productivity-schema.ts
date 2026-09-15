@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import { check, foreignKey, index, integer, pgTable, primaryKey, text, unique } from "drizzle-orm/pg-core";
-import { comments, memberships, tasks, users, workspaces } from "./postgres-schema";
+import { comments, memberships, projects, tasks, users, workspaces } from "./postgres-schema";
 import { authUser } from "./auth-schema";
 
 export const checklistItems = pgTable("checklist_items", {
@@ -70,3 +70,17 @@ export const workerState = pgTable("worker_state", {
   name: text("name").primaryKey(), leaseUntil: text("lease_until").notNull(), leaseId: text("lease_id"),
   cursorWorkspace: text("cursor_workspace").notNull().default(""), cursorUser: text("cursor_user").notNull().default(""),
 });
+
+// Immutable receipts make a confirmed CSV batch recoverable after a lost response.
+export const taskImports = pgTable("task_imports", {
+  workspaceId: text("workspace_id").notNull(), userId: text("user_id").notNull().references(() => users.id),
+  requestId: text("request_id").notNull(), projectId: text("project_id").notNull(),
+  inputHash: text("input_hash").notNull(), taskIds: text("task_ids").notNull(),
+  rowCount: integer("row_count").notNull(), createdAt: text("created_at").notNull(),
+}, t => [
+  primaryKey({ columns: [t.workspaceId, t.userId, t.requestId] }),
+  foreignKey({ columns: [t.workspaceId, t.projectId], foreignColumns: [projects.workspaceId, projects.id] }),
+  unique("uq_task_import_content").on(t.workspaceId, t.userId, t.inputHash),
+  index("idx_task_import_actor_time").on(t.workspaceId, t.userId, t.createdAt),
+  check("task_import_bounds", sql`${t.rowCount} BETWEEN 1 AND 100 AND length(${t.inputHash})=64 AND length(${t.taskIds})<=4000`),
+]);

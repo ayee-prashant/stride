@@ -54,6 +54,15 @@ jobs:
           node-version: '24'
       - run: npm ci --no-audit --no-fund
       - run: npm run db:generate
+      - name: Report generated migration sources for review
+        run: |
+          node --input-type=module <<'NODE'
+          import { execFileSync } from 'node:child_process';
+          import { readFileSync } from 'node:fs';
+          import { gzipSync } from 'node:zlib';
+          const names = execFileSync('git', ['ls-files', '--modified', '--others', '--exclude-standard', 'drizzle-postgres'], { encoding: 'utf8' }).trim().split('\n').filter(Boolean);
+          for (const path of names) console.log('GENERATED_MIGRATION', JSON.stringify({ path, gzip: gzipSync(readFileSync(path)).toString('base64') }));
+          NODE
       - uses: actions/upload-artifact@v4
         id: generated
         with:
