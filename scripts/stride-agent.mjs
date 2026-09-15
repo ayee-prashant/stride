@@ -7,7 +7,7 @@ import { createServer } from "node:http";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { Client, StreamableHTTPClientTransport, auth } from "@modelcontextprotocol/client";
-import { Server, ListToolsRequestSchema, CallToolRequestSchema, ListResourcesRequestSchema, ReadResourceRequestSchema } from "@modelcontextprotocol/server";
+import { Server } from "@modelcontextprotocol/server";
 import { StdioServerTransport } from "@modelcontextprotocol/server/stdio";
 
 const run = promisify(execFile);
@@ -104,10 +104,10 @@ async function bridge() {
   const remote = new Client({ name: "stride-companion", version: "1.0.0" }, { versionNegotiation: { mode: { pin: "2026-07-28" } } });
   await remote.connect(new StreamableHTTPClientTransport(new URL("/mcp", site), { authProvider: provider, fetch: boundedFetch }));
   const local = new Server({ name: "stride", version: "1.0.0" }, { capabilities: { tools: {}, resources: {} } });
-  local.setRequestHandler(ListToolsRequestSchema, () => remote.listTools());
-  local.setRequestHandler(CallToolRequestSchema, request => remote.callTool({ name: request.params.name, arguments: request.params.arguments }));
-  local.setRequestHandler(ListResourcesRequestSchema, () => remote.listResources());
-  local.setRequestHandler(ReadResourceRequestSchema, request => remote.readResource({ uri: request.params.uri }));
+  local.setRequestHandler("tools/list", () => remote.listTools());
+  local.setRequestHandler("tools/call", request => remote.callTool({ name: request.params.name, arguments: request.params.arguments }));
+  local.setRequestHandler("resources/list", () => remote.listResources());
+  local.setRequestHandler("resources/read", request => remote.readResource({ uri: request.params.uri }));
   const transport = new StdioServerTransport(); await local.connect(transport);
   const close = async () => { await remote.close(); await local.close(); await release(); };
   process.once("SIGINT", () => void close()); process.once("SIGTERM", () => void close()); process.stdin.once("end", () => void close());

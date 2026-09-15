@@ -1,5 +1,49 @@
 # Agent workforce implementation
 
+## Attended delivery release — 2026-09-15
+
+The current implementation is on `feature/agent-delivery`, reviewable in
+[PR #10](https://github.com/ayee-prashant/stride/pull/10). The earlier sections
+below retain the evidence for preceding increments; their pending-execution
+statements describe those older versions.
+
+Implemented behavior includes:
+
+- Stable profiles and eleven scoped role prompts with explicit exclusions.
+  Human role acceptance and machine enrollment are separate decisions.
+- Native OAuth PKCE with distinct agent/companion audiences, short access tokens,
+  rotating refresh tokens, persisted session checks and immediate revocation.
+- MCP 2026-07-28 plus an explicit legacy adapter; a local stdio bridge and an
+  attended terminal companion with private, resumable notification delivery.
+- Human-approved BA requirements and SA design/ticket plans; manual assignment,
+  exact immutable work packets and separate operator authorization for each start.
+- Dev, optional specialists, peer review, QA, UAT and release gates. Reports wait
+  for human acceptance. Failed QA/UAT repeats the affected reviews; repeated
+  failures require replanning. Candidate withdrawal clears downstream authority.
+- Shared approved documents, verified repository snapshots and scoped checkpoints.
+  Context changes, membership changes, old sessions and expired leases fence work.
+- Independent GitHub PR/check/file-scope verification and exact deployment/artifact
+  checks. Agent assertions cannot manufacture repository or release evidence.
+- Three-pane human context editing and delivery review, preserved drafts, mobile
+  controls, private review links and immutable, timestamped audit records.
+
+The native, PostgreSQL/concurrency, maintained MCP, migration, dependency-audit,
+type, lint and production-build gates have passed. Final real OAuth, shipped CLI,
+browser and restore acceptance are still being completed. This paragraph does
+not claim the attended release is deployed; current exact release evidence is
+recorded in ../RELEASE_REVIEW.md.
+
+The deployed application needs its own GitHub App installation and worker-only
+signing key. Those credentials are not available through the development GitHub
+connector. BA requirements work does not require GitHub; source-aware development
+and independent candidate/deployment acceptance stay blocked until it is connected.
+No OpenRouter or model API is required. Arbitrary IDE auto-wake and automatic task
+assignment remain outside the approved first attended release.
+
+Use [ATTENDED_SETUP.md](ATTENDED_SETUP.md) for machine setup and the daily workflow.
+
+## Historical increment evidence
+
 Implementation approved on 2026-09-14. Work is on
 `feature/agent-context-foundation`, `feature/github-project-context`, and
 `feature/agent-role-registry`, based on the reviewed design. This record

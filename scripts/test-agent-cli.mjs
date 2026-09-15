@@ -14,11 +14,14 @@ export async function verifyAgentCli({ origin, connection, request, json, profil
   let stage = "login"; let login; let watcher; let client; let transport;
   try {
     login = spawn(process.execPath, ["scripts/stride-agent.mjs", "login", "--connection", connection.id, "--site", origin, "--client-id", connection.client_id, "--companion-client-id", connection.companion_client_id], { stdio: ["ignore", "ignore", "pipe"] });
-    let pending = ""; let size = 0; let approvals = 0; let approvalError;
+    let pending = ""; let size = 0; let approvals = 0; let approvalError; let diagnostic = "unclassified";
     let queue = Promise.resolve();
     login.stderr.setEncoding("utf8");
     login.stderr.on("data", chunk => {
       size += Buffer.byteLength(chunk); if (size > 32768) { login.kill(); return; }
+      const missingExport = /does not provide an export named '([A-Za-z]+)'/.exec(chunk);
+      if (missingExport) diagnostic = "missing_export_" + missingExport[1];
+      for (const [needle, code] of [["Authorization server mismatch", "issuer_mismatch"], ["safe size limit", "response_size"], ["registered client IDs", "client_id_format"], ["SEP-2352", "issuer_stamp"], ["Unsafe credential", "credential_permissions"], ["Invalid URL", "invalid_url"], ["fetch failed", "connection_failed"], ["EADDRINUSE", "callback_in_use"]]) if (chunk.includes(needle)) diagnostic = code;
       pending += chunk;
       const lines = pending.split("\n"); pending = lines.pop();
       for (const line of lines) if (line.startsWith(origin + "/")) {
@@ -40,6 +43,7 @@ export async function verifyAgentCli({ origin, connection, request, json, profil
       login.once("exit", code => { clearTimeout(timeout); resolve(code); });
     });
     await queue; if (approvalError) throw approvalError;
+    if (exit !== 0) console.error(JSON.stringify({ event: "agent_cli_login_diagnostic", diagnostic, approvals }));
     assert.equal(exit, 0); assert.equal(approvals, 2);
     assert.equal((await lstat(directory)).mode & 0o077, 0);
     for (const purpose of ["agent", "companion"]) {

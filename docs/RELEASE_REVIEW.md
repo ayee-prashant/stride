@@ -1,4 +1,45 @@
-# Release review — 2026-09-14
+# Release review — 2026-09-15
+
+## Attended agent delivery — current release candidate
+
+[PR #10](https://github.com/ayee-prashant/stride/pull/10) contains the complete
+attended delivery implementation and the preceding context/profile increments.
+It adds human responsibilities, BA/SA approval, scoped immutable work packets,
+manual assignment/start grants, checkpoints, specialist/peer/QA/UAT/release gates,
+independent repository/deployment evidence, OAuth enrollment, MCP and a local
+companion. Reports remain proposals until the responsible human accepts them.
+
+The verified domain flow includes both QA and UAT failures followed by development
+and repeated reviews, exact artifact authorization and production closure. It
+also covers same-profile review provenance, duplicate active plan rejection,
+competing claims, stale role/membership/context, original-session revocation,
+private notification cursors and immutable audit receipts. GitHub-provider tests
+use explicitly simulated endpoints; no live GitHub installation is claimed.
+
+Generated migrations 0006–0008 are additive. Published migration/lock archives were
+checked before commit; prior migration bytes remain unchanged. Provisioning denies
+runtime updates/deletes on packets and audit events. Membership epochs rotate on
+real role changes, while no-op authorization locks preserve them. Attempt authority
+uses a database clock and the original real human session.
+
+The native (121 tests), real PostgreSQL/concurrency, maintained modern/legacy MCP,
+migration-parity, dependency audit, typecheck, lint and production build gates have
+passed. Real OAuth integration exposed internal/public hostname handling, consent
+request-context and fetch-navigation issues; these were corrected without bypassing
+provider authorization. The final OAuth, shipped-CLI, browser and restore gates are
+still running. No production deployment of this candidate is claimed yet.
+
+`stride-agents` has been prepared as a private coordinator with restricted database
+references. The rollout must provision migrations first, then deploy the exact
+verified source and inspect actual startup/readiness/live-verification results.
+The dedicated application's GitHub App key/bindings are not configured. Vercel
+still returns a team-scope 403 on 2026-09-15. Neither limit is concealed by the CI
+fixtures or by the canonical Railway application URL.
+
+See [attended setup](agent-workforce/ATTENDED_SETUP.md). No model API is required;
+arbitrary IDE wake-up, automatic assignment and native Windows credential storage
+are outside this first attended release. The following sections are historical
+evidence for earlier increments and deployments.
 
 ## Human agent roles — feature review
 
