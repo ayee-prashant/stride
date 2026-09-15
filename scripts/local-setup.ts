@@ -40,7 +40,9 @@ function port(value: string | undefined, fallback: number): number {
 
 // Keep generated dotenv values literal in both Node and Next.js (which expands $).
 function checkFields(email: string, name: string, appPort: number, dbPort: number): void {
-  if (email.length > 254 || hasControl(email) || !/^[^\s@'"`$\\#]+@[^\s@'"`$\\#]+\.[^\s@'"`$\\#]+$/.test(email)) fail("Enter a valid email address without dotenv metacharacters.");
+  // The comma exclusion matters beyond dotenv syntax: allowedEmails() splits STRIDE_ALLOWED_EMAILS on
+  // commas, so a comma here would silently widen the local sign-in allow-list to more than one address.
+  if (email.length > 254 || hasControl(email) || !/^[^\s@'"`$\\#,]+@[^\s@'"`$\\#,]+\.[^\s@'"`$\\#,]+$/.test(email)) fail("Enter a valid email address without dotenv metacharacters.");
   if (!name || name.length > 100 || hasControl(name) || /['"`$\\]/.test(name)) fail("Enter a name of 1–100 characters without control characters, quotes, $, or backslashes.");
   if (appPort === dbPort) fail("The app and database need different ports.");
 }
@@ -233,7 +235,30 @@ export function provisioningEnvironment(config: LocalConfig, inherited: Environm
   return { ...clean, ...environments(config).provision };
 }
 
-export async function setup(rootPath: string, options: SetupOptions, ask: (field: "email" | "name") => Promise<string>, log = console.log) {
+export type CheckResult = { state: "fresh" | "existing"; root: string; appUrl: string; port: number; dbPort: number };
+
+/**
+ * Read-only preflight: the same Node/Docker/port checks setup() performs before it installs
+ * anything, writes a file, or starts a container. Lets a human or agent confirm a checkout is
+ * ready to run setup (or see exactly why it isn't) without committing to any side effect.
+ */
+export async function checkSetup(rootPath: string, options: SetupOptions): Promise<CheckResult> {
+  if (Number(process.versions.node.split(".")[0]) !== 24) fail("Stride requires Node.js 24. Install it, then rerun npm run setup.");
+  if (process.env.NODE_ENV === "production") fail("This command is for local development. Clear NODE_ENV=production before continuing.");
+  const root = await realpath(rootPath);
+  const run = commandAt(root);
+  const saved = await readConfig(root, options);
+  localDocker(run); // Read-only reachability probe: throws with the same diagnostics setup() would give.
+  const appPort = saved?.port ?? port(options.port, 3000);
+  const dbPort = saved?.dbPort ?? port(options.dbPort, 5432);
+  if (!saved) {
+    if (appPort === dbPort) fail("The app and database need different ports.");
+    await Promise.all([assertPortAvailable(appPort), assertPortAvailable(dbPort)]);
+  }
+  return { state: saved ? "existing" : "fresh", root, appUrl: `http://127.0.0.1:${appPort}`, port: appPort, dbPort };
+}
+
+export async function setup(rootPath: string, options: SetupOptions, ask: (field: "email" | "name") => Promise<string>, log = console.log): Promise<LocalConfig> {
   if (Number(process.versions.node.split(".")[0]) !== 24) fail("Stride requires Node.js 24. Install it, then rerun npm run setup.");
   if (process.env.NODE_ENV === "production") fail("This command is for local development. Clear NODE_ENV=production before continuing.");
   const root = await realpath(rootPath);
@@ -245,20 +270,23 @@ export async function setup(rootPath: string, options: SetupOptions, ask: (field
   if (!options.skipInstall) {
     const npmCli = process.env.npm_execpath;
     if (!npmCli) throw new SetupError("Run this command through npm run setup so it can install locked dependencies.");
-    log("Installing locked dependencies...");
+    log("==> Installing locked dependencies...");
     if (!run(process.execPath, [npmCli, "ci"], { inherit: true, timeout: 600_000 }).ok) fail("Dependency installation failed. Fix the npm error, then rerun setup.");
   } else if (await readOptional(join(root, "node_modules", "pg", "package.json")) === undefined) {
     fail("--skip-install requires dependencies already installed with npm ci.");
   }
   await saveConfig(config);
-  log("Starting the local PostgreSQL database...");
+  log("==> Starting the local PostgreSQL database...");
   await startDatabase(config, docker);
-  log("Applying migrations and provisioning the local account...");
+  log("==> Applying migrations and provisioning the local account...");
   const provision = run(process.execPath, ["--experimental-strip-types", "scripts/provision-postgres.ts"],
     { env: provisioningEnvironment(config), timeout: 120_000 });
   if (!provision.ok) fail("Database provisioning failed. Saved credentials and data were retained. Check docs/LOCAL_SETUP.md, then rerun setup.");
-  log(`Local setup is ready. Run: npm run dev -- --port ${config.port}`);
-  log(`Open http://127.0.0.1:${config.port}. Sign in using STRIDE_BOOTSTRAP_EMAIL and STRIDE_BOOTSTRAP_PASSWORD from .env.provision.`);
-  log("An existing account keeps its current password. Generated passwords are never printed.");
-  log(`To stop the database without deleting data: docker stop stride-local-${config.id}`);
+  log("");
+  log("Setup complete. Next steps:");
+  log(`  npm run dev -- --port ${config.port}`);
+  log(`  Open http://127.0.0.1:${config.port} and sign in using STRIDE_BOOTSTRAP_EMAIL / STRIDE_BOOTSTRAP_PASSWORD from .env.provision.`);
+  log("  An existing account keeps its current password; generated passwords are never printed.");
+  log(`  Stop the database without deleting data: docker stop stride-local-${config.id}`);
+  return config;
 }

@@ -34,9 +34,26 @@ must match `APP_URL`; follow the command printed by setup. Noninteractive runs
 require `--email` and `--name`. Names and emails cannot contain dotenv syntax such
 as quotes, `$`, backslashes, or line breaks. No password command-line option exists.
 
-Run `npm run setup -- --help` for options. `--skip-install` is available after
-`npm ci`, for example when resuming after a Docker failure. After pulling changes
-to the lockfile, run the default setup or `npm ci` again.
+Run `npm run setup -- --help` for options (or `--help --json` for a machine-readable
+option list). `--skip-install` is available after `npm ci`, for example when
+resuming after a Docker failure. After pulling changes to the lockfile, run the
+default setup or `npm ci` again.
+
+### For scripts and agents
+
+```powershell
+npm run setup -- --check --json
+npm run setup -- --email you@example.com --name "Your Name" --json
+```
+
+`--check` verifies Node, Docker reachability and port availability and exits
+0 or 1 without installing anything, writing a file, or starting a container —
+useful to confirm a checkout is ready before committing to a real run. `--json`
+prints exactly one JSON result line on stdout (`{"ok": true, ...}` or
+`{"ok": false, "mode": ..., "error": ...}`); human-readable progress and errors
+go to stderr instead, so stdout stays parseable. Combined with `--email`/`--name`,
+setup runs fully noninteractively — required whenever stdin/stdout are not a
+terminal, which includes any agent or CI invocation.
 
 ## Manual setup (without Docker)
 

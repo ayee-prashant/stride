@@ -28,7 +28,7 @@ test("setup generates independent secrets and separates web and provisioning cre
 });
 
 test("setup rejects malformed account input, dotenv injection and conflicting ports", () => {
-  for (const email of ["", "not-email", "user@example.test\nEVIL=1", "user\0@example.test", "user$ENV@example.test", "user'@example.test"]) assert.throws(() => newConfig("fixture", { ...input, email }));
+  for (const email of ["", "not-email", "user@example.test\nEVIL=1", "user\0@example.test", "user$ENV@example.test", "user'@example.test", "user@example.test,attacker@example.test"]) assert.throws(() => newConfig("fixture", { ...input, email }));
   for (const name of ["", "A\nB", "A\0B", "'quoted'", "$SECRET", "x".repeat(101)]) assert.throws(() => newConfig("fixture", { ...input, name }));
   for (const port of ["0", "80", "65536", "3000.5", "3e3", "3000;command"]) assert.throws(() => newConfig("fixture", { ...input, port }));
   assert.throws(() => newConfig("fixture", { ...input, port: "5432" }));
