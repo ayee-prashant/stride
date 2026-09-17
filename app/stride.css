@@ -378,6 +378,10 @@ h1 { font-size: clamp(1.9rem, 3vw, 2.4rem); font-weight: 700; letter-spacing: -.
 .delivery-bullets { padding-left:1.25rem; font-size:.85rem; line-height:1.65; }
 ul.delivery-bullets { list-style:disc; } ol.delivery-bullets { list-style:decimal; }
 .delivery-bullets li+li { margin-top:.4rem; }
+/* The prompt is long and is read as a document, so it scrolls in place. */
+.delivery-prompt { white-space:pre-wrap; overflow-wrap:anywhere; font-family:inherit; font-size:.82rem; line-height:1.65; margin:.7rem 0; max-height:22rem; overflow-y:auto; padding:.9rem 1rem; background:var(--muted); border:1px solid var(--border); border-radius:.5rem; }
+.delivery-exclusions { border-left:3px solid #bd790f; padding-left:1.1rem; margin-left:.15rem; list-style:none; }
+.delivery-exclusions li { color:var(--muted-foreground); }
 .delivery-finding { padding:.8rem; border-left:3px solid #c77e3d; background:var(--muted); }
 .delivery-notices { display:grid; gap:1rem; }
 .delivery-notices article { display:flex; flex-wrap:wrap; align-items:center; gap:1rem; border-bottom:1px solid var(--border); padding:.9rem 0; }
