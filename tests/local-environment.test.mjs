@@ -9,6 +9,12 @@ async function fixture(context) {
   const root = await mkdtemp(join(tmpdir(), "stride-local-test-"));
   context.after(() => rm(root, { recursive: true, force: true })); return root;
 }
+// scripts/local-environment.mjs is POSIX-only by design — the guard test below asserts
+// it rejects win32. The cases that follow read uid ownership and create symlinks, which
+// Windows cannot do without elevation, so they are skipped rather than failing there.
+const posixOnly = process.platform === "win32"
+  ? { skip: "POSIX-only: local-environment.mjs rejects win32, and these assert uid ownership and symlinks" }
+  : {};
 test("local setup rejects production credentials, remote Docker and unsupported runtimes", () => {
   for (const environment of [{ NODE_ENV: "production" }, { DATABASE_URL: "remote" }, { RAILWAY_ENVIRONMENT_ID: "production" }, { PGHOST: "remote" }, { STRIDE_GITHUB_APP_PRIVATE_KEY: "private" }]) assert.throws(() => guardLocalEnvironment(environment, "linux", "24.1.0"));
   assert.throws(() => guardLocalEnvironment({}, "win32", "24.1.0"));
@@ -17,7 +23,7 @@ test("local setup rejects production credentials, remote Docker and unsupported 
   assert.equal(localDockerEndpoint("ssh://server"), false); assert.equal(localDockerEndpoint("tcp://127.0.0.1:2375"), false);
   assert.equal(localDockerEndpoint("unix:///var/run/docker.sock"), true);
 });
-test("local setup is repeatable, isolates worktrees and separates admin/runtime credentials", async context => {
+test("local setup is repeatable, isolates worktrees and separates admin/runtime credentials", posixOnly, async context => {
   const root = await fixture(context); const other = await fixture(context);
   const settings = await prepareLocalSettings(root); const again = await prepareLocalSettings(root);
   assert.deepEqual(settings, again); assert.deepEqual(await loadLocalSettings(root), settings);
@@ -34,7 +40,7 @@ test("local setup is repeatable, isolates worktrees and separates admin/runtime 
   await writeFile(join(other, ".stride-local/settings.json"), JSON.stringify(settings));
   await assert.rejects(() => loadLocalSettings(other));
 });
-test("existing environment, edited config, links and public credential files are never overwritten", async context => {
+test("existing environment, edited config, links and public credential files are never overwritten", posixOnly, async context => {
   const root = await fixture(context); const settings = await prepareLocalSettings(root);
   const original = await readFile(join(root, ".stride-local/settings.json"));
   await writeFile(join(root, ".env.local"), "DATABASE_URL=existing\n");
@@ -52,7 +58,7 @@ test("existing environment, edited config, links and public credential files are
   await writeFile(join(override, ".env.development.local"), "DATABASE_URL=remote");
   await assert.rejects(() => verifyLocalRuntime(override, valid));
 });
-test("invalid ports do not create local credentials; incomplete setup can resume", async context => {
+test("invalid ports do not create local credentials; incomplete setup can resume", posixOnly, async context => {
   const root = await fixture(context);
   for (const options of [{ appPort: 80 }, { dbPort: 65536 }, { appPort: 3100, dbPort: 3100 }, { reset: true }]) await assert.rejects(() => prepareLocalSettings(root, options));
   assert.equal(await loadLocalSettings(root), null);
