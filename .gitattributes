@@ -1,0 +1,8 @@
+# scripts/generate-agent-roles.mjs regenerates lib/server/agent-templates.generated.ts
+# from the role templates and compares the result byte for byte, which npm test runs
+# first. With core.autocrlf=true a Windows checkout rewrites these files to CRLF while
+# the generator still emits LF, so that check fails on Windows and passes in CI. Pin
+# them to LF on every platform.
+docs/agent-workforce/templates/** text eol=lf
+lib/server/agent-templates.generated.ts text eol=lf
+scripts/generate-agent-roles.mjs text eol=lf
