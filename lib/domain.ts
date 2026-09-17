@@ -22,6 +22,9 @@ export type Task = {
   project_name?: string; assignee_name?: string | null; responsible_id?: string; responsible_name?: string;
 };
 export type Activity = { id: string; action: string; actor_name: string; created_at: string };
+/** One workspace-wide activity row, carrying the task and project it belongs to. */
+export type WorkspaceActivity = Activity & { task_id: string; task_title: string; project_id: string; project_name: string };
+export type WorkspaceActivityPage = { activity: WorkspaceActivity[]; hasMore: boolean; nextOffset: number };
 export type CommentDraft = { body: string; mentioned_user_ids: string[] };
 export type TaskComment = CommentDraft & { id: string; workspace_id: string; task_id: string; author_id: string; author_name: string; created_at: string };
 export type TaskNotification = { id: string; task_id: string; task_title: string; project_name: string; kind: "assignment" | "mention" | "overdue" | "reminder"; actor_name: string | null; created_at: string; read_at: string | null };

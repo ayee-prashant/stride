@@ -1,7 +1,7 @@
 import { AppError, dateAtOffset, identifier, object, parseComment, parseMember, parseNotificationQuery, parseProject, parseProjectPatch, parseTaskCreate, parseTaskPatch, text } from "../domain.ts";
 import { notificationAllowed } from "./notification-rules.ts";
 import { localClock, nextOccurrence } from "../productivity.ts";
-import type { Activity, CommentPage, Identity, Member, NotificationPage, PageQuery, Project, Role, Task, TaskComment, TaskNotification, TaskQuery, Workspace } from "../domain.ts";
+import type { Activity, CommentPage, Identity, Member, NotificationPage, PageQuery, Project, Role, Task, TaskComment, TaskNotification, TaskQuery, Workspace, WorkspaceActivity, WorkspaceActivityPage } from "../domain.ts";
 
 export type SqlValue = string | number | null;
 export interface SqlResult<T = Record<string, unknown>> { results: T[]; meta: { changes: number } }
@@ -179,6 +179,21 @@ export class Repository {
     await this.task(userId, workspaceId, taskId);
     const result = await this.statement(`SELECT a.id,a.action,a.created_at,u.name AS actor_name FROM activity a JOIN users u ON u.id=a.actor_id WHERE a.workspace_id=? AND a.task_id=? AND ${memberGuard} ORDER BY a.created_at DESC,a.id DESC LIMIT 50`, workspaceId, taskId, workspaceId, userId).all<Activity>();
     return result.results;
+  }
+  /** Workspace-wide attribution: who did what, across every task the member can see. */
+  async workspaceActivity(userId: string, workspaceId: string, query: PageQuery): Promise<WorkspaceActivityPage> {
+    await this.membership(userId, workspaceId);
+    const result = await this.statement(`SELECT a.id,a.action,a.created_at,u.name AS actor_name,
+        t.id AS task_id,t.title AS task_title,p.id AS project_id,p.name AS project_name
+      FROM activity a
+      JOIN users u ON u.id=a.actor_id
+      JOIN tasks t ON t.workspace_id=a.workspace_id AND t.id=a.task_id
+      JOIN projects p ON p.workspace_id=t.workspace_id AND p.id=t.project_id
+      WHERE a.workspace_id=? AND ${memberGuard}
+      ORDER BY a.created_at DESC,a.id DESC LIMIT ? OFFSET ?`,
+    workspaceId, workspaceId, userId, query.limit + 1, query.offset).all<WorkspaceActivity>();
+    const rows = result.results;
+    return { activity: rows.slice(0, query.limit), hasMore: rows.length > query.limit, nextOffset: query.offset + query.limit };
   }
   async comments(userId: string, workspaceId: string, taskId: string, query: PageQuery): Promise<CommentPage> {
     await this.task(userId, workspaceId, taskId);
