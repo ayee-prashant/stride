@@ -217,6 +217,29 @@ foreach ($n in $names) {
     ForEach-Object { if ($_ -is [System.Management.Automation.ErrorRecord]) { if ($null -ne $_.Exception) { $_.Exception.Message } else { $_.ToString() } } else { $_ } } |
     ForEach-Object { Write-Host $_; $_ }
   [System.IO.File]::WriteAllText((Join-Path $run 'agent-output.txt'), ($captured -join [Environment]::NewLine), (New-Object System.Text.UTF8Encoding $false))
+
+  # Record what the run cost, next to what it produced. Without this there is no
+  # way to answer whether a way of working is worth what it consumes - and the
+  # transcripts for an earlier task came back empty, so the evidence was simply
+  # gone by the time the question was asked.
+  $joined = ($captured -join "`n")
+  $tokens = $null
+  $m = [regex]::Match($joined, '(?m)^\s*tokens used\s*?
+?\s*([\d,]+)')
+  if (-not $m.Success) { $m = [regex]::Match($joined, 'tokens used[\s:]*([\d,]+)') }
+  if ($m.Success) { $tokens = [int]($m.Groups[1].Value -replace ',', '') }
+  [System.IO.File]::WriteAllText((Join-Path $run 'run.json'), (([pscustomobject]@{
+    member       = $n
+    model        = $policy.model
+    role         = $Roster[$n].Role
+    runtime      = Get-Runtime $n
+    started_at   = $t0.ToString('o')
+    seconds      = $secs
+    tokens       = $tokens
+    transcript_bytes = ($joined.Length)
+    prompt_bytes = (([System.Text.Encoding]::UTF8.GetByteCount($Prompt)))
+    exit_code    = $LASTEXITCODE
+  } | ConvertTo-Json -Depth 3)), (New-Object System.Text.UTF8Encoding $false))
   $secs = [int]((Get-Date) - $t0).TotalSeconds
 
   $results += [pscustomobject]@{ Agent = $n; Model = $(if ($policy.model) { $policy.model } else { 'default' }); Approval = $policy.approval_mode; Seconds = $secs }
