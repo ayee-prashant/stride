@@ -343,8 +343,13 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (url.pathname === '/' || url.pathname === '/index.html') {
+      // The UI is being rebuilt. The API below is unaffected and is what the new
+      // one will consume; this route is the only thing missing.
       const f = path.join(HERE, 'hub.html');
-      if (!existsSync(f)) return json(res, 404, { error: 'hub.html missing' });
+      if (!existsSync(f)) return json(res, 503, {
+        error: 'the UI is being rebuilt',
+        api: ['/api/state', '/api/recovery', '/api/version', '/api/stream', '/api/work', '/api/policy'],
+      });
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
       return res.end(readFileSync(f));
     }

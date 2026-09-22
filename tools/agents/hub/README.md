@@ -19,7 +19,7 @@ Then open <http://localhost:7400>.
 |---|---|
 | `server.mjs` | MCP endpoint for agents, SSE feed and JSON API for the UI |
 | `db.mjs` | the store — SQLite via built-in `node:sqlite`, no dependency |
-| `hub.html` | the UI: context, approvals, work, live activity, controller |
+| *(UI)* | being rebuilt - the server still serves `/`, which reports 503 until it lands |
 | `connect.ps1` | registers the hub as an MCP server in all three CLIs |
 | `runner.ps1` | runs agents **under the controller** (model + approval mode) |
 | `db.test.mjs` | 35 checks of the invariants that make concurrency safe |

@@ -140,7 +140,7 @@ if ($Code) {
     & docker rm -f $Container | Out-Null
     Write-Host ""
     Write-Host "Authenticated with your subscription. Helper container removed." -ForegroundColor Green
-    Write-Host "Try:  .\agent.ps1 -Agent claude -Task" -ForegroundColor Green
+    Write-Host "Try:  agents doctor" -ForegroundColor Green
   }
   else {
     Write-Host ""
