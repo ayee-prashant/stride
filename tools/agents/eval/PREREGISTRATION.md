@@ -144,3 +144,38 @@ a conclusion.
 - Call a single-run difference a finding.
 - Add capability to either condition mid-experiment. If something is missing,
   that is a result.
+
+---
+
+## Amendment 1 — traceability scoring instrument
+
+**Added before any M1C run. Committed separately from the original so the change
+and its reason are visible in history rather than folded in.**
+
+The original said traceability would be scored "by a fresh agent that did not
+participate". That is changed to a typed `score` question per item, answered by
+the decisions model already used elsewhere in this harness.
+
+**Why.** The regexes this harness used to score the reviewer matrix were wrong in
+two of four cells, and both errors flattered the result — one invented a model
+gradient, the other inflated a cost figure. A chat model asked to grade prose
+has the same failure mode with none of the calibration: its answer is a sentence
+I then interpret. A typed question returns a probability, so a borderline answer
+is recorded as borderline instead of being rounded by whoever reads it.
+
+**The risk this introduces, stated plainly.** I am changing the measuring
+instrument after seeing it produce a result I liked. That is the shape of a
+post-hoc choice even when the reasoning is sound. Three constraints follow:
+
+1. The ten questions are unchanged from the original. They were fixed before any
+   scoring existed and are not renegotiated here.
+2. Both conditions are scored by the same instrument, same questions, same
+   order, in the same run.
+3. The raw probabilities are reported, not just the yes/partial/no rounding, so
+   the reader can see where the instrument was uncertain rather than taking my
+   bucketing on trust.
+
+**What would invalidate this choice.** If the model's answers disagree with a
+manual reading of the records on any item, the manual reading wins and the
+disagreement is reported. The instrument is here to be more consistent than a
+regex, not to be the final authority on its own output.
