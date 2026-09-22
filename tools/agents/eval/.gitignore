@@ -1,2 +1,5 @@
 # Run outputs are evidence for one experiment, not source. Re-runnable.
 runs/
+# Never commit a key. It lives in OPENROUTER_API_KEY or ~/.openrouter/key.
+*.key
+.env

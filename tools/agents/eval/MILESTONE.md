@@ -61,12 +61,42 @@ not contain it. **The defect was routing, not reasoning.**
 The team confounds both. So: hold the implementation fixed — Terra's 75/77
 output — and vary only the reviewer.
 
-| Reviewer | Model | `-0s` | repetition | whitespace | offered the reading the grader asserts | time |
+Scored by asking a typed question of each transcript, not by grepping it. The
+first scoring used regexes and was wrong in two places — see below.
+
+| Reviewer | Model | `-0s` | repetition | whitespace | offers rejection | time |
 |---|---|:---:|:---:|:---:|:---:|---:|
-| agent1 | gpt-5.6-terra *(same model that wrote it)* | yes | yes | — | — | 38s |
-| tester | claude-sonnet-5 | yes | yes | **yes** | — | 81s |
-| manager | claude-opus-5 | yes | yes | — | **yes** | 48s |
-| agent2 | gpt-5.6-sol | yes | yes | — | — | **4133s** |
+| agent1 | gpt-5.6-terra *(same model that wrote it)* | **0.98** | 0.78–0.88 | 0.09 | 0.11 | 38s |
+| tester | claude-sonnet-5 | **0.98** | 0.92 | 0.05 | 0.08 | 81s |
+| manager | claude-opus-5 | **0.98** | 0.92 | 0.06 | **0.97** | 48s |
+| agent2 | gpt-5.6-sol | **0.98** | 0.11 | 0.08 | 0.09 | **4133s** |
+
+*(probability that the review raised this as an unresolved decision for the spec
+author; 5 transcripts cost $0.000459 to score)*
+
+### The first scoring was wrong, and it inflated the result
+
+The original matrix was produced with `grep`. Re-scoring the same transcripts
+with a typed question changed two cells:
+
+| grep reported | actually |
+|---|---|
+| tester found **all three** | nobody flagged whitespace (0.05–0.09) |
+| agent2 found repetition | it did not (0.11) |
+| only manager offered rejection | confirmed (0.97 vs ~0.10) |
+
+The whitespace "finding" was the word appearing in *"a battery of edge cases
+(empty string, whitespace variants, repeated/out-of-order…)"* — a list of what
+the reviewer had **tested**, not what it flagged as unresolved. A regex answers
+"does this word appear"; the question was "does this review escalate this to a
+human". Those differ, and the difference produced a model gradient I reported as
+a finding.
+
+**What survives is cleaner than what I claimed.** All four reviewers, across
+three models and both runtimes, flagged negated zero at 0.98 — uniform, not
+graded by model. The implementation pass had reported no ambiguities at all. The
+role-separation signal is stronger for being model-independent; the "Sonnet
+found more" gradient was my instrument, not the models.
 
 All four reviewers recovered at least two of the three deleted rules, across
 three different models and both runtimes. The implementation pass had declared
@@ -83,10 +113,10 @@ That rules out "the stronger model found it".
 > inside one invocation, a fresh same-model *implementation* pass, and a fresh
 > same-model *review* pass — would settle it and has not been run.
 
-Reviewer-model differences were also visible: Sonnet found all three and verified
-the runtime behaviour; Opus was the only one whose options included rejecting
-`-0s`, which is what the grader asserts. **Single runs cannot attribute those
-differences reliably to model capability** and they may reverse on a re-run.
+One model difference survives re-scoring: Opus was the only reviewer to include
+*rejecting* `-0s` among its candidate readings (0.97 against ~0.10), which is
+what the grader asserts. That is a single observation on one task and is
+recorded as such, not as a capability claim.
 
 **Cost variance between reviewers dwarfed quality variance.** Sol took 4133s —
 69 minutes, 54× Sonnet — for a result no better than Terra's 38s. The run was

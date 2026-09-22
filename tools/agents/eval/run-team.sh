@@ -92,7 +92,11 @@ that parse.js violates.
 
 Report: how many assertions, how many passed, and each violation found.'
 
-if grep -qiE 'fail|violat' "$RUN/transcript-tester.txt" 2>/dev/null; then
+# Was a regex: grep -qiE 'fail|violat'. It matched the word "fail" inside the
+# sentence "No violations found" and triggered a needless fourth invocation,
+# which then inflated the cost figure in the comparison. A regex answers "does
+# this word appear"; the question is "does this report assert a failure".
+if node classify.mjs "$RUN/transcript-tester.txt"      'Does this report state that the implementation FAILED or VIOLATED the specification, such that a fix is required?'      'Reports at least one violation or failure requiring a fix'      'Reports no violations, or reports success' >/dev/null 2>&1; then
   step agent1 'You are the implementer. The tester found problems with parse.js.
 
 Read tester.test.mjs and its findings, fix parse.js so every case passes, and do

@@ -75,13 +75,17 @@ SECS=$(( $(date +%s) - START ))
 
 # The implementation is unchanged, so the score is fixed. What varies is whether
 # the review surfaced the decision that a human needed to make.
-FOUND_AMBIG=no
-grep -qiE '\-0s|negated zero|negative zero' "$RUN/review.txt" && FOUND_AMBIG=yes
-FOUND_OTHER=$(grep -ciE 'unresolved|ambiguo|does not (say|specify|determine)|could reasonably' "$RUN/review.txt" || true)
+# Was a regex over the transcript. It scored a MENTION as a finding, which is
+# not the same thing: a review that raises negated zero and resolves it itself
+# scored identically to one that flags it for the spec author. Re-scoring the
+# same transcripts with a typed question changed the matrix - the whitespace
+# "find" was the word appearing in a list of things the reviewer had TESTED.
+FOUND_P=$(node "$HERE/classify.mjs" "$RUN/review.txt"   'Does this review flag the handling of a negated zero duration (such as "-0s") as an UNRESOLVED decision that the specification does not determine and that needs the spec author to settle?'   'Raises it as unresolved, ambiguous, or something to ask the author about'   'Does not raise it, or mentions it but treats it as already settled' 2>/dev/null || true)
+FOUND_AMBIG=$(node -e "process.stdout.write((parseFloat('${FOUND_P:-0}')>0.5)?'yes':'no')")
 
 cat > "$RUN/run.json" <<JSON
 {"condition":"review","reviewer":"$REVIEWER","model":"$model","seconds":$SECS,
- "found_the_ambiguity":"$FOUND_AMBIG","ambiguity_mentions":$FOUND_OTHER}
+ "found_the_ambiguity":"$FOUND_AMBIG","found_probability":${FOUND_P:-null}}
 JSON
 
 echo "  ${SECS}s   found the -0s ambiguity: $FOUND_AMBIG"
