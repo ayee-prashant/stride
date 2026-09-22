@@ -6,3 +6,16 @@
 docs/agent-workforce/templates/** text eol=lf
 lib/server/agent-templates.generated.ts text eol=lf
 scripts/generate-agent-roles.mjs text eol=lf
+
+# The agent tooling runs inside Linux containers. A CR breaks a shebang line and
+# every command after it, so these must stay LF regardless of the checkout platform.
+tools/agents/**/*.sh text eol=lf
+tools/agents/*.sh text eol=lf
+tools/agents/**/*.mjs text eol=lf
+tools/agents/*.mjs text eol=lf
+tools/agents/Dockerfile* text eol=lf
+tools/agents/**/*.json text eol=lf
+tools/agents/*.json text eol=lf
+# Bundled into containers and read by agents there.
+tools/agents/git/PROTOCOL.md text eol=lf
+tools/agents/workspace/** text eol=lf

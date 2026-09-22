@@ -1,0 +1,37 @@
+# Codex via the official install script rather than the npm package.
+FROM node:24-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      git ca-certificates curl ripgrep less \
+ && rm -rf /var/lib/apt/lists/*
+
+RUN useradd -m -u 1001 -s /bin/bash agent
+
+# Install as the agent user so the binary lands in a path that user owns,
+# then surface wherever it put itself on PATH.
+USER agent
+ENV HOME=/home/agent
+RUN curl -fsSL https://chatgpt.com/codex/install.sh | sh
+
+USER root
+# The installer drops the binary under /home/agent/.codex, and at runtime we mount a
+# named volume over /home/agent for credentials — which would hide it. Copy the binary
+# out to /usr/local/bin so the mount cannot shadow it.
+RUN set -eux; \
+    found="$(find /home/agent -type f -name codex -perm -u+x 2>/dev/null | head -1)"; \
+    test -n "$found"; \
+    bindir="$(dirname "$found")"; \
+    # Copy the WHOLE release bin directory, not just `codex`: it ships helper
+    # binaries such as codex-code-mode-host, and without them the tool runner
+    # fails closed and the agent cannot touch the workspace at all.
+    echo "copied from: $bindir"; ls -1 "$bindir"; \
+    cp -a "$bindir"/. /usr/local/bin/; \
+    chmod 0755 /usr/local/bin/codex*; \
+    rm -rf /home/agent/.codex; \
+    printf '%s\n' "@openai/codex (official installer)" > /etc/agent-cli
+
+USER agent
+WORKDIR /work
+ENV TERM=xterm-256color
+ENV NO_COLOR=1
+CMD ["bash"]
