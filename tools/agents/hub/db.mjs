@@ -431,6 +431,29 @@ export class Store {
     });
   }
 
+  /** Close an item that should not be worked on - a duplicate, or one written from
+   *  a brief that turned out to be wrong. Human-only, and it abandons rather than
+   *  deletes: an item an agent may already have read has to stay visible with a
+   *  reason, or the log stops explaining itself. */
+  closeWork(projectId, actor, { itemId, reason }) {
+    if (actor !== 'human') throw new Error('only a human may close a work item');
+    const r = this.#tx(() => {
+      const item = this.db.prepare('SELECT * FROM work_items WHERE project_id=? AND id=?').get(projectId, itemId);
+      if (!item) throw new Error('no such work item');
+      if (item.state === 'done') throw new Error('that item is already done');
+      this.db.prepare(`UPDATE work_items SET state='abandoned', claimed_by=NULL, lease_until=NULL, assignee=NULL, outcome=?, version=version+1 WHERE project_id=? AND id=?`)
+        .run(reason ?? 'closed', projectId, itemId);
+      const seq = this.#append(projectId, {
+        kind: 'work_abandoned', actor,
+        summary: `${actor} closed "${item.title}"${reason ? ': ' + reason : ''}`,
+        payload: { id: itemId, reason: reason ?? null },
+      });
+      return { id: itemId, state: 'abandoned', head_sequence: seq };
+    });
+    this.#emit({ projectId, ...r });
+    return r;
+  }
+
   listWork(projectId) {
     this.#sweepLeases(projectId);
     return {

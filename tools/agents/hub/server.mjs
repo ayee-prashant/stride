@@ -273,6 +273,11 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, store.setPolicy(name, { model, approvalMode: approval_mode }));
     }
 
+    if (url.pathname === '/api/work/close' && req.method === 'POST') {
+      const { item_id, reason } = await body(req);
+      return json(res, 200, store.closeWork(PROJECT, 'human', { itemId: item_id, reason }));
+    }
+
     if (url.pathname === '/api/work' && req.method === 'POST') {
       const { title, body: b } = await body(req);
       if (!title) return json(res, 400, { error: 'title is required' });

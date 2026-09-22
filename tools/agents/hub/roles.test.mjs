@@ -64,6 +64,17 @@ ok('creation records who it was for', feed.some((e) => e.kind === 'work_created'
 ok('reassignment is recorded', feed.some((e) => e.kind === 'work_assigned' && e.payload?.assignee === 'tester'));
 ok('every work event names its actor', feed.filter((e) => e.kind.startsWith('work_')).every((e) => !!e.actor));
 
+console.log('\nclosing work is human-only and abandons rather than deletes');
+const w9 = s.createWorkItem(P, { title: 'Written from a bad brief', actor: 'manager', assignee: 'agent1', requestId: 'm9' });
+throws('the manager cannot close an item', () => s.closeWork(P, 'manager', { itemId: w9.id, reason: 'x' }), /only a human/);
+throws('an implementer cannot close one', () => s.closeWork(P, 'agent1', { itemId: w9.id, reason: 'x' }), /only a human/);
+s.closeWork(P, 'human', { itemId: w9.id, reason: 'superseded by the corrected brief' });
+const closed = s.listWork(P).items.find((i) => i.id === w9.id);
+ok('a closed item is abandoned, not gone', closed && closed.state === 'abandoned');
+ok('and carries the reason', closed.outcome === 'superseded by the corrected brief');
+ok('and is unassigned so nobody waits on it', closed.assignee === null);
+ok('the closure is in the log', s.feed(P, { since: 0, limit: 200 }).events.some((e) => e.kind === 'work_abandoned'));
+
 console.log(`\n  ${pass} passed, ${fail} failed`);
 console.log(fail === 0 ? '  RESULT: PASS\n' : '  RESULT: FAIL\n');
 process.exit(fail === 0 ? 0 : 1);
