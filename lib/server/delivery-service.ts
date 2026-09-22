@@ -5,6 +5,7 @@ import { deliveryLink } from "../delivery.ts";
 import type { AgentActor } from "../delivery.ts";
 import type { Database } from "./repository.ts";
 import { Repository } from "./repository.ts";
+import { ContextRepository } from "./context-repository.ts";
 import { DeliveryReview } from "./delivery-review.ts";
 import { digest } from "./delivery-store.ts";
 
@@ -42,6 +43,35 @@ export class DeliveryService extends DeliveryReview {
     return { read_through: cursor };
   }
   async companionNotices(actor: AgentActor, after: number) { await this.validateConnection(actor); return this.notices(actor.operator_id, actor.workspace_id, actor.project_id, after); }
+
+  /** Shared project context for an agent: the approved requirements, decisions and
+   * constraints every agent on this project must work from, plus the head sequence
+   * so a stale view is detectable without a second call.
+   *
+   * Read as the connection's human operator, the same scoping companionNotices uses,
+   * so an agent can never see more than the person accountable for it. These are
+   * reads only: publishing context requires an admin membership, which an agent
+   * does not have, so an agent still cannot change what it is told. */
+  async agentProjectContext(actor: AgentActor) {
+    await this.validateConnection(actor);
+    return new ContextRepository(this.repo).brief(actor.operator_id, actor.workspace_id, actor.project_id);
+  }
+  async agentContextChanges(actor: AgentActor, after: number) {
+    await this.validateConnection(actor);
+    return new ContextRepository(this.repo).changes(actor.operator_id, actor.workspace_id, actor.project_id, after);
+  }
+  async agentContextHistory(actor: AgentActor, documentId: string, before = 0) {
+    await this.validateConnection(actor);
+    return new ContextRepository(this.repo).history(actor.operator_id, actor.workspace_id, actor.project_id, documentId, before);
+  }
+  /** What every other agent and human has done on this project, in order. This is how
+   * one agent learns what another did: by reading the shared log, not by being messaged.
+   * A late-joining agent therefore sees the whole history, which a message it was never
+   * sent could not give it. */
+  async agentPeerActivity(actor: AgentActor, after: number) {
+    await this.validateConnection(actor);
+    return this.history(actor.operator_id, actor.workspace_id, actor.project_id, null, after);
+  }
   /** Durable reconciliation. Heartbeats themselves do not create productivity events. */
   async reconcile(limit = 50) {
     await this.refreshClock();
