@@ -1,119 +1,172 @@
-# Milestone 1 — is the team worth what it costs?
+# Milestone 1 — does coordination earn its cost?
 
-**Date:** 2026-09-22  ·  **Status:** feature freeze, evaluated  ·  **Verdict:** not yet
+**Date:** 2026-09-22 · **Status:** feature freeze, evaluated · **Verdict:** yes, but not as a team
 
 The system was built over one session on a feedback loop, which is a good way to
 get capable and a bad way to stay honest. This is the stop-and-measure.
 
 ## The question
 
-Does coordinating several agents produce better software than one agent working
-alone — and if so, where? Token cost is not the goal, but spending 4× for the
-same output is not "traceable and solid", it is waste dressed as rigour.
+Not "use fewer tokens". Rather: **spend extra agents and tokens only where they
+buy better software, better decisions, better traceability or safer recovery.**
 
 ## Method
 
-One task (`parseDuration`, the inverse of the formatter the team built earlier),
+One task — `parseDuration`, the inverse of a formatter the team built earlier —
 graded by **77 held-out assertions written from the spec before any run and shown
-to no agent**. The grader was validated against a known-good reference first —
-77/77 — so a low score means the implementation failed, not the test.
+to no agent**. The grader was validated against a known-good reference first,
+77/77, so a low score means the implementation failed, not the test.
 
-Two specs, identical task:
+Two specs, same task:
 
-- **precise** — every rule stated, including ordering, exact whitespace, and
-  that `-0s` is invalid.
-- **ambiguous** — the same task with those three rules removed. Both readings
-  defensible. The held-out suite still asserts the strict reading.
+- **precise** — every rule stated, including that `-0s` is invalid.
+- **ambiguous** — the same task with three rules deleted: unit ordering and
+  repetition, exact whitespace, and negated zero. Both readings defensible.
 
-Two conditions: one agent alone, told it is alone and that nobody will review
-its work; and the team (manager plans and assigns, implementer builds, tester
-validates from the spec, implementer fixes).
-
-The team ran in a **single shared workspace** rather than separate git clones —
-no fetch/push overhead, every member sees the others' files immediately. That
-favours the team, so the cost below is a floor.
+> **An important caveat about scoring the ambiguous spec.** The held-out suite
+> embodies one chosen interpretation. An implementation that scores 75/77 against
+> it is *not wrong relative to the spec it received* — it answered a question the
+> spec never asked. So before the ambiguity is resolved, the legitimate measure is
+> whether review **identified** it, **explained the consequence**, **offered the
+> plausible readings**, and **escalated rather than silently inventing a rule**.
+> Only after resolution does 77/77 become a fair correctness target.
 
 ## Results
 
-| Spec | Condition | Model(s) | Score | Agent time | Invocations |
-|---|---|---|---:|---:|---:|
-| precise | solo | gpt-5.6-terra | **77/77** | 80s | 1 |
-| precise | solo | claude-opus-5 | **77/77** | 71s | 1 |
-| precise | solo | gpt-5.6-sol | **77/77** | 102s | 1 |
-| precise | **team** | all four | **77/77** | **217s** | **4** |
-| ambiguous | solo | gpt-5.6-terra | **75/77** | 82s | 1 |
-| ambiguous | **team** | all four | **75/77** | **284s** | **4** |
+### Does the four-role team beat one agent?
 
-## What this says
+| Spec | Condition | Score | Agent time | Invocations |
+|---|---|---:|---:|---:|
+| precise | solo (terra) | 77/77 | 80s | 1 |
+| precise | solo (opus) | 77/77 | 71s | 1 |
+| precise | solo (sol) | 77/77 | 102s | 1 |
+| precise | **team** | 77/77 | **217s** | **4** |
+| ambiguous | solo (terra) | 75/77 | 82s | 1 |
+| ambiguous | **team** | 75/77 | **284s** | **4** |
 
-**On a well-specified task the team is pure overhead.** Three different models,
-working alone, each hit the ceiling. The team matched them for 2.7× the time and
-4× the invocations. The tester found nothing, because there was nothing to find:
-*"No violations found — parse.js correctly implements the spec."*
+No. On a precise task three different models each hit the ceiling alone and the
+team matched them for 2.7× the time. On the ambiguous task the team scored the
+same as solo.
 
-**On an ambiguous task the team scored no better either.** Both lost the same two
-assertions, both on `-0s` — the same defect class as the signed-zero bug in the
-earlier formatter task. Ambiguity in the spec produced a wrong guess whether one
-agent or four were working.
+**But the team produced one thing solo did not.** Its manager identified the
+exact ambiguity that cost both conditions their two assertions. The solo agent
+reported *"Ambiguities found: none."* So did the team's own implementer.
 
-**But one thing only the team produced.** The manager, unprompted:
+**And the team failed to act on it.** That observation went into the manager's
+report to a human. `PLAN.md`, the artifact the implementer was told to read, did
+not contain it. **The defect was routing, not reasoning.**
 
-> `"-0s"` parses to `-0` under a literal reading, and whether the hidden suite
-> wants `0` or `-0` is unspecified; I'd return `0`.
+### Is it the extra role, or the stronger model?
 
-That is the exact ambiguity that cost both conditions their two points. The solo
-agent reported *"Ambiguities found: none."* So did the team's own implementer.
+The team confounds both. So: hold the implementation fixed — Terra's 75/77
+output — and vary only the reviewer.
 
-**And the team failed to act on it.** The manager put that observation in its
-report to the human. Its `PLAN.md` — the artifact the implementer was told to
-read — listed three rules likely to be got wrong (correctly predicting the sign
-handling and the strict-form requirements) but **not the `-0s` ambiguity**. The
-implementer never saw the one insight that would have changed the outcome.
+| Reviewer | Model | `-0s` | repetition | whitespace | offered the reading the grader asserts |
+|---|---|:---:|:---:|:---:|:---:|
+| agent1 | gpt-5.6-terra *(same model that wrote it)* | yes | yes | — | — |
+| tester | claude-sonnet-5 | yes | yes | **yes** | — |
+| manager | claude-opus-5 | yes | yes | — | **yes** |
+
+Every reviewer recovered at least two of the three deleted rules. The
+implementation pass had declared the spec unambiguous.
+
+**The first row is the one that matters.** A fresh Terra invocation, asked to
+review, surfaced requirements a Terra invocation asked to implement had missed.
+That rules out "the stronger model found it".
+
+> **What this does and does not establish.** It shows a fresh invocation doing
+> review behaves differently from one doing implementation. It does **not**
+> isolate *why*: role framing, fresh context and additional inference budget are
+> all still confounded with each other. An ablation separating them — self-review
+> inside one invocation, a fresh same-model *implementation* pass, and a fresh
+> same-model *review* pass — would settle it and has not been run.
+
+Reviewer-model differences were also visible: Sonnet found all three and verified
+the runtime behaviour; Opus was the only one whose options included rejecting
+`-0s`, which is what the grader asserts. **Single runs cannot attribute those
+differences reliably to model capability** and they may reverse on a re-run.
+
+### Does routing the finding change the outcome?
+
+The whole point. Take the same 75/77 implementation, hand it a structured open
+question carrying the consequence, the readings and a human's resolution, and
+re-run the implementer.
+
+| Stage | Score | Ambiguity surfaced | Cost |
+|---|---:|---|---:|
+| implement alone | 75/77 | no — *"ambiguities: none"* | 82s |
+| + independent review | 75/77 | **yes**, with readings | +38s |
+| + routed resolution | **77/77** | resolved | +27s |
+
+**The chain closes.** Independent review produced new information; a structured
+artifact persisted it; a human resolved it; the implementer changed the code; the
+measure moved.
+
+The change was four lines, and the implementer correctly reported that only
+OQ-1 required it — OQ-2 and OQ-3 already matched, and it left them alone.
+
+```
+implement(82s) + review(38s) + resolve(27s) = 147s, 3 invocations  ->  77/77
+the four-role team                          = 284s, 4 invocations  ->  75/77
+```
 
 ## Conclusion
 
-Right now the team is mostly waste. It costs 4× and produces the same artifact.
+The finding is **not "multi-agent is better"**. It is:
 
-The mechanism that would justify it is real and was observed: **a reviewing role
-notices that a specification is underdetermined when a building role does not.**
-Both ran the same task; only the manager saw it. That is not a scoring
-difference, it is an information difference, and it is the thing worth having —
-a spec question routed to a human is worth more than a confident guess.
+> **A second, explicitly critical pass surfaces problems the same model misses
+> while implementing — and only pays off if the finding is routed into an
+> artifact the implementer must consume.**
 
-The defect is routing, not reasoning. The manager's uncertainty went into prose
-addressed to a human instead of into the artifact the implementer consumes.
+A fixed four-role pipeline is the wrong default. It costs 4× and, in the one case
+where it discovered something valuable, dropped it on the floor.
 
-## What to do next — one change, then re-measure
+## Direction
 
-**Make uncertainty a first-class artifact, not a paragraph.** The manager should
-be required to emit `open_questions` as structured output, the implementer
-required to read them, and anything still open at submission time recorded on
-the work item so a human sees it. If the manager's `-0s` note had been an open
-question the implementer had to answer or escalate, this experiment would have
-had a different result.
+Default to the smallest thing that works:
 
-Then re-run exactly this evaluation. If the ambiguous-spec gap does not move,
-the team is not worth its cost for tasks of this size and should be reserved for
-work too large for one agent — which this task is not.
+```
+IMPLEMENT -> REVIEW -> (open question?) -> resolve -> targeted fix
+```
 
-**Explicitly not next:** more capability. No new roles, no sealed test flow, no
-authenticated git gateway, no provenance schema. Those are all defensible and
-none of them is the reason this scored 75/77.
+Treat everything else as **escalation triggered by risk**, not a mandatory stage:
+
+| Trigger | Escalate to |
+|---|---|
+| ambiguity the review cannot resolve | a human, or a manager role |
+| risky or wide-reaching change | independent testing |
+| disputed approach | a second implementation |
+| critical artifact | sealed verification |
+
+Multi-agent work becomes an escalation mechanism rather than the default shape.
+
+## Still open
+
+- **The ablation.** Self-review in one invocation vs a fresh implementation pass
+  vs a fresh review pass. Until that is run, "role separation" remains one of
+  several candidate explanations.
+- **One task, single runs.** The role-separation effect is large enough to read
+  through that noise; the model gradient is not.
+- **Five of the six dimensions are unmeasured.** Only software quality and cost
+  have data. Reasoning diversity has one observation. Coordination effectiveness
+  has one diagnosis. Traceability and recovery have none — and recovery is the
+  one a "solid tool" claim rests on.
+- **Cost is wall-clock and invocations.** The Claude CLI does not report tokens.
+  Codex does: the resolution pass was 7,150. An attempt to measure the earlier
+  task retroactively failed outright — its transcripts were 3 bytes each,
+  destroyed by an encoding bug in the runner. Cost must be recorded as it happens.
 
 ## Reproducing
 
 ```
-./run-solo.sh agent1                          # precise spec, one agent
-SPEC_FILE=SPEC-AMBIGUOUS.md ./run-solo.sh agent1
-./run-team.sh                                 # precise spec, the team
-SPEC_FILE=SPEC-AMBIGUOUS.md ./run-team.sh
+./run-solo.sh agent1                                  # precise, one agent
+SPEC_FILE=SPEC-AMBIGUOUS.md ./run-solo.sh agent1      # ambiguous, one agent
+./run-team.sh                                         # precise, four roles
+SPEC_FILE=SPEC-AMBIGUOUS.md ./run-team.sh             # ambiguous, four roles
+./run-review.sh <reviewer> runs/<impl-dir>            # fixed impl, vary reviewer
+./run-resolve.sh agent1 runs/<impl-dir>               # route the resolution
 ```
 
-Each run writes `run.json` with time and, where the CLI reports it, tokens.
-`heldout.test.mjs` grades every condition identically in a clean container.
-
-**Measurement gap:** the Claude CLI does not report token usage, so cost here is
-wall-clock and invocation count. Those are honest proxies but not the same
-thing. An earlier attempt to measure retroactively failed outright — the
-transcripts for the formatter task were 3 bytes each, destroyed by an encoding
-bug in the runner. Cost must be recorded at the time or it is not recoverable.
+Every condition is graded by the identical `heldout.test.mjs` in a clean
+container. Each run writes `run.json` with time, invocations and, where the CLI
+reports it, tokens.
