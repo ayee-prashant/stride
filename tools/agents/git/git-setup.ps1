@@ -72,6 +72,8 @@ function Get-AgentConfig([string]$root) {
 
 $Config = Get-AgentConfig (Split-Path -Parent $Here)
 $Agents = $Config.Enabled
+# Any runtime image will do for a chmod; take the first on the roster.
+$HookImage = @($Config.Members.Values | ForEach-Object { $_.Image })[0]
 
 function Say([string]$t, [string]$c = 'Gray') { Write-Host $t -ForegroundColor $c }
 
@@ -137,9 +139,38 @@ if (-not (Test-Path $Bare)) {
   # be explicit so a later change of mind does not silently break pushes.
   GitIn $Bare @('config', 'receive.denyCurrentBranch', 'refuse') | Out-Null
 
-  # The seed carried your origin. Remove it: agents must not be able to reach
-  # github.com even by accident, and no credentials are mounted for it anyway.
+  # The seed carried your origin. Remove it so no tooling here pushes to GitHub by
+  # accident. NOTE: this is hygiene, not a boundary - a container with network
+  # access can add its own remote. See README for what is actually enforced.
   GitIn $Bare @('remote', 'remove', 'origin') | Out-Null
+
+  # Confine every agent-reachable write to the agent branch namespace.
+  # Attack-verified: without this an agent pushed to refs/heads/main and created
+  # refs/heads/sneaky, both plain fast-forwards that denyNonFastForwards allows.
+  # A hook runs inside git-receive-pack, so unlike a bind mount there is no path
+  # around it. git:// has no authentication, so this cannot tell WHICH agent is
+  # pushing - ownership within agent/* stays unenforced.
+  $hookLines = @(
+    '#!/bin/sh',
+    '# Installed by git-setup.ps1. Agents may only write refs/heads/agent/*.',
+    'ref="$1"',
+    'case "$ref" in',
+    '  refs/heads/agent/*) exit 0 ;;',
+    '  *)',
+    '    echo "remote: error: refusing to update $ref" >&2',
+    '    echo "remote: agents may only write refs/heads/agent/*" >&2',
+    '    exit 1',
+    '    ;;',
+    'esac',
+    ''
+  )
+  $hookPath = Join-Path $Bare 'hooks/update'
+  # LF only and no BOM: /bin/sh runs this inside a Linux container, where a CR
+  # breaks the shebang and every line after it.
+  [System.IO.File]::WriteAllText($hookPath, ($hookLines -join "`n"), (New-Object System.Text.UTF8Encoding $false))
+  # The exec bit can only be set from inside a container; Windows has no notion of it.
+  & docker run --rm -v "${Bare}:/b" $HookImage chmod 0755 /b/hooks/update 2>&1 | Out-Null
+  Say "  ref policy installed: agents may only write refs/heads/agent/*" 'Green'
   Say "  created, force-push and branch deletion disabled, github remote removed" 'Green'
 }
 else { Say "Shared repo already exists at $Bare" 'DarkGray' }

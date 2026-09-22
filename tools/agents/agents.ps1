@@ -17,8 +17,10 @@ param(
   [Parameter(Position = 0)][string]$Command = 'status',
   [Parameter(Position = 1)][string]$Arg1,
   [Parameter(Position = 2)][string]$Arg2,
-  [switch]$Repo
+  [switch]$Repo,
+  [switch]$Json
 )
+$script:AsJson = [bool]$Json
 
 # Native tools log progress to stderr; 'Stop' would turn that into a crash.
 $ErrorActionPreference = 'Continue'
@@ -88,80 +90,125 @@ function Test-Network { $r = & docker network ls -q -f "name=^stride-agents$" 2>
 function Test-Gateway { $r = & docker ps -q -f "name=^stride-git-gateway$" 2>$null; return [bool]$r }
 
 # ---------------------------------------------------------------- doctor ----
+# Every check records a structured result as well as printing one, so the same
+# health model can be read by a person, by CI, by a bug report or by the panel.
+# A diagnostic that exists only as console text cannot be consumed by anything.
+$script:Checks = @()
+function Rec([string]$id, [string]$status, [string]$text, [string]$fix = '', [string]$detail = '', [string]$severity = 'repairable') {
+  $script:Checks += [pscustomobject]@{
+    id = $id; status = $status
+    # Severity only means something for a failure; reporting a passing check as
+    # 'repairable' is noise for anything consuming this.
+    severity = $(if ($status -eq 'ok') { $null } else { $severity })
+    text = $text; fix = $fix; detail = $detail
+  }
+  if ($script:AsJson) { return }
+  if ($status -eq 'ok') { Ok $text }
+  elseif ($status -eq 'warn') { Warn $text }
+  else { Bad $text }
+  if ($status -ne 'ok' -and $detail) { Note $detail }
+  if ($status -ne 'ok' -and $fix) { Fix $fix }
+}
+
 function Invoke-Doctor {
-  $problems = 0
-  Write-Host ""
-  Write-Host "  AGENT TEAM - health check" -ForegroundColor White
-  Write-Host "  ----------------------------------------------------------" -ForegroundColor DarkGray
+  $script:Checks = @()
+  if (-not $script:AsJson) {
+    Write-Host ""
+    Write-Host "  AGENT TEAM - health check" -ForegroundColor White
+    Write-Host "  ----------------------------------------------------------" -ForegroundColor DarkGray
+    Head "Machine"
+  }
 
-  Head "Machine"
-  if (Test-Docker) { Ok "Docker is running" }
-  else { Bad "Docker is not running"; Fix "start Docker Desktop, then run this again"; $problems++ }
-  if (Test-Node) { Ok "Node.js $(& node --version)" }
-  else { Bad "Node.js is not on PATH"; Fix "install from https://nodejs.org"; $problems++ }
+  # Blocking: nothing downstream can work until these are true.
+  if (Test-Docker) { Rec 'machine.docker' 'ok' 'Docker is running' }
+  else { Rec 'machine.docker' 'error' 'Docker is not running' 'start Docker Desktop, then run this again' '' 'blocking' }
+  if (Test-Node) { Rec 'machine.node' 'ok' "Node.js $(& node --version)" }
+  else { Rec 'machine.node' 'error' 'Node.js is not on PATH' 'install from https://nodejs.org' '' 'blocking' }
 
-  Head "Images"
+  if (-not $script:AsJson) { Head "Images" }
   foreach ($r in $Runtimes) {
-    if (Test-Image $r.Image) { Ok "$($r.Image)" }
-    else { Bad "$($r.Image) is not built"; Fix "agents setup   (builds it from $($r.Dockerfile))"; $problems++ }
+    if (Test-Image $r.Image) { Rec "image.$($r.Name)" 'ok' $r.Image }
+    else { Rec "image.$($r.Name)" 'error' "$($r.Image) is not built" 'agents setup' "built from $($r.Dockerfile)" }
   }
 
-  Head "Hub"
-  if (Test-Path (Join-Path $Here 'hub\node_modules')) { Ok "hub dependencies installed" }
-  else { Bad "hub dependencies missing"; Fix "agents setup"; $problems++ }
-  if (Test-HubUp) { Ok "hub is running at $HubApi" }
-  else { Bad "hub is not running"; Fix "agents setup   (starts it)"; $problems++ }
+  if (-not $script:AsJson) { Head "Hub" }
+  if (Test-Path (Join-Path $Here 'hub\node_modules')) { Rec 'hub.deps' 'ok' 'hub dependencies installed' }
+  else { Rec 'hub.deps' 'error' 'hub dependencies missing' 'agents setup' }
+  if (Test-HubUp) { Rec 'hub.running' 'ok' "hub is running at $HubApi" }
+  else { Rec 'hub.running' 'error' 'hub is not running' 'agents setup' }
 
-  Head "Sign-ins  (one per runtime; members share the runtime's sign-in)"
+  if (-not $script:AsJson) { Head "Sign-ins  (one per runtime; members share the runtime's sign-in)" }
   foreach ($r in $Runtimes) {
-    if (-not (Test-Volume $r.Base)) {
-      Bad "$($r.Name): never signed in"
-      Fix "agents login $($r.Name)"
-      $problems++
-    }
-    elseif (Test-SignedIn $r.Name $r.Base) { Ok "$($r.Name) is signed in" }
-    else { Bad "$($r.Name): signed out or credentials unreadable"; Fix "agents login $($r.Name)"; $problems++ }
+    # Blocking: setup refuses to build dependent resources without credentials,
+    # because a member with a token and no sign-in fails later as a puzzling 401.
+    if (-not (Test-Volume $r.Base)) { Rec "auth.$($r.Name)" 'error' "$($r.Name): never signed in" "agents login $($r.Name)" '' 'blocking' }
+    elseif (Test-SignedIn $r.Name $r.Base) { Rec "auth.$($r.Name)" 'ok' "$($r.Name) is signed in" }
+    else { Rec "auth.$($r.Name)" 'error' "$($r.Name): signed out or credentials unreadable" "agents login $($r.Name)" '' 'blocking' }
   }
 
-  Head "Git gateway"
-  if (Test-Network) { Ok "network stride-agents" }
-  else { Bad "network stride-agents is missing"; Fix "agents setup"; $problems++ }
-  if (Test-Gateway) { Ok "gateway is serving the shared repo" }
-  else {
-    Bad "git gateway is not running"
-    Note "without it agents cannot push, and the old writable mount is what let"
-    Note "one agent delete another's branch without going through the hooks"
-    Fix "agents setup"
-    $problems++
+  if (-not $script:AsJson) { Head "Git gateway" }
+  if (Test-Network) { Rec 'git.network' 'ok' 'network stride-agents' }
+  else { Rec 'git.network' 'error' 'network stride-agents is missing' 'agents setup' }
+  if (Test-Gateway) { Rec 'git.gateway' 'ok' 'gateway is serving the shared repo' }
+  else { Rec 'git.gateway' 'error' 'git gateway is not running' 'agents setup' 'without it agents cannot push, and a writable mount of the bare repo is what let one agent delete another branch' }
+  if (Test-Path (Join-Path $Here 'git\stride.git')) {
+    if (Test-Path (Join-Path $Here 'git\stride.git\hooks\update')) { Rec 'git.refpolicy' 'ok' 'ref policy installed (agents may only write refs/heads/agent/*)' }
+    else { Rec 'git.refpolicy' 'error' 'ref policy hook missing - agents could push to main' 'agents setup' }
   }
 
-  Head "Team  ($($Members.Count) members)"
+  if (-not $script:AsJson) { Head "Team  ($($Members.Count) members)" }
   foreach ($m in $Members) {
     $bits = @()
     if (-not (Test-Volume $m.Vol)) { $bits += 'no home' }
     elseif (-not (Test-McpRegistered $m.Name)) { $bits += 'hub not registered' }
     if (-not (Test-Checkout $m.Name)) { $bits += 'no git checkout' }
-    if ($bits.Count -eq 0) { Ok ("{0,-9} {1,-8} {2}" -f $m.Name, $m.Runtime, $m.Model) }
-    else {
-      Bad ("{0,-9} {1}" -f $m.Name, ($bits -join ', '))
-      Fix "agents setup"
-      $problems++
+    if ($bits.Count -eq 0) { Rec "member.$($m.Name)" 'ok' ("{0,-9} {1,-8} {2}" -f $m.Name, $m.Runtime, $m.Model) }
+    else { Rec "member.$($m.Name)" 'error' ("{0,-9} {1}" -f $m.Name, ($bits -join ', ')) 'agents setup' }
+  }
+
+  # A member with resources but no longer on the roster. Reported, never removed:
+  # deleting someone's home and branch because a line vanished from a config file
+  # is not a repair.
+  $known = @($Members.Name)
+  foreach ($v in (& docker volume ls -q -f 'name=^agent-' 2>$null)) {
+    $who = $v -replace '^agent-', '' -replace '-home$', ''
+    if ($known -notcontains $who -and $Runtimes.Name -notcontains $who) {
+      Rec "orphan.$who" 'warn' "$who has a home volume but is not on the roster" 'remove it by hand if that is intended' 'retained for safety; nothing is deleted automatically'
     }
+  }
+
+  $errors = @($script:Checks | Where-Object { $_.status -eq 'error' })
+  $blocking = @($errors | Where-Object { $_.severity -eq 'blocking' })
+
+  if ($script:AsJson) {
+    # Write-Host, not the pipeline: this function also returns the error count,
+    # and `exit (Invoke-Doctor)` would otherwise receive the JSON as well.
+    Write-Host (([pscustomobject]@{
+          healthy    = ($errors.Count -eq 0)
+          blocking   = $blocking.Count
+          repairable = ($errors.Count - $blocking.Count)
+          checks     = $script:Checks
+        } | ConvertTo-Json -Depth 4))
+    return $errors.Count
   }
 
   Write-Host ""
   Write-Host "  ----------------------------------------------------------" -ForegroundColor DarkGray
-  if ($problems -eq 0) {
+  if ($errors.Count -eq 0) {
     Write-Host "  Everything is ready." -ForegroundColor Green
-    Note "give work:  agents run manager ""plan and assign ..."""
+    Write-Host "         give work:  agents run manager ..." -ForegroundColor DarkGray
     Write-Host "         track it:   agents ui" -ForegroundColor DarkGray
   }
   else {
-    Write-Host "  $problems thing(s) need attention - each is labelled with its fix above." -ForegroundColor Yellow
-    Write-Host "  Most are handled by:  agents setup" -ForegroundColor Cyan
+    if ($blocking.Count -gt 0) {
+      Write-Host "  $($blocking.Count) blocking - nothing else can proceed until these are fixed:" -ForegroundColor Red
+      foreach ($b in $blocking) { Write-Host "      $($b.fix)" -ForegroundColor Cyan }
+    }
+    $rep = $errors.Count - $blocking.Count
+    if ($rep -gt 0) { Write-Host "  $rep repairable - handled by:  agents setup" -ForegroundColor Yellow }
   }
   Write-Host ""
-  return $problems
+  return $errors.Count
 }
 
 # ----------------------------------------------------------------- setup ----
@@ -312,6 +359,9 @@ function Invoke-Status {
 }
 
 # ------------------------------------------------------------------ main ----
+# Accept the flag spelling a person will actually type.
+if ($Arg1 -eq '--json' -or $Arg2 -eq '--json') { $script:AsJson = $true }
+
 switch ($Command.ToLower()) {
   'doctor' { exit (Invoke-Doctor) }
   'setup' { exit (Invoke-Setup) }

@@ -92,23 +92,40 @@ could not tell them apart.
 
 ### What is enforced, and what is not
 
-Being precise about this matters more than sounding secure.
+Each row below was tested by running the attack, not by reading the code.
+"Attack-verified" means the attempt was made and the outcome observed.
 
-| Property | Status |
+**Attack-verified blocked**
+
+| Attack | Stopped by |
 |---|---|
-| Cannot force-push or delete a branch | **Enforced** by receive hooks, now that there is no filesystem path around them |
-| Cannot tamper with the bare repo directly | **Enforced** — agents have no mount of it |
-| Cannot approve their own context | **Enforced** — no such tool exists |
-| Cannot create or assign work unless manager | **Enforced** in the store |
-| Cannot act on a lapsed lease | **Enforced** by lease generations |
-| Cannot push *as another member* | **Not enforced.** `git daemon` has no authentication; any container on the `stride-agents` network can push to any branch. Identity is recorded by commit author, which is a convention, not a control. Closing this needs an authenticated gateway that checks identity and lease generation per push. |
-| Cannot reach the internet or exfiltrate code | **Not enforced.** Containers have unrestricted egress — verified: `github.com`, `example.com` and the model APIs are all reachable. An agent could `git remote add`, `curl`, or use any other client. A local `origin` is not a security boundary. Real enforcement needs default-deny egress with an allowlist for the model endpoints, which is not in place. |
+| Write bare-repo files directly | no mount of it exists in any agent |
+| Force-push / rewrite history | `receive.denyNonFastForwards` |
+| Delete any ref | `receive.denyDeletes` |
+| Push to `main` | `update` hook confining writes to `refs/heads/agent/*` |
+| Create a ref outside `agent/*` | same hook |
+| Create or assign work without being manager | role check in the store |
+| Act on a lapsed lease | lease generations |
+| Approve its own proposed context | no such tool exists |
 
-Two of these were previously claimed as enforced and were not. The writable
-bind mount of the bare repo let one agent delete another's branch with
-`update-ref`, bypassing `receive.denyDeletes` entirely, because those hooks only
-run inside `git-receive-pack`. That is fixed. The egress claim was simply
-wrong.
+**Attack-verified succeeds — not enforced**
+
+| Attack | Why |
+|---|---|
+| `agent1` fast-forwards `agent2`'s branch | It is an ordinary fast-forward, which `denyNonFastForwards` is supposed to allow. `git://` has no authentication, so a hook cannot tell which agent is pushing. Branch *ownership* is a convention recorded in commit authorship, not a control. |
+| Reach the internet, add a remote, exfiltrate | Containers have unrestricted egress — `github.com` and `example.com` are both reachable. A local `origin` is hygiene, not a boundary. Enforcement needs default-deny egress with an allowlist for the model endpoints. |
+
+Both of these are left unenforced deliberately for now. The work-assignment
+system already records which member owns an item, and git is artifact transport;
+cryptographic branch ownership is worth building when there is a concrete need,
+not before. Closing the first needs an authenticated gateway that checks caller
+identity and lease generation per push, which `git daemon` cannot do.
+
+**Corrections.** Two properties were previously documented as enforced and were
+not. A writable bind mount of the bare repo let one agent delete another's
+branch with `update-ref`, because `denyDeletes` only runs inside
+`git-receive-pack`. And "agents cannot reach GitHub" was simply false. Both
+claims were found by attacking them.
 
 `hub/DESIGN.md` has the reasoning; `git/PROTOCOL.md` is what the agents read.
 
@@ -118,7 +135,7 @@ wrong.
 |---|---|
 | `agents.cmd` / `agents.ps1` | **the entry point** — everything below is machinery |
 | `agents.json` | the roster and runtimes |
-| `hub/` | MCP server, store, tracking panel, 91 tests |
+| `hub/` | MCP server, store, tracking panel, 113 tests |
 | `git/` | per-member checkouts and the shared repo |
 | `team-setup.ps1`, `git/git-setup.ps1`, `hub/runner.ps1` | called by `agents setup` and `agents run` |
 
