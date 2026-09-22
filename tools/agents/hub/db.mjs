@@ -132,6 +132,16 @@ export class Store {
     add('agents', 'role', "TEXT NOT NULL DEFAULT 'implementer'");
     // Who a work item is meant for. NULL means anyone may take it.
     add('work_items', 'assignee', 'TEXT');
+    // A lease that only expires does not stop a zombie worker: an agent can
+    // freeze past its expiry, another can take over, and the first can wake and
+    // carry on. Every claim bumps this, and a write carrying an older generation
+    // is refused forever. expected_version protects rows; this protects the
+    // work itself, including side effects outside the database.
+    add('work_items', 'lease_generation', 'INTEGER NOT NULL DEFAULT 0');
+    // How far through the log this agent has actually read. The log proves the
+    // order of mutations; without this it cannot prove what an agent KNEW when
+    // it acted, which is the thing that matters when work turns out to be stale.
+    add('agents', 'observed_sequence', 'INTEGER NOT NULL DEFAULT 0');
   }
 
   // ---- plumbing -----------------------------------------------------------
@@ -157,11 +167,17 @@ export class Store {
   #append(projectId, ev) {
     const seq = this.#head(projectId) + 1;
     this.db.prepare('UPDATE context_heads SET sequence = ? WHERE project_id = ?').run(seq, projectId);
+    // Record how far the actor had read when it did this. #52 happening after
+    // #51 says nothing about whether the actor had seen #51; based_on does.
+    const basedOn = ev.actor && ev.actor !== 'human' && ev.actor !== 'system'
+      ? this.observedSequence(ev.actor) : null;
+    const payload = { ...(ev.payload ?? {}) };
+    if (basedOn !== null) { payload.based_on_sequence = basedOn; payload.stale_by = Math.max(0, (seq - 1) - basedOn); }
     this.db.prepare(
       `INSERT INTO context_events(project_id, sequence, kind, actor, document_id, version, summary, payload, created_at)
        VALUES(?,?,?,?,?,?,?,?,?)`
     ).run(projectId, seq, ev.kind, ev.actor, ev.documentId ?? null, ev.version ?? null,
-          ev.summary, ev.payload ? JSON.stringify(ev.payload) : null, now());
+          ev.summary, Object.keys(payload).length ? JSON.stringify(payload) : null, now());
     return seq;
   }
 
@@ -200,6 +216,18 @@ export class Store {
     this.db.prepare('INSERT INTO agents(token,name,project_id,model,approval_mode,runtime,role,created_at) VALUES(?,?,?,?,?,?,?,?)')
       .run(token, name, projectId, model, approvalMode, runtime ?? null, role ?? 'implementer', now());
     return token;
+  }
+
+  /** Called by every read tool. Advances the actor's cursor so later writes can
+   *  record what it had seen. Never moves backwards: reading an older page of
+   *  the log does not un-know what was already read. */
+  observe(name, sequence) {
+    this.db.prepare('UPDATE agents SET observed_sequence = MAX(observed_sequence, ?) WHERE name = ?')
+      .run(sequence, name);
+  }
+  observedSequence(name) {
+    const r = this.db.prepare('SELECT observed_sequence FROM agents WHERE name = ?').get(name);
+    return r ? r.observed_sequence : 0;
   }
 
   agentByToken(token) {
@@ -458,7 +486,7 @@ export class Store {
     this.#sweepLeases(projectId);
     return {
       head_sequence: this.#head(projectId),
-      items: this.db.prepare('SELECT id,title,body,state,claimed_by,lease_until,outcome,version,assignee FROM work_items WHERE project_id=? ORDER BY created_at').all(projectId),
+      items: this.db.prepare('SELECT id,title,body,state,claimed_by,lease_until,outcome,version,assignee,lease_generation FROM work_items WHERE project_id=? ORDER BY created_at').all(projectId),
     };
   }
 
@@ -484,17 +512,29 @@ export class Store {
         throw e;
       }
       const until = new Date(Date.now() + leaseSeconds * 1000).toISOString();
-      this.db.prepare('UPDATE work_items SET state=?, claimed_by=?, lease_until=?, version=version+1 WHERE project_id=? AND id=?')
-        .run('claimed', actor, until, projectId, itemId);
-      const seq = this.#append(projectId, { kind: 'work_claimed', actor, summary: `${actor} claimed "${item.title}"`, payload: { id: itemId, lease_until: until } });
-      return { id: itemId, claimed_by: actor, lease_until: until, head_sequence: seq };
+      // Every claim, including a takeover after expiry, mints a new generation.
+      // The previous holder's token is now permanently worthless.
+      const gen = item.lease_generation + 1;
+      this.db.prepare('UPDATE work_items SET state=?, claimed_by=?, lease_until=?, lease_generation=?, version=version+1 WHERE project_id=? AND id=?')
+        .run('claimed', actor, until, gen, projectId, itemId);
+      const seq = this.#append(projectId, { kind: 'work_claimed', actor, summary: `${actor} claimed "${item.title}"`, payload: { id: itemId, lease_until: until, lease_generation: gen } });
+      return { id: itemId, claimed_by: actor, lease_until: until, lease_generation: gen, head_sequence: seq };
     });
   }
 
-  releaseWork(projectId, actor, { itemId, outcome, summary, requestId }) {
+  releaseWork(projectId, actor, { itemId, outcome, summary, requestId, leaseGeneration }) {
     return this.#idempotent(projectId, requestId, () => {
       const item = this.db.prepare('SELECT * FROM work_items WHERE project_id=? AND id=?').get(projectId, itemId);
       if (!item) throw new Error('no such work item');
+      // The fence. A worker that stalled past its lease, lost the item to
+      // someone else and then woke up still holds generation N while the item
+      // is on N+1; its result is rejected rather than overwriting the current
+      // holder's. Time alone cannot express this.
+      if (leaseGeneration !== undefined && leaseGeneration !== item.lease_generation) {
+        const e = new Error(`stale lease: you hold generation ${leaseGeneration}, the item is on ${item.lease_generation}`);
+        e.conflict = { lease_generation: item.lease_generation, claimed_by: item.claimed_by };
+        throw e;
+      }
       if (item.claimed_by && item.claimed_by !== actor) throw new Error(`claimed by ${item.claimed_by}, not you`);
       const state = outcome === 'done' ? 'done' : 'open';
       this.db.prepare('UPDATE work_items SET state=?, claimed_by=NULL, lease_until=NULL, outcome=?, version=version+1 WHERE project_id=? AND id=?')

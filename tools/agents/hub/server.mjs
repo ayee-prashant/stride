@@ -52,6 +52,14 @@ function buildServer(agent) {
   const server = new McpServer({ name: 'stride-context', version: '1.0.0' });
   const project = agent.project_id;
 
+  // A read that does not record itself cannot later prove what the agent knew.
+  const observed = (fn) => () => {
+    const value = fn();
+    const seen = value && typeof value === 'object' && 'head_sequence' in value ? value.head_sequence : null;
+    if (seen !== null) store.observe(agent.name, seen);
+    return value;
+  };
+
   const run = (fn) => {
     try {
       const value = fn();
@@ -86,7 +94,7 @@ function buildServer(agent) {
   server.registerTool('context_head',
     { description: 'The approved shared context for this project: requirements, decisions and constraints every agent must work from. Read this before starting work.',
       inputSchema: z.object({}).strict(), annotations: { readOnlyHint: true } },
-    () => run(() => store.contextHead(project)));
+    () => run(observed(() => store.contextHead(project))));
 
   server.registerTool('context_get',
     { description: 'One context document with its full revision history, so you can see how a decision changed and who approved it.',
@@ -113,7 +121,7 @@ function buildServer(agent) {
     { description: 'What every agent and human has done, in order, since a sequence number. This is how you find out what the other agents are doing - they do not message you directly. Poll with since=<the head_sequence you last saw>.',
       inputSchema: z.object({ since: z.number().int().min(0).default(0), limit: z.number().int().min(1).max(200).default(50) }).strict(),
       annotations: { readOnlyHint: true } },
-    (i) => run(() => store.feed(project, { since: i.since ?? 0, limit: i.limit ?? 50 })));
+    (i) => run(observed(() => store.feed(project, { since: i.since ?? 0, limit: i.limit ?? 50 }))));
 
   server.registerTool('note_append',
     { description: 'Publish a finding, warning or decision for the other agents to read. Use this instead of trying to message an agent directly.',
@@ -128,7 +136,7 @@ function buildServer(agent) {
   server.registerTool('work_list',
     { description: 'Work items for this project and who currently holds each one.',
       inputSchema: z.object({}).strict(), annotations: { readOnlyHint: true } },
-    () => run(() => store.listWork(project)));
+    () => run(observed(() => store.listWork(project))));
 
   server.registerTool('work_create',
     { description: 'Create a work item and optionally assign it to a teammate. Only the manager may do this. Break a task into items small enough that one member can finish one, and assign each to whoever is best suited - call agent_identity first to see who is available and what each is for.',
@@ -155,15 +163,21 @@ function buildServer(agent) {
         lease_seconds: z.number().int().min(60).max(86400).default(1800),
       }).strict() },
     (i) => run(() => store.claimWork(project, agent.name, { itemId: i.item_id, leaseSeconds: i.lease_seconds ?? 1800, requestId: i.request_id })));
+  // The returned lease_generation is a fence, not a receipt: hold it and pass it
+  // back to work_release. If your lease lapsed and someone else took the item,
+  // your generation is stale and your result is refused rather than overwriting
+  // theirs. Time alone cannot express that.
 
   server.registerTool('work_release',
-    { description: 'Give up a work item, with the outcome. Use done when finished, or open to hand it back for someone else.',
+    { description: 'Give up a work item, with the outcome. Use done when finished, or open to hand it back. Pass the lease_generation you were given when you claimed it.',
       inputSchema: z.object({
         request_id: z.string().min(8), item_id: z.string(),
         outcome: z.enum(['done', 'open', 'blocked']),
         summary: z.string().max(2000).optional(),
+        lease_generation: z.number().int().min(1).optional()
+          .describe('The lease_generation work_claim gave you. Pass it: if your lease lapsed and another agent took over, this is what stops your result overwriting theirs.'),
       }).strict() },
-    (i) => run(() => store.releaseWork(project, agent.name, { itemId: i.item_id, outcome: i.outcome, summary: i.summary, requestId: i.request_id })));
+    (i) => run(() => store.releaseWork(project, agent.name, { itemId: i.item_id, outcome: i.outcome, summary: i.summary, requestId: i.request_id, leaseGeneration: i.lease_generation })));
 
   return server;
 }

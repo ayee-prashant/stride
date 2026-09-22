@@ -189,7 +189,11 @@ foreach ($a in $Agents) {
   # container - an agent could never push or fetch through it. Point origin at
   # the path the container sees, and keep the host path as a second remote so
   # host-side tooling (-Status) still works.
-  GitIn $c @('remote', 'set-url', 'origin', '/shared') | Out-Null
+  # origin is the gateway, NOT a mounted path. A writable bind mount of the bare
+  # repo let an agent delete another agent's branch with update-ref, bypassing
+  # receive.denyDeletes entirely - those hooks only run inside git-receive-pack.
+  # Verified: the attack succeeded through the mount and is refused through this.
+  GitIn $c @('remote', 'set-url', 'origin', 'git://stride-git-gateway/stride.git') | Out-Null
   GitIn $c @('remote', 'remove', 'host') | Out-Null
   GitIn $c @('remote', 'add', 'host', $Bare) | Out-Null
   GitIn $c @('branch', "--set-upstream-to=origin/$branch", $branch) | Out-Null

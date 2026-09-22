@@ -84,6 +84,8 @@ function Test-McpRegistered([string]$member) {
 }
 
 function Test-Checkout([string]$member) { return (Test-Path (Join-Path $Here "git\clones\$member")) }
+function Test-Network { $r = & docker network ls -q -f "name=^stride-agents$" 2>$null; return [bool]$r }
+function Test-Gateway { $r = & docker ps -q -f "name=^stride-git-gateway$" 2>$null; return [bool]$r }
 
 # ---------------------------------------------------------------- doctor ----
 function Invoke-Doctor {
@@ -119,6 +121,18 @@ function Invoke-Doctor {
     }
     elseif (Test-SignedIn $r.Name $r.Base) { Ok "$($r.Name) is signed in" }
     else { Bad "$($r.Name): signed out or credentials unreadable"; Fix "agents login $($r.Name)"; $problems++ }
+  }
+
+  Head "Git gateway"
+  if (Test-Network) { Ok "network stride-agents" }
+  else { Bad "network stride-agents is missing"; Fix "agents setup"; $problems++ }
+  if (Test-Gateway) { Ok "gateway is serving the shared repo" }
+  else {
+    Bad "git gateway is not running"
+    Note "without it agents cannot push, and the old writable mount is what let"
+    Note "one agent delete another's branch without going through the hooks"
+    Fix "agents setup"
+    $problems++
   }
 
   Head "Team  ($($Members.Count) members)"
@@ -225,14 +239,41 @@ function Invoke-Setup {
   }
   if ($bad -gt 0) { Fix "agents doctor   (says which part)"; return 1 }
 
-  # ---- 5. checkouts ----
-  Head "5. Git checkouts"
+  # ---- 5. git gateway ----
+  Head "5. Git gateway"
+  if (-not (Test-Network)) { & docker network create stride-agents 2>&1 | Out-Null }
+  if (Test-Network) { Ok "network ready" } else { Bad "could not create the network"; return 1 }
+
+  $bare = Join-Path $Here 'git\stride.git'
+  if (Test-Path $bare) {
+    # Recreate rather than reuse: the mount path or repo may have moved, and a
+    # stale gateway serving the wrong directory fails in a confusing way.
+    & docker rm -f stride-git-gateway 2>&1 | Out-Null
+    $inner = 'git config --global --add safe.directory "*"; exec git daemon --base-path=/srv --export-all --enable=receive-pack --reuseaddr'
+    & docker run -d --name stride-git-gateway --network stride-agents -v "${bare}:/srv/stride.git" (($Runtimes | Select-Object -First 1).Image) bash -lc $inner 2>&1 | Out-Null
+    Start-Sleep -Milliseconds 800
+    if (Test-Gateway) { Ok "gateway serving git://stride-git-gateway/stride.git" }
+    else { Bad "gateway did not start"; Fix "docker logs stride-git-gateway"; return 1 }
+  }
+  else { Note "no shared repo yet - the next step creates it" }
+
+  # ---- 6. checkouts ----
+  Head "6. Git checkouts"
   & (Join-Path $Here 'git\git-setup.ps1') | Out-Null
   foreach ($m in $Members) {
     if (Test-Checkout $m.Name) { Ok ("{0,-9} on agent/{0}" -f $m.Name) }
     else { Bad ("{0,-9} has no checkout" -f $m.Name); $bad++ }
   }
   if ($bad -gt 0) { return 1 }
+
+  # git-setup creates the bare repo on a first run, so the gateway had nothing to
+  # serve a moment ago. Bring it up now rather than making the user run setup twice.
+  if (-not (Test-Gateway) -and (Test-Path (Join-Path $Here 'git\stride.git'))) {
+    $inner2 = 'git config --global --add safe.directory "*"; exec git daemon --base-path=/srv --export-all --enable=receive-pack --reuseaddr'
+    & docker run -d --name stride-git-gateway --network stride-agents -v "$(Join-Path $Here 'git\stride.git'):/srv/stride.git" (($Runtimes | Select-Object -First 1).Image) bash -lc $inner2 2>&1 | Out-Null
+    Start-Sleep -Milliseconds 800
+    if (Test-Gateway) { Ok "gateway started" }
+  }
 
   Write-Host ""
   Write-Host "  Setup complete." -ForegroundColor Green

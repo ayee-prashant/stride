@@ -161,12 +161,14 @@ foreach ($n in $names) {
     # is what origin points at inside the container.
     $gitDir = Join-Path (Split-Path -Parent $Here) 'git'
     $clone = Join-Path $gitDir "clones\$n"
-    $bare = Join-Path $gitDir 'stride.git'
     if (-not (Test-Path $clone)) {
       Write-Host "  $n has no checkout - run ..\git\git-setup.ps1 first" -ForegroundColor Yellow
       continue
     }
-    $d += @('-v', "${clone}:/repo", '-v', "${bare}:/shared", '-v', "$(Join-Path $gitDir 'PROTOCOL.md'):/PROTOCOL.md:ro", '-w', '/repo')
+    # No mount of the bare repo. Agents reach it only through the gateway on this
+    # network, so every write goes through git-receive-pack where the
+    # non-fast-forward and deletion hooks actually apply.
+    $d += @('--network', 'stride-agents', '-v', "${clone}:/repo", '-v', "$(Join-Path $gitDir 'PROTOCOL.md'):/PROTOCOL.md:ro", '-w', '/repo')
   }
   else { $d += @('-v', "${run}:/work", '-w', '/work') }
   if ((Get-Runtime $n) -eq 'gemini') { $d += @('--hostname', 'stride-agent-gemini') }

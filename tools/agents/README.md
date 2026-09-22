@@ -77,9 +77,38 @@ could not tell them apart.
   job, and nothing is stuck if one dies holding it.
 - **Humans approve.** Agents propose; proposed context stays pending until a
   person promotes it. There is no approve tool on the agent surface at all.
-- **Git is isolated.** Each member has its own clone and branch, syncing through
-  a local bare repo. Agents cannot reach GitHub, cannot force-push, and cannot
-  delete a branch — the server refuses.
+- **Work is fenced, not just timed.** Every claim mints a `lease_generation`.
+  A worker that stalls past its lease, loses the item to someone else and then
+  wakes up is refused on its old generation rather than overwriting the current
+  holder's result. An expiry alone cannot express that.
+- **The log records what an actor had read**, not only the order things
+  happened. `#52 after #51` says nothing about whether the actor had seen `#51`;
+  every write carries `based_on_sequence` and `stale_by`, so you can say
+  "this was built from state through #48 and was four events stale".
+- **Git writes go through a gateway.** Each member has its own clone and branch.
+  The authoritative bare repo is served by a `git daemon` container and is *not*
+  mounted into any agent, so every write passes through `git-receive-pack` where
+  the non-fast-forward and deletion hooks apply.
+
+### What is enforced, and what is not
+
+Being precise about this matters more than sounding secure.
+
+| Property | Status |
+|---|---|
+| Cannot force-push or delete a branch | **Enforced** by receive hooks, now that there is no filesystem path around them |
+| Cannot tamper with the bare repo directly | **Enforced** — agents have no mount of it |
+| Cannot approve their own context | **Enforced** — no such tool exists |
+| Cannot create or assign work unless manager | **Enforced** in the store |
+| Cannot act on a lapsed lease | **Enforced** by lease generations |
+| Cannot push *as another member* | **Not enforced.** `git daemon` has no authentication; any container on the `stride-agents` network can push to any branch. Identity is recorded by commit author, which is a convention, not a control. Closing this needs an authenticated gateway that checks identity and lease generation per push. |
+| Cannot reach the internet or exfiltrate code | **Not enforced.** Containers have unrestricted egress — verified: `github.com`, `example.com` and the model APIs are all reachable. An agent could `git remote add`, `curl`, or use any other client. A local `origin` is not a security boundary. Real enforcement needs default-deny egress with an allowlist for the model endpoints, which is not in place. |
+
+Two of these were previously claimed as enforced and were not. The writable
+bind mount of the bare repo let one agent delete another's branch with
+`update-ref`, bypassing `receive.denyDeletes` entirely, because those hooks only
+run inside `git-receive-pack`. That is fixed. The egress claim was simply
+wrong.
 
 `hub/DESIGN.md` has the reasoning; `git/PROTOCOL.md` is what the agents read.
 
@@ -89,7 +118,7 @@ could not tell them apart.
 |---|---|
 | `agents.cmd` / `agents.ps1` | **the entry point** — everything below is machinery |
 | `agents.json` | the roster and runtimes |
-| `hub/` | MCP server, store, tracking panel, 79 tests |
+| `hub/` | MCP server, store, tracking panel, 91 tests |
 | `git/` | per-member checkouts and the shared repo |
 | `team-setup.ps1`, `git/git-setup.ps1`, `hub/runner.ps1` | called by `agents setup` and `agents run` |
 
