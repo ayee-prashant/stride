@@ -142,6 +142,13 @@ export class Store {
     // order of mutations; without this it cannot prove what an agent KNEW when
     // it acted, which is the thing that matters when work turns out to be stale.
     add('agents', 'observed_sequence', 'INTEGER NOT NULL DEFAULT 0');
+    // An artifact can exist in git while the coordination write never landed -
+    // the worker pushed and then died. Without these the two systems cannot be
+    // correlated and produced work is silently lost: git does not know which
+    // work item a commit served, and the hub does not know a commit exists.
+    add('work_items', 'commit_sha', 'TEXT');
+    add('work_items', 'last_holder', 'TEXT');
+    add('work_items', 'claimed_at', 'TEXT');
   }
 
   // ---- plumbing -----------------------------------------------------------
@@ -432,7 +439,7 @@ export class Store {
         this.#append(projectId, {
           kind: 'work_lease_expired', actor: 'system',
           summary: `${w.claimed_by}'s lease on "${w.title}" expired; it is available again`,
-          payload: { id: w.id, previous_holder: w.claimed_by, lease_until: w.lease_until },
+          payload: { id: w.id, previous_holder: w.claimed_by, lease_until: w.lease_until, branch: `agent/${w.claimed_by}` },
         });
       }
     });
@@ -482,11 +489,35 @@ export class Store {
     return r;
   }
 
+  /** Work that ended abnormally and may have left an artifact behind.
+   *
+   *  Deliberately does not guess. A worker that pushed a commit and died before
+   *  reporting leaves git and the hub disagreeing, and the honest output is to
+   *  name the disagreement and who to ask - not to attach the commit
+   *  automatically, which would be inventing a completion nobody verified. */
+  recoveryCandidates(projectId) {
+    this.#sweepLeases(projectId);
+    const rows = this.db.prepare(
+      `SELECT id, title, state, last_holder, claimed_at, commit_sha, lease_generation, outcome
+         FROM work_items
+        WHERE project_id = ? AND state IN ('open','claimed') AND last_holder IS NOT NULL
+        ORDER BY claimed_at`
+    ).all(projectId);
+    return {
+      head_sequence: this.#head(projectId),
+      candidates: rows.map((r) => ({
+        ...r,
+        branch: `agent/${r.last_holder}`,
+        reason: r.commit_sha ? 'reclaimed after a recorded commit' : 'held, then abandoned without reporting',
+      })),
+    };
+  }
+
   listWork(projectId) {
     this.#sweepLeases(projectId);
     return {
       head_sequence: this.#head(projectId),
-      items: this.db.prepare('SELECT id,title,body,state,claimed_by,lease_until,outcome,version,assignee,lease_generation FROM work_items WHERE project_id=? ORDER BY created_at').all(projectId),
+      items: this.db.prepare('SELECT id,title,body,state,claimed_by,lease_until,outcome,version,assignee,lease_generation,commit_sha,last_holder FROM work_items WHERE project_id=? ORDER BY created_at').all(projectId),
     };
   }
 
@@ -515,14 +546,14 @@ export class Store {
       // Every claim, including a takeover after expiry, mints a new generation.
       // The previous holder's token is now permanently worthless.
       const gen = item.lease_generation + 1;
-      this.db.prepare('UPDATE work_items SET state=?, claimed_by=?, lease_until=?, lease_generation=?, version=version+1 WHERE project_id=? AND id=?')
-        .run('claimed', actor, until, gen, projectId, itemId);
+      this.db.prepare('UPDATE work_items SET state=?, claimed_by=?, lease_until=?, lease_generation=?, last_holder=?, claimed_at=?, version=version+1 WHERE project_id=? AND id=?')
+        .run('claimed', actor, until, gen, actor, now(), projectId, itemId);
       const seq = this.#append(projectId, { kind: 'work_claimed', actor, summary: `${actor} claimed "${item.title}"`, payload: { id: itemId, lease_until: until, lease_generation: gen } });
       return { id: itemId, claimed_by: actor, lease_until: until, lease_generation: gen, head_sequence: seq };
     });
   }
 
-  releaseWork(projectId, actor, { itemId, outcome, summary, requestId, leaseGeneration }) {
+  releaseWork(projectId, actor, { itemId, outcome, summary, requestId, leaseGeneration, commit }) {
     return this.#idempotent(projectId, requestId, () => {
       const item = this.db.prepare('SELECT * FROM work_items WHERE project_id=? AND id=?').get(projectId, itemId);
       if (!item) throw new Error('no such work item');
@@ -537,10 +568,10 @@ export class Store {
       }
       if (item.claimed_by && item.claimed_by !== actor) throw new Error(`claimed by ${item.claimed_by}, not you`);
       const state = outcome === 'done' ? 'done' : 'open';
-      this.db.prepare('UPDATE work_items SET state=?, claimed_by=NULL, lease_until=NULL, outcome=?, version=version+1 WHERE project_id=? AND id=?')
-        .run(state, summary ?? null, projectId, itemId);
-      const seq = this.#append(projectId, { kind: 'work_released', actor, summary: `${actor} released "${item.title}" (${outcome})`, payload: { id: itemId, outcome, summary } });
-      return { id: itemId, state, head_sequence: seq };
+      this.db.prepare('UPDATE work_items SET state=?, claimed_by=NULL, lease_until=NULL, outcome=?, commit_sha=COALESCE(?,commit_sha), version=version+1 WHERE project_id=? AND id=?')
+        .run(state, summary ?? null, commit ?? null, projectId, itemId);
+      const seq = this.#append(projectId, { kind: 'work_released', actor, summary: `${actor} released "${item.title}" (${outcome})`, payload: { id: itemId, outcome, summary, commit: commit ?? null } });
+      return { id: itemId, state, commit: commit ?? null, head_sequence: seq };
     });
   }
 }

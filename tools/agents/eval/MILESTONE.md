@@ -1,6 +1,6 @@
 # Milestone 1 — does coordination earn its cost?
 
-**Date:** 2026-09-22 · **Status:** feature freeze, evaluated · **Verdict:** yes, but not as a team
+**Date:** 2026-09-22 · **Status:** feature freeze · **M1A:** passed · **M1B:** passed with two real gaps found and closed
 
 The system was built over one session on a feedback loop, which is a good way to
 get capable and a bad way to stay honest. This is the stop-and-measure.
@@ -172,6 +172,52 @@ Multi-agent work becomes an escalation mechanism rather than the default shape.
   Codex does: the resolution pass was 7,150. An attempt to measure the earlier
   task retroactively failed outright — its transcripts were 3 bytes each,
   destroyed by an encoding bug in the runner. Cost must be recorded as it happens.
+
+## M1B — does coordination survive failure without lying?
+
+Four invariants. "Recovers automatically" is deliberately not one of them: a
+system that stops and says *"I have commit X, work Y never completed, worker Z is
+gone"* has passed; one that quietly guesses has not.
+
+| Invariant | Result |
+|---|---|
+| **No silent loss** — produced work stays recoverable | passed, after a fix |
+| **No false success** — unfinished work never promoted | passed |
+| **No duplicate authority** — two workers cannot own one generation | passed |
+| **Explainable recovery** — the human can find out what happened | passed, after a fix |
+
+37 tests that kill things rather than mock them: the hub SIGKILLed mid-transaction
+and immediately after commit, restart reconstruction, lease expiry, zombie
+writers, and retries after a lost reply.
+
+### Two gaps the attacks found
+
+**Split brain — the artifact exists, the coordination write never landed.** An
+agent pushed a real commit and died before `work_release`. Git held
+`3ed922f by agent1-agent`; the hub showed the work `open`, no outcome, and **zero
+events referencing the commit**. Neither system knew about the other, so produced
+work was unrecoverable in practice — nothing told a human it existed.
+
+Now `work_release` accepts the commit it produced, claims record the holder and
+time, and `/api/recovery` reports what ended abnormally:
+
+```
+w_e814fbe6  needs a decision: held, then abandoned without reporting
+            last held by agent1  ·  branch agent/agent1  ·  commit: none recorded
+```
+
+It deliberately does **not** attach the commit. Doing so would invent a
+completion nobody verified.
+
+**A stale hub reports healthy.** A claim came back with no lease generation, and
+every check said "hub is running". It was — a process started before fencing
+existed. My restart had silently failed to bind and the old one kept serving.
+`/api/version` now compares process start time against source mtime, `doctor`
+reports it, and `agents restart` fixes it.
+
+The first version of that check was itself broken: it cached the mtime at
+startup, so it could only ever compare a value against itself. It now reads at
+request time.
 
 ## Reproducing
 

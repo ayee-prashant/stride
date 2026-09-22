@@ -7,7 +7,7 @@
 // not a websocket to the agents.
 
 import http from 'node:http';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { McpServer, createMcpHandler } from '@modelcontextprotocol/server';
@@ -19,6 +19,23 @@ const PORT = Number(process.env.PORT || 7400);
 const PROJECT = process.env.PROJECT || 'default';
 
 const store = new Store(path.join(HERE, 'data', 'hub.db'));
+
+// When this process started, and when its own source was last written. A hub
+// left running across a code change reports healthy while serving the old
+// behaviour - which cost a real debugging cycle here: a claim came back with no
+// lease generation because the process predated fencing, and every check said
+// "hub is running".
+const STARTED_AT = new Date().toISOString();
+// Read at REQUEST time, not at startup. Caching it at boot makes the check
+// structurally incapable of ever firing: the value can only change after the
+// process started, which is exactly the case it exists to catch.
+function sourceMtime() {
+  try {
+    return ['server.mjs', 'db.mjs']
+      .map((f) => statSync(path.join(HERE, f)).mtime.toISOString())
+      .sort().at(-1);
+  } catch { return null; }
+}
 
 // Which agents are actually in play. Read per call rather than cached, so
 // editing agents.json takes effect without restarting the hub. A disabled agent
@@ -174,10 +191,12 @@ function buildServer(agent) {
         request_id: z.string().min(8), item_id: z.string(),
         outcome: z.enum(['done', 'open', 'blocked']),
         summary: z.string().max(2000).optional(),
+        commit: z.string().max(64).optional()
+          .describe('The commit you produced, if any. Record it: if you die before reporting, this is what links the artifact in git to this work item.'),
         lease_generation: z.number().int().min(1).optional()
           .describe('The lease_generation work_claim gave you. Pass it: if your lease lapsed and another agent took over, this is what stops your result overwriting theirs.'),
       }).strict() },
-    (i) => run(() => store.releaseWork(project, agent.name, { itemId: i.item_id, outcome: i.outcome, summary: i.summary, requestId: i.request_id, leaseGeneration: i.lease_generation })));
+    (i) => run(() => store.releaseWork(project, agent.name, { itemId: i.item_id, outcome: i.outcome, summary: i.summary, requestId: i.request_id, leaseGeneration: i.lease_generation, commit: i.commit })));
 
   return server;
 }
@@ -256,6 +275,17 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    if (url.pathname === '/api/version' && req.method === 'GET') {
+      const mtime = sourceMtime();
+      return json(res, 200, {
+        started_at: STARTED_AT,
+        source_mtime: mtime,
+        // True when the code on disk is newer than the process serving it, so
+        // every other check can pass while the behaviour is out of date.
+        stale: !!(mtime && mtime > STARTED_AT),
+      });
+    }
+
     if (url.pathname === '/api/state' && req.method === 'GET') {
       return json(res, 200, {
         project: PROJECT,
@@ -285,6 +315,10 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === '/api/policy' && req.method === 'POST') {
       const { name, model, approval_mode } = await body(req);
       return json(res, 200, store.setPolicy(name, { model, approvalMode: approval_mode }));
+    }
+
+    if (url.pathname === '/api/recovery' && req.method === 'GET') {
+      return json(res, 200, store.recoveryCandidates(PROJECT));
     }
 
     if (url.pathname === '/api/work/close' && req.method === 'POST') {

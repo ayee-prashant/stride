@@ -134,8 +134,37 @@ function Invoke-Doctor {
   if (-not $script:AsJson) { Head "Hub" }
   if (Test-Path (Join-Path $Here 'hub\node_modules')) { Rec 'hub.deps' 'ok' 'hub dependencies installed' }
   else { Rec 'hub.deps' 'error' 'hub dependencies missing' 'agents setup' }
-  if (Test-HubUp) { Rec 'hub.running' 'ok' "hub is running at $HubApi" }
+  if (Test-HubUp) {
+    Rec 'hub.running' 'ok' "hub is running at $HubApi"
+    # "Running" is not the same as "running the current code". A hub left up
+    # across an edit passes every other check while serving the old behaviour -
+    # that cost a debugging cycle when a claim came back with no lease
+    # generation because the process predated fencing.
+    try {
+      $v = Invoke-RestMethod -Uri "$HubApi/api/version" -TimeoutSec 3
+      if ($v.stale) {
+        Rec 'hub.stale' 'error' 'the running hub predates its own source' 'agents restart' "started $($v.started_at), source changed $($v.source_mtime)"
+      }
+      else { Rec 'hub.stale' 'ok' 'hub is running the current code' }
+    }
+    catch { Rec 'hub.stale' 'warn' 'this hub is too old to report its version' 'agents restart' }
+  }
   else { Rec 'hub.running' 'error' 'hub is not running' 'agents setup' }
+
+  # Abnormal endings that a human needs to decide about. Never auto-resolved:
+  # attaching a commit nobody verified would be inventing a completion.
+  if (Test-HubUp) {
+    try {
+      $rec = Invoke-RestMethod -Uri "$HubApi/api/recovery" -TimeoutSec 5
+      if ($rec.candidates.Count -gt 0) {
+        foreach ($c in $rec.candidates) {
+          Rec "recovery.$($c.id)" 'warn' "$($c.id) needs a decision: $($c.reason)" "look at branch $($c.branch), then close or reassign it" "last held by $($c.last_holder); commit recorded: $(if ($c.commit_sha) { $c.commit_sha } else { 'none' })"
+        }
+      }
+      else { Rec 'recovery.none' 'ok' 'no work ended abnormally' }
+    }
+    catch { }
+  }
 
   if (-not $script:AsJson) { Head "Sign-ins  (one per runtime; members share the runtime's sign-in)" }
   foreach ($r in $Runtimes) {
@@ -366,6 +395,14 @@ switch ($Command.ToLower()) {
   'doctor' { exit (Invoke-Doctor) }
   'setup' { exit (Invoke-Setup) }
   'status' { Invoke-Status; exit 0 }
+  'restart' {
+    $o = (Get-NetTCPConnection -LocalPort 7400 -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1).OwningProcess
+    if ($o) { Stop-Process -Id $o -Force; Start-Sleep -Seconds 2; Write-Host "  stopped the old hub" -ForegroundColor DarkGray }
+    Start-Process -FilePath 'node' -ArgumentList (Join-Path $Here 'hub\server.mjs') -WorkingDirectory (Join-Path $Here 'hub') -WindowStyle Hidden
+    for ($i = 0; $i -lt 15; $i++) { if (Test-HubUp) { break }; Start-Sleep -Milliseconds 400 }
+    if (Test-HubUp) { Ok 'hub restarted on the current code' } else { Bad 'hub did not come back'; exit 1 }
+    exit 0
+  }
   'ui' {
     if (-not (Test-HubUp)) { Warn "hub is not running - starting it"; Invoke-Setup | Out-Null }
     Start-Process $HubApi; Write-Host "  opened $HubApi" -ForegroundColor Green; exit 0
@@ -405,6 +442,7 @@ switch ($Command.ToLower()) {
     Write-Host "    status                 the team at a glance" -ForegroundColor Gray
     Write-Host "    login <claude|codex>   sign in a runtime" -ForegroundColor Gray
     Write-Host "    run <member> ""<task>""  give someone work" -ForegroundColor Gray
+    Write-Host "    restart                restart the hub on the current code" -ForegroundColor Gray
     Write-Host "    ui                     open the tracking panel" -ForegroundColor Gray
     Write-Host ""
     exit 0
