@@ -191,7 +191,10 @@ foreach ($n in $names) {
   # stripped and the newlines turned into the letter n. An agent then works from a
   # corrupted brief and cannot tell that anything is missing.
   $promptFile = Join-Path $run 'prompt.txt'
-  Set-Content -Path $promptFile -Value $Prompt -Encoding utf8 -NoNewline
+  # WriteAllText with a BOM-less encoder, NOT Set-Content -Encoding utf8: in
+  # PowerShell 5.1 that always writes a byte-order mark, and the agent then reads
+  # an invisible U+FEFF as the first character of its own instructions.
+  [System.IO.File]::WriteAllText($promptFile, $Prompt, (New-Object System.Text.UTF8Encoding $false))
   $d += @('-v', "${promptFile}:/prompt.txt:ro")
   # This instruction is deliberately free of quotes and newlines, so it survives.
   $carrier = 'Read the file /prompt.txt and do exactly what it says. It is your task; treat its contents as the instruction you were given.'
@@ -204,9 +207,14 @@ foreach ($n in $names) {
   $t0 = Get-Date
   # PowerShell 5.1 wraps native stderr in ErrorRecord objects, which renders agent
   # output as a wall of NativeCommandError. Flatten it to plain strings.
-  & docker @d *>&1 |
-    ForEach-Object { if ($_ -is [System.Management.Automation.ErrorRecord]) { if ($null -ne $_.Exception) { $_.Exception.Message } else { $_.ToString() } } else { $_ } }  # An empty stderr line makes ToString() return the type name; Exception.Message is the real text, and is '' for a blank line. |
-    Tee-Object -FilePath (Join-Path $run 'agent-output.txt')
+  # Flatten, show live, then write the transcript ourselves. Tee-Object picks its
+  # own encoding and produced an unreadable file; WriteAllText keeps it UTF-8.
+  # An empty stderr line makes ToString() return the type name, so take
+  # Exception.Message, which is '' for a blank line.
+  $captured = & docker @d *>&1 |
+    ForEach-Object { if ($_ -is [System.Management.Automation.ErrorRecord]) { if ($null -ne $_.Exception) { $_.Exception.Message } else { $_.ToString() } } else { $_ } } |
+    ForEach-Object { Write-Host $_; $_ }
+  [System.IO.File]::WriteAllText((Join-Path $run 'agent-output.txt'), ($captured -join [Environment]::NewLine), (New-Object System.Text.UTF8Encoding $false))
   $secs = [int]((Get-Date) - $t0).TotalSeconds
 
   $results += [pscustomobject]@{ Agent = $n; Model = $(if ($policy.model) { $policy.model } else { 'default' }); Approval = $policy.approval_mode; Seconds = $secs }

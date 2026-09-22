@@ -1,6 +1,5 @@
 {
   "_comment": "The roster is the single source of truth: who exists, what CLI they run, what model, and what they are allowed to do. A member's identity is its NAME, not its runtime - two members can share a runtime (same CLI, same subscription) while being different agents on different models. Each gets its own cloned home volume so it has its own credentials, its own MCP token and its own git branch; without that the hub could not tell them apart.",
-
   "roster": {
     "manager": {
       "runtime": "claude",
@@ -27,23 +26,37 @@
       "purpose": "Writes test cases and validates other members' work against them. Reports findings; does not approve its own verdict."
     }
   },
-
   "disabled": {
     "gemini": "Sign-in not completed. Its credential store cannot be read in a container other than the one that wrote it, so the hostname is pinned to stride-agent-gemini and login must be redone in a terminal."
   },
-
   "models": {
     "_comment": "Verified against the live CLI, not guessed. An unsupported id fails at run time, so a model is only listed here once it has actually answered a prompt.",
-    "verified": ["gpt-5.6-terra", "gpt-5.6-sol", "claude-opus-5", "claude-sonnet-5"],
+    "verified": [
+      "gpt-5.6-terra",
+      "gpt-5.6-sol",
+      "claude-opus-5",
+      "claude-sonnet-5"
+    ],
     "rejected": {
       "gpt-5.6-astra": "Not supported on this ChatGPT account - the API refuses it.",
       "gpt-5-codex": "Not supported on this ChatGPT account - the API refuses it."
     }
   },
-
   "runtimes": {
-    "_comment": "Which container image and base credential volume each runtime uses. A roster member's home volume is cloned from the base so it carries the same sign-in but its own config.",
-    "claude": { "image": "stride-agent-claude", "baseVolume": "agent-claude-home" },
-    "codex": { "image": "stride-agent-codex-official", "baseVolume": "agent-codex-home" }
+    "_comment": "Everything needed to build and identify a runtime. `package` is the npm CLI the shared Dockerfile installs; codex has none because it is built from the official install script in Dockerfile.codex. setup builds any image that is missing.",
+    "claude": {
+      "image": "stride-agent-claude",
+      "baseVolume": "agent-claude-home",
+      "dockerfile": "Dockerfile",
+      "package": "@anthropic-ai/claude-code",
+      "signIn": "claude-login.ps1 -Start"
+    },
+    "codex": {
+      "image": "stride-agent-codex-official",
+      "baseVolume": "agent-codex-home",
+      "dockerfile": "Dockerfile.codex",
+      "package": null,
+      "signIn": "login.cmd codex, then inside: codex login --device-auth"
+    }
   }
 }

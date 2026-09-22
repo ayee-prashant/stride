@@ -1,118 +1,124 @@
-# CLI agents in containers
+# Agent team
 
-Three coding agents — Claude Code, Codex, Gemini — each in its own container,
-each signed in with **your own subscription**. No API keys.
+Several CLI coding agents, each in its own container, each signed in with **your
+own subscription**, sharing context through an MCP server and coordinating
+through git. No API keys.
 
-## Use this
-
-```
-ui.cmd
-```
-
-Opens a control panel in your browser: who is signed in, one click to sign in,
-one click to run work, and the full output of each agent side by side.
-
-It runs a small local server (Node, no dependencies) because every button
-shells out to docker on this machine — a hosted page could not do that.
-
-### Or from the terminal
+## Setup
 
 ```
-agents.cmd
+agents setup
 ```
 
-Shows who is signed in and gives you a menu.
+That is the whole thing. It builds the container images, installs and starts the
+hub, clones a home volume per member, issues each a token, registers the hub as
+an MCP server inside each one, and creates a git checkout per member.
+
+Every step is skipped if it is already done, so **running it again is always
+safe** — it is also the repair command when something drifts.
+
+It stops and asks only for the one thing it cannot do for you, signing in:
 
 ```
-  CLI AGENTS
-  ---------------------------------------------
-  claude   READY   Claude pro subscription
-  codex    READY   ChatGPT sign-in
-  gemini   SIGN IN not signed in
-  ---------------------------------------------
-
-  What would you like to do?
-   1) Sign in to gemini
-   2) Run the test task on every signed-in agent
-   3) Ask every signed-in agent to do something
-   4) Re-check who is signed in
-   q) Quit
+agents login claude
+agents login codex
 ```
 
-Non-interactive forms, if you prefer:
+Then `agents setup` again.
+
+### When something is wrong
+
+```
+agents doctor
+```
+
+Checks every prerequisite and prints the exact fix beside anything broken —
+Docker not running, an image not built, a runtime signed out, a member missing
+its checkout. It never stops at the first problem, so one run tells you
+everything that needs attention.
+
+## Daily use
 
 | Command | Does |
 |---|---|
-| `agents.cmd check` | who is signed in |
-| `agents.cmd login gemini` | sign one agent in, start to finish |
-| `agents.cmd run` | graded task on every signed-in agent |
-| `agents.cmd ask "write a haiku"` | one prompt to every signed-in agent |
+| `agents status` | the team at a glance, plus anything waiting on you |
+| `agents ui` | the tracking panel — live feed, approvals, who holds what |
+| `agents run <member> "<task>"` | give someone work |
+| `agents doctor` | what is broken and how to fix it |
 
-## Signing in
+## The team
 
-Pick the agent from the menu and follow what it prints. Each agent differs,
-and the menu handles the differences for you:
+`agents.json` is the roster — who exists, which CLI they run, which model, and
+what they are allowed to do. Editing it is how you change the team; nothing else
+needs touching.
 
-- **Claude** — a browser page gives you a code; paste it when asked. You paste
-  into PowerShell, not into the container, because a container terminal on
-  Windows cannot receive a paste.
-- **Codex** — run `codex login --device-auth` in the shell it opens.
-- **Gemini** — choose **Login with Google**, *not* "Gemini API key". The
-  callback completes by itself, so there is nothing to paste.
+| Member | Runtime | Model | Role |
+|---|---|---|---|
+| manager | claude | claude-opus-5 | Plans, splits and assigns. Cannot implement. |
+| agent1 | codex | gpt-5.6-terra | Implements assigned work. |
+| agent2 | codex | gpt-5.6-sol | Implements assigned work. |
+| tester | claude | claude-sonnet-5 | Writes tests and validates. |
 
-Credentials persist in a docker volume per agent (`agent-<name>-home`), so you
-sign in once, not every time.
+Two members can share a runtime while being different agents on different
+models — each gets a **clone** of that runtime's home volume, so it has its own
+credentials, its own hub token and its own git branch. Without that the hub
+could not tell them apart.
 
-## What the test task proves
+## How it works
 
-`workspace/TASK.md` asks for a Roman-numeral converter; `workspace/verify.js`
-checks it with 31 assertions (21 value cases, 10 `RangeError` cases). Every
-agent gets an identical copy in its own folder, so they cannot see each other's
-work, and the result is graded in a clean `node:24-slim` container rather than
-in the agent's own — an agent cannot mark its own homework.
+- **Instructions reach an agent as tools it calls, not as a prompt.** All three
+  CLIs speak MCP over HTTP natively, so shared context arrives as
+  `context_head`, `feed_read`, `work_list` — things the agent can pull when it
+  needs them, not a string fixed before it started.
+- **Agents do not message each other.** Every action appends to one ordered log.
+  Agent B learns what Agent A did by reading it, which gives a total order over
+  who knew what and when, and lets a late joiner see the whole history.
+- **Work is claimed with an expiring lease**, so two agents never duplicate a
+  job, and nothing is stuck if one dies holding it.
+- **Humans approve.** Agents propose; proposed context stays pending until a
+  person promotes it. There is no approve tool on the agent surface at all.
+- **Git is isolated.** Each member has its own clone and branch, syncing through
+  a local bare repo. Agents cannot reach GitHub, cannot force-push, and cannot
+  delete a branch — the server refuses.
 
-Results land in `runs/<agent>/<timestamp>/`, including the agent's full output.
+`hub/DESIGN.md` has the reasoning; `git/PROTOCOL.md` is what the agents read.
 
 ## Files
 
-| File | What it is |
+| | |
 |---|---|
-| `ui.cmd` / `ui.mjs` / `ui.html` | **the control panel** — browser UI, start here |
-| `agents.cmd` / `agents.ps1` | the same thing in a terminal menu |
-| `claude-login.ps1` | Claude's login, which needs special handling (see below) |
-| `login.cmd`, `agent.ps1`, `run-task.sh` | older single-purpose drivers, still work |
-| `Dockerfile`, `Dockerfile.codex` | the images |
-| `workspace/` | the graded task |
+| `agents.cmd` / `agents.ps1` | **the entry point** — everything below is machinery |
+| `agents.json` | the roster and runtimes |
+| `hub/` | MCP server, store, tracking panel, 79 tests |
+| `git/` | per-member checkouts and the shared repo |
+| `team-setup.ps1`, `git/git-setup.ps1`, `hub/runner.ps1` | called by `agents setup` and `agents run` |
+
+`hub/data`, `hub/node_modules`, `git/stride.git`, `git/clones` and `runs/` are
+regenerated and not committed.
 
 ## Things that caused real bugs here
 
 Worth knowing before changing any of this.
 
-- **PowerShell 5.1 splits a native command's argument on embedded double
-  quotes.** `bash -lc "script -qfc \"claude auth login\" ..."` reaches docker
-  as several separate arguments. Pass shell code with single quotes only, or
-  mount it as a file.
-- **Piping a string into `docker exec -i bash` prepends a UTF-8 BOM**, which
-  bash reports as a syntax error on line 1.
-- **Docker needs a Windows path.** Under Git Bash `$PWD` is `/tmp/...`, and
-  docker will silently mount an *empty* directory rather than failing. Use
-  `cygpath -m`.
-- **`--name` does not set the container hostname**, only `--hostname` does.
-  Gemini's credential store cannot be read in a container other than the one
-  that wrote it, so its hostname is pinned to `stride-agent-gemini`. Login and
-  task runs must use the same value.
-- **A login shell left running keeps holding the OAuth callback ports.** The
-  next attempt then fails with "port is already allocated", which names the
-  port but not the container. The login helper has a fixed name and is
-  reclaimed automatically.
-- **A Windows directory name must not end in `.`** — Win32 strips the trailing
-  dot, so the folder you create is not the folder you can list afterwards.
-  `toISOString().slice(0, 15)` lands exactly on one.
-- **Gemini's login cannot be automated.** Driven through a pipe its TUI only
-  redraws its banner, and `--prompt` mode refuses manual auth outright
-  ("Manual authorization is required but the current session is
-  non-interactive"), even with `GOOGLE_GENAI_USE_GCA=true` and a real pty.
-  The UI opens a terminal window for it rather than pretending otherwise.
+- **PowerShell 5.1 mangles a native-command argument containing double quotes or
+  newlines.** A multi-line prompt arrived in the container as one run-together
+  string with quotes stripped and newlines turned into the letter `n`. Prompts
+  now go in as a mounted file; the agent working from a corrupted brief is how
+  this was found.
+- **`Set-Content -Encoding utf8` writes a BOM in 5.1.** The agent read an
+  invisible U+FEFF as the first character of its instructions. Use
+  `[System.IO.File]::WriteAllText` with `UTF8Encoding($false)`.
+- **PowerShell function names are case-insensitive and shadow external
+  commands.** A helper named `Git` made `& git` call itself.
+- **PowerShell 5.1 has no `??`** — it is a parse error, not a runtime one.
+- **A new Docker volume is owned by root**, but the images run as uid 1001, so
+  copying into one needs `--user root` and a `chown` afterwards.
+- **`--name` does not set a container's hostname**, only `--hostname` does.
+- **Windows checks out CRLF by default.** These files are mounted into Linux
+  containers where a CR breaks a shebang and every line after it — hence the
+  `.gitattributes` entries. Getting this wrong once showed 326 files as modified.
 - **Never set `ANTHROPIC_API_KEY`.** It takes precedence over the signed-in
-  account, so a stray key silently bills the API instead of the subscription
-  and makes auth failures look like key failures.
+  account, so a stray key silently bills the API instead of the subscription and
+  makes auth failures look like key failures.
+- **Verify a model id before setting it.** `gpt-5-codex` and `gpt-5.6-astra` are
+  both rejected on a ChatGPT account; an unsupported id fails at run time.
