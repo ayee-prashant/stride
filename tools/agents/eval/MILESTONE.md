@@ -61,14 +61,16 @@ not contain it. **The defect was routing, not reasoning.**
 The team confounds both. So: hold the implementation fixed — Terra's 75/77
 output — and vary only the reviewer.
 
-| Reviewer | Model | `-0s` | repetition | whitespace | offered the reading the grader asserts |
-|---|---|:---:|:---:|:---:|:---:|
-| agent1 | gpt-5.6-terra *(same model that wrote it)* | yes | yes | — | — |
-| tester | claude-sonnet-5 | yes | yes | **yes** | — |
-| manager | claude-opus-5 | yes | yes | — | **yes** |
+| Reviewer | Model | `-0s` | repetition | whitespace | offered the reading the grader asserts | time |
+|---|---|:---:|:---:|:---:|:---:|---:|
+| agent1 | gpt-5.6-terra *(same model that wrote it)* | yes | yes | — | — | 38s |
+| tester | claude-sonnet-5 | yes | yes | **yes** | — | 81s |
+| manager | claude-opus-5 | yes | yes | — | **yes** | 48s |
+| agent2 | gpt-5.6-sol | yes | yes | — | — | **4133s** |
 
-Every reviewer recovered at least two of the three deleted rules. The
-implementation pass had declared the spec unambiguous.
+All four reviewers recovered at least two of the three deleted rules, across
+three different models and both runtimes. The implementation pass had declared
+the spec unambiguous.
 
 **The first row is the one that matters.** A fresh Terra invocation, asked to
 review, surfaced requirements a Terra invocation asked to implement had missed.
@@ -85,6 +87,21 @@ Reviewer-model differences were also visible: Sonnet found all three and verifie
 the runtime behaviour; Opus was the only one whose options included rejecting
 `-0s`, which is what the grader asserts. **Single runs cannot attribute those
 differences reliably to model capability** and they may reverse on a re-run.
+
+**Cost variance between reviewers dwarfed quality variance.** Sol took 4133s —
+69 minutes, 54× Sonnet — for a result no better than Terra's 38s. The run was
+genuine: 178 lines of substantive review, no retries, no rate limiting in the
+transcript. One run cannot separate an inherently slow model from transient
+load, but a reviewer that may take an hour is not usable as a default stage
+whatever it finds. Reviewer choice should be treated as a latency decision as
+much as a quality one.
+
+**A detail worth recording, because it cuts against the framing above.** Two
+reviewers reported that the implementation returns `-0`, not `0`, and checked it
+with `Object.is`. My own probe of the same code printed `0` — string
+concatenation renders `-0` as `"0"`. The agents were more precise about the
+artefact than the harness measuring them was. That is a caution about trusting
+any single instrument here, including mine.
 
 ### Does routing the finding change the outcome?
 
