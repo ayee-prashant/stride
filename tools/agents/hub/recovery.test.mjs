@@ -5,7 +5,8 @@
 //
 //   NO SILENT LOSS       produced work stays recoverable
 //   NO FALSE SUCCESS     unfinished work is never promoted
-//   NO DUPLICATE AUTHORITY  two workers cannot both own a generation
+//   NO DUPLICATE AUTHORITY  two workers cannot both record completion
+//                           (COORDINATION ONLY - see the note below)
 //   EXPLAINABLE RECOVERY the human can find out what happened
 //
 // A system that stops and says "I have commit X, work Y never completed, worker
@@ -89,7 +90,12 @@ console.log('\nNO FALSE SUCCESS: a dead worker cannot leave work looking finishe
     s.feed(P, { since: 0, limit: 200 }).events.some((e) => e.kind === 'work_lease_expired'));
 }
 
-console.log('\nNO DUPLICATE AUTHORITY: the zombie cannot write after being replaced');
+// SCOPE. This covers the HUB write path only. Git is a second, unfenced
+// write path: the daemon has no authentication, so a worker whose lease has
+// been fenced here can still push to any agent branch, including the current
+// holder's. Verified by attack - a fenced agent1 pushed to agent/agent2 and
+// was accepted. The invariant is "cannot record completion", not "cannot write".
+console.log('\nNO DUPLICATE AUTHORITY: coordination records only) the zombie cannot report completion');
 {
   const s = new Store(FILE);
   s.registerAgent({ name: 'agent2', projectId: P, runtime: 'codex', role: 'implementer' });
@@ -97,7 +103,7 @@ console.log('\nNO DUPLICATE AUTHORITY: the zombie cannot write after being repla
   const first = s.claimWork(P, 'agent1', { itemId: w.id, leaseSeconds: -1, requestId: 'd-2' });
   const second = s.claimWork(P, 'agent2', { itemId: w.id, requestId: 'd-3' });
   ok('the replacement holds a later generation', second.lease_generation > first.lease_generation);
-  throws('the zombie is refused',
+  throws('the zombie cannot record completion',
     () => s.releaseWork(P, 'agent1', { itemId: w.id, outcome: 'done', leaseGeneration: first.lease_generation, requestId: 'd-4' }),
     /stale lease/);
   ok('and the item still belongs to the replacement',

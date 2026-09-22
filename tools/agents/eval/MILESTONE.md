@@ -1,6 +1,6 @@
 # Milestone 1 — does coordination earn its cost?
 
-**Date:** 2026-09-22 · **Status:** feature freeze · **M1A:** passed · **M1B:** passed with two real gaps found and closed
+**Date:** 2026-09-22 · **Status:** feature freeze · **M1A:** one promising result, mechanism unattributed · **M1B:** partial
 
 The system was built over one session on a feedback loop, which is a good way to
 get capable and a bad way to stay honest. This is the stop-and-measure.
@@ -127,6 +127,43 @@ implement(82s) + review(38s) + resolve(27s) = 147s, 3 invocations  ->  77/77
 the four-role team                          = 284s, 4 invocations  ->  75/77
 ```
 
+## The correction that matters most
+
+**The only positive result in this project was produced without STRIDE.**
+
+`run-solo.sh`, `run-review.sh` and `run-resolve.sh` — the three scripts that took
+an implementation from 75/77 to 77/77 — contain **zero** references to the hub,
+MCP, the network, or a token. Verified by inspection:
+
+```
+run-solo.sh      hub refs: 0   mcp refs: 0   network: 0   HUB_TOKEN: 0
+run-review.sh    hub refs: 0   mcp refs: 0   network: 0   HUB_TOKEN: 0
+run-resolve.sh   hub refs: 0   mcp refs: 0   network: 0   HUB_TOKEN: 0
+```
+
+Each is `docker run` with a mounted directory and a prompt file. No leases, no
+event log, no roster, no gateway, no MCP.
+
+So the evidence supports a claim about a **workflow**:
+
+> implement → independent review → structured resolution → targeted fix
+> improved one implementation on one task.
+
+It does **not** support any claim about the coordination platform. A shell script
+passing files between three CLI invocations is not a counterfactual to STRIDE
+here — it is what actually produced the result.
+
+Two further caveats on the team comparison that made STRIDE look worse than it
+is, and which cut both ways: the team condition ran in a shared workspace rather
+than the real architecture, and an over-broad transcript grep matched the word
+"fail" and triggered an unnecessary fourth invocation. So 284s/4 is not a clean
+measurement of the product either.
+
+**What STRIDE has left to prove.** If a file-passing script reaches the same code
+quality, the platform must justify its machinery on traceability, recovery, or
+coordination under concurrency — not on output quality, where it currently has
+no advantage to show.
+
 ## Conclusion
 
 The finding is **not "multi-agent is better"**. It is:
@@ -159,9 +196,15 @@ Multi-agent work becomes an escalation mechanism rather than the default shape.
 
 ## Still open
 
+- **Does STRIDE add anything?** The next experiment is the same
+  implement → review → resolve chain with the hub, leases and event log in the
+  loop, compared against the file-passing scripts that already reach 77/77. If
+  code quality is equal, the platform must be justified on traceability,
+  recovery or concurrency instead.
 - **The ablation.** Self-review in one invocation vs a fresh implementation pass
   vs a fresh review pass. Until that is run, "role separation" remains one of
-  several candidate explanations.
+  several candidate explanations alongside fresh context and extra inference.
+- **One task, one run per condition.** Nothing here generalises yet.
 - **One task, single runs.** The role-separation effect is large enough to read
   through that noise; the model gradient is not.
 - **Five of the six dimensions are unmeasured.** Only software quality and cost
@@ -183,8 +226,21 @@ gone"* has passed; one that quietly guesses has not.
 |---|---|
 | **No silent loss** — produced work stays recoverable | passed, after a fix |
 | **No false success** — unfinished work never promoted | passed |
-| **No duplicate authority** — two workers cannot own one generation | passed |
+| **No duplicate authority** | **partial — coordination only** |
 | **Explainable recovery** — the human can find out what happened | passed, after a fix |
+
+**The authority invariant is narrower than first claimed.** Fencing covers the
+hub. Git is a second, unauthenticated write path. Verified by attack:
+
+```
+hub:  agent1 refused -> stale lease: you hold generation 1, the item is on 2
+git:  agent1 PUSHED 1aa79d0 to agent/agent2 - NOT fenced
+```
+
+A worker fenced out of recording completion can still modify the artifact the
+current holder is working on, including on another agent's branch. The honest
+statement is *"cannot record completion"*, not *"cannot write"*. The test and its
+heading have been narrowed to match.
 
 37 tests that kill things rather than mock them: the hub SIGKILLed mid-transaction
 and immediately after commit, restart reconstruction, lease expiry, zombie
